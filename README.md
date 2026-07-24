@@ -41,6 +41,19 @@ of them is `brandu-change-me` (override with `SEED_STAFF_PASSWORD` when seeding)
 Production build: `npm run build`, then `npm start` — the API serves the built client from
 `client/dist` on one port.
 
+## Deployment
+
+- **VentraIP / cPanel shared hosting** (Setup Node.js App): [`docs/DEPLOY-cpanel.md`](docs/DEPLOY-cpanel.md).
+  `npm run build:deploy` produces a self-contained `deploy/` bundle (a single
+  `app.cjs` with the engine inlined, the built client, and the seed data) that
+  installs only one native dependency on the host.
+- **Docker / VPS / managed host** (Render, Railway, Fly.io):
+  [`docs/DEPLOY-docker.md`](docs/DEPLOY-docker.md), using the root `Dockerfile`,
+  `docker-compose.yml`, and `render.yaml`.
+
+Set `SESSION_SECRET` in production and serve over HTTPS. The database
+(`data/brandu.sqlite`) and `uploads/` are the only stateful paths — back them up.
+
 ### Tests
 
 ```bash

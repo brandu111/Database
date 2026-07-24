@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { Company, Mark, MarkContact, Opposition } from '@brandu/shared';
 import { hashPassword } from './auth.js';
-import { newId, openDb, saveCompany, saveMark, saveOpposition, type DB } from './db.js';
+import { newId, saveCompany, saveMark, saveOpposition, type DB } from './db.js';
 
 /**
  * One-off database seed from the design-handoff data bundle:
@@ -14,13 +13,13 @@ import { newId, openDb, saveCompany, saveMark, saveOpposition, type DB } from '.
  *  - the full Reva case export, with Madrid families linked relationally
  *  - contact prefill: known contacts propagated onto company records and cases
  * Safe to re-run: it refuses to touch a database that already has marks.
+ *
+ * The importable `seed(db, {...})` is free of `import.meta` so it bundles into
+ * the single-file deploy artifact; the CLI wrapper lives in `seed-cli.ts`.
  */
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SEED_DIR = path.resolve(__dirname, '../../server/seed');
-
-function readJson<T>(name: string): T | null {
-  const p = path.join(SEED_DIR, name);
+function readJson<T>(dir: string, name: string): T | null {
+  const p = path.join(dir, name);
   if (!fs.existsSync(p)) return null;
   return JSON.parse(fs.readFileSync(p, 'utf8')) as T;
 }
@@ -126,7 +125,8 @@ function contactPrefill(marks: Mark[], oppositions: Opposition[], companies: Com
   });
 }
 
-export function seed(db: DB, opts: { staffPassword?: string } = {}): { marks: number; oppositions: number; companies: number; templates: number } {
+export function seed(db: DB, opts: { staffPassword?: string; seedDir: string }): { marks: number; oppositions: number; companies: number; templates: number } {
+  const seedDir = opts.seedDir;
   const existing = db.prepare(`SELECT COUNT(*) AS n FROM marks`).get() as { n: number };
   if (existing.n > 0) throw new Error(`Database already contains ${existing.n} marks — refusing to re-seed. Delete the database file to start over.`);
 
@@ -151,7 +151,7 @@ export function seed(db: DB, opts: { staffPassword?: string } = {}): { marks: nu
   let templates = 0;
   const insTpl = db.prepare(`INSERT INTO email_templates(id,doc) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET doc=excluded.doc`);
   for (const file of ['au-email-templates.json', 'intl-email-templates.json']) {
-    const j = readJson<{ templates: { id: string }[] }>(file);
+    const j = readJson<{ templates: { id: string }[] }>(seedDir, file);
     if (!j) continue;
     for (const t of j.templates || []) {
       insTpl.run(t.id, JSON.stringify(t));
@@ -159,7 +159,7 @@ export function seed(db: DB, opts: { staffPassword?: string } = {}): { marks: nu
     }
   }
 
-  const oppData = readJson<{ oppositions: Partial<Opposition>[] }>('opposition-data.json');
+  const oppData = readJson<{ oppositions: Partial<Opposition>[] }>(seedDir, 'opposition-data.json');
   const oppositions: Opposition[] = (oppData?.oppositions || []).map((o) => {
     const base: Opposition = {
       id: o.id || newId('o'),
@@ -181,7 +181,7 @@ export function seed(db: DB, opts: { staffPassword?: string } = {}): { marks: nu
     return merged;
   });
 
-  const reva = readJson<Partial<Mark>[]>('reva-data.json') || [];
+  const reva = readJson<Partial<Mark>[]>(seedDir, 'reva-data.json') || [];
   const marks = reva.map((r) => blankMark(r));
   linkMadridFamilies(marks);
 
@@ -215,13 +215,4 @@ export function seed(db: DB, opts: { staffPassword?: string } = {}): { marks: nu
   tx();
 
   return { marks: marks.length, oppositions: oppositions.length, companies: companies.length, templates };
-}
-
-const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (invokedDirectly) {
-  const dbFile = process.env.DB_FILE || path.resolve(__dirname, '../../server/data/brandu.sqlite');
-  const db = openDb(dbFile);
-  const out = seed(db);
-  console.log(`Seeded ${dbFile}:`, out);
-  console.log('Staff users created with the initial password — change it after first sign-in.');
 }

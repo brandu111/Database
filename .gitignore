@@ -1,5 +1,6 @@
 node_modules/
 dist/
+deploy/
 *.tsbuildinfo
 server/data/*.sqlite*
 server/uploads/

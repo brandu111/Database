@@ -1,0 +1,21 @@
+# Local / single-VM deployment of the BrandU trade mark database.
+#   docker compose up -d --build
+# Then open http://localhost:3000 and sign in.
+# Set SESSION_SECRET to a long random string before exposing this publicly.
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: "change-me-to-a-long-random-string"
+      # SEED_ON_START is set in the image; the seed is a no-op once data exists.
+    volumes:
+      - brandu-data:/app/data
+      - brandu-uploads:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  brandu-data:
+  brandu-uploads:
