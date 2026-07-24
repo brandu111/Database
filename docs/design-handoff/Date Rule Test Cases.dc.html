@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#f7f6f3}a{color:#d34b44}a:hover{color:#b23b35}</style>
+</helmet>
+<div style="font-family:'Instrument Sans',sans-serif;background:#f7f6f3;min-height:100vh;color:#16233b;padding:28px 32px 60px">
+  <div style="max-width:1180px;margin:0 auto">
+    <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:280px">
+        <div style="font-size:24px;font-weight:700;letter-spacing:-0.01em">Date Rule Test Cases</div>
+        <div style="font-size:13.5px;color:#59616c;line-height:1.55;margin-top:6px;max-width:760px">A validation harness for the deadline engine. Enter real worked examples — an anchor date and the deadline you <em>know</em> is correct — and the engine's computed result is checked against it. This table is the acceptance spec: the coded backend must reproduce every <strong style="color:#1d7a3f">PASS</strong> here, including the edge cases (month-end rollover, leap years, weekend/holiday roll-forward).</div>
+      </div>
+      <div style="display:flex;gap:18px;flex-shrink:0">
+        <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:12px 18px;text-align:center;min-width:80px"><div style="font-size:26px;font-weight:700;color:#1d7a3f">{{ passCount }}</div><div style="font-size:11px;color:#59616c;text-transform:uppercase;letter-spacing:0.05em">Pass</div></div>
+        <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:12px 18px;text-align:center;min-width:80px"><div style="font-size:26px;font-weight:700;color:{{ failColor }}">{{ failCount }}</div><div style="font-size:11px;color:#59616c;text-transform:uppercase;letter-spacing:0.05em">Fail</div></div>
+      </div>
+    </div>
+
+    <div style="background:#fdf3e4;border:1px solid #f0dfc0;border-radius:10px;padding:12px 16px;margin-top:18px;font-size:12.5px;color:#7a5a1e;line-height:1.55">
+      <strong>Engine note:</strong> the harness uses simple calendar arithmetic (add N months/years, clamped to month end). It does <strong>not</strong> yet roll deadlines off weekends/public holidays — those rows are flagged so the developer knows they're expected-fail in the prototype and must pass in real code.
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin:22px 0 10px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#16233b">Cases</div>
+      <div onClick="{{ addCase }}" style="background:#d34b44;color:#fff;border-radius:7px;padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer">+ Add case</div>
+      <div style="margin-left:auto;font-size:12px;color:#59616c">Offset units: <span style="font-family:'IBM Plex Mono',monospace">d</span> days · <span style="font-family:'IBM Plex Mono',monospace">m</span> months · <span style="font-family:'IBM Plex Mono',monospace">y</span> years</div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:auto">
+      <div style="display:grid;grid-template-columns:1.3fr 1.5fr 1.1fr 0.9fr 1.1fr 1.1fr 0.7fr 36px;gap:8px;min-width:940px;padding:9px 16px;font-size:10.5px;font-weight:600;color:#59616c;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2;background:#faf9f7">
+        <div>Jurisdiction</div><div>Rule / deadline</div><div>Anchor date</div><div>Offset</div><div>Expected</div><div>Computed</div><div>Result</div><div></div>
+      </div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:1.3fr 1.5fr 1.1fr 0.9fr 1.1fr 1.1fr 0.7fr 36px;gap:8px;min-width:940px;padding:8px 16px;border-bottom:1px solid #f1f0ee;align-items:center;background:{{ r.rowBg }}">
+          <input value="{{ r.jur }}" onChange="{{ r.setJur }}" placeholder="Australia" style="border:1px solid #eeede9;border-radius:6px;padding:5px 8px;font-size:12.5px;color:#16233b;font-family:inherit;outline-color:#d34b44;width:100%">
+          <input value="{{ r.rule }}" onChange="{{ r.setRule }}" placeholder="Renewal Deadline" style="border:1px solid #eeede9;border-radius:6px;padding:5px 8px;font-size:12.5px;color:#16233b;font-family:inherit;outline-color:#d34b44;width:100%">
+          <input type="date" value="{{ r.anchor }}" onChange="{{ r.setAnchor }}" style="border:1px solid #eeede9;border-radius:6px;padding:5px 6px;font-size:12px;color:#16233b;font-family:inherit;outline-color:#d34b44;width:100%">
+          <div style="display:flex;gap:3px"><input value="{{ r.n }}" onChange="{{ r.setN }}" style="border:1px solid #eeede9;border-radius:6px;padding:5px 4px;font-size:12.5px;color:#16233b;font-family:inherit;outline-color:#d34b44;width:44px;text-align:center"><select value="{{ r.unit }}" onChange="{{ r.setUnit }}" style="border:1px solid #eeede9;border-radius:6px;padding:5px 2px;font-size:12.5px;color:#16233b;font-family:inherit;background:#fff"><option value="d">d</option><option value="m">m</option><option value="y">y</option></select></div>
+          <input type="date" value="{{ r.expected }}" onChange="{{ r.setExpected }}" style="border:1px solid #eeede9;border-radius:6px;padding:5px 6px;font-size:12px;color:#16233b;font-family:inherit;outline-color:#d34b44;width:100%">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#2b3542">{{ r.computed }}</div>
+          <div><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:{{ r.badgeBg }};color:{{ r.badgeColor }};white-space:nowrap">{{ r.badge }}</span></div>
+          <div onClick="{{ r.del }}" style="color:#c2372e;cursor:pointer;text-align:center">✕</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:22px;background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:16px 18px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Edge cases the coded engine must handle</div>
+      <div style="font-size:13px;color:#2b3542;line-height:1.7">
+        <div>• <strong>Month-end rollover</strong> — 31 Aug + 6 months has no 31 Feb; define the rule (last day of month vs first of next).</div>
+        <div>• <strong>Leap years</strong> — 29 Feb + N years lands on 28 Feb in non-leap years.</div>
+        <div>• <strong>Weekend / public-holiday roll-forward</strong> — a deadline on a non-business day rolls to the next business day, per each jurisdiction's IP-office calendar.</div>
+        <div>• <strong>Priority vs filing anchors</strong> — Convention Priority runs from the earliest priority date, not always the local filing date.</div>
+        <div>• <strong>Renewal anchor per jurisdiction</strong> — AU/NZ renew from filing; US/Madrid/others from registration. Confirm each.</div>
+        <div>• <strong>Rule versioning</strong> — record which rule version produced each date so changes can be recomputed and audited.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { cases: this.seed() };
+  seed(){
+    return [
+      {id:'c1', jur:'Australia', rule:'Renewal Deadline (from filing +10y)', anchor:'2020-08-15', n:10, unit:'y', expected:'2030-08-15', note:''},
+      {id:'c2', jur:'Australia', rule:'Convention Priority (filing +6m)', anchor:'2024-01-31', n:6, unit:'m', expected:'2024-07-31', note:''},
+      {id:'c3', jur:'Australia', rule:'Month-end rollover (31 Aug +6m)', anchor:'2023-08-31', n:6, unit:'m', expected:'2024-02-29', note:'clamps to Feb month-end'},
+      {id:'c4', jur:'USA', rule:'Renewal (from registration +10y)', anchor:'2018-02-13', n:10, unit:'y', expected:'2028-02-13', note:''},
+      {id:'c5', jur:'USA', rule:'S8 Declaration (registration +6y)', anchor:'2019-03-05', n:6, unit:'y', expected:'2025-03-05', note:''},
+      {id:'c6', jur:'Australia', rule:'Leap-year anchor (29 Feb +10y)', anchor:'2016-02-29', n:10, unit:'y', expected:'2026-02-28', note:'non-leap target year'},
+      {id:'c7', jur:'Australia', rule:'Weekend roll-forward (Sat deadline)', anchor:'2021-06-12', n:2, unit:'m', expected:'2021-08-13', note:'12 Aug 2021 was a Thursday — sample: real engine rolls to next business day'}
+    ];
+  }
+  shift(iso,n,unit){
+    if(!iso) return '';
+    const d=new Date(iso+'T00:00:00'); if(isNaN(d)) return '';
+    const day=d.getDate();
+    if(unit==='d'){ d.setDate(d.getDate()+n); }
+    else if(unit==='y'){ d.setFullYear(d.getFullYear()+n); if(d.getDate()!==day) d.setDate(0); }
+    else { d.setDate(1); d.setMonth(d.getMonth()+n); const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); d.setDate(Math.min(day,dim)); }
+    const p=x=>String(x).padStart(2,'0');
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+  fmt(iso){ if(!iso) return '—'; const p=iso.split('-'); if(p.length!==3) return iso; const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return p[2]+' '+M[+p[1]-1]+' '+p[0]; }
+  up(id,k,v){ this.setState(s=>({cases:s.cases.map(c=>c.id===id?Object.assign({},c,{[k]:v}):c)})); }
+  renderVals(){
+    const rows=this.state.cases.map(c=>{
+      const computed=this.shift(c.anchor,parseInt(c.n,10)||0,c.unit);
+      const pass = computed && c.expected && computed===c.expected;
+      const missing = !c.anchor || !c.expected;
+      const badge = missing?'—':(pass?'PASS':'FAIL');
+      return {
+        jur:c.jur, rule:c.rule, anchor:c.anchor, n:c.n, unit:c.unit, expected:c.expected,
+        computed:computed?this.fmt(computed):'—',
+        badge, badgeBg:missing?'#eef0f3':(pass?'#e8f4ec':'#fdeeed'), badgeColor:missing?'#8a8f98':(pass?'#1d7a3f':'#c2372e'),
+        rowBg:missing?'#fff':(pass?'#fff':'#fefafa'),
+        setJur:e=>this.up(c.id,'jur',e.target.value), setRule:e=>this.up(c.id,'rule',e.target.value),
+        setAnchor:e=>this.up(c.id,'anchor',e.target.value), setN:e=>this.up(c.id,'n',e.target.value),
+        setUnit:e=>this.up(c.id,'unit',e.target.value), setExpected:e=>this.up(c.id,'expected',e.target.value),
+        del:()=>this.setState(s=>({cases:s.cases.filter(x=>x.id!==c.id)}))
+      };
+    });
+    const passCount=rows.filter(r=>r.badge==='PASS').length;
+    const failCount=rows.filter(r=>r.badge==='FAIL').length;
+    return { rows, passCount, failCount, failColor:failCount>0?'#c2372e':'#8a8f98',
+      addCase:()=>this.setState(s=>({cases:s.cases.concat([{id:'c'+Date.now(),jur:'',rule:'',anchor:'',n:0,unit:'m',expected:'',note:''}])})) };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,615 @@
+import express, { type Express } from 'express';
+import cookieParser from 'cookie-parser';
+import multer from 'multer';
+import fs from 'node:fs';
+import path from 'node:path';
+import { randomBytes } from 'node:crypto';
+import {
+  applyStage,
+  daysBetween,
+  ensureRuleRows,
+  oppSchedule,
+  shift,
+  todayISO,
+  type AlertRow,
+  type Company,
+  type Mark,
+  type Opposition,
+  type OppositionDate,
+  type StaffLevel,
+} from '@brandu/shared';
+import {
+  deleteCompany,
+  deleteMark,
+  deleteOpposition,
+  getCompany,
+  getFirmSettings,
+  getMark,
+  getOppDatesMaster,
+  getOpposition,
+  listCompanies,
+  listMarks,
+  listOppositions,
+  newId,
+  saveCompany,
+  saveMark,
+  saveOpposition,
+  saveJurisdictionRules,
+  setFirmSettings,
+  setOppDatesMaster,
+  loadRules,
+  type DB,
+} from './db.js';
+import {
+  checkPassword,
+  clearSessionCookie,
+  generatePassword,
+  getSecret,
+  hashPassword,
+  makeSession,
+  readSession,
+  requireClient,
+  requireStaff,
+  setSessionCookie,
+} from './auth.js';
+
+const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
+
+function blankMark(over: Partial<Mark>): Mark {
+  return {
+    id: newId('m'),
+    name: '',
+    jurisdiction: 'Australia',
+    application: '',
+    registration: '',
+    status: 'Pending',
+    owner: '',
+    filingBasis: '',
+    type: 'Word',
+    classes: '',
+    regType: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'Australia',
+    phone: '',
+    matter: '',
+    ourDocket: '',
+    clientDocket: '',
+    goods: '',
+    comments: '',
+    disclaimers: '',
+    dates: [],
+    actions: [],
+    contacts: [],
+    docs: [],
+    image: null,
+    treaty: { basis: '', date: '', desigs: [] },
+    ...over,
+  };
+}
+
+/**
+ * All mark writes flow through here: run the status stage transition when the
+ * status changed, then activate/recompute rule rows — including Madrid
+ * designation renewal propagation across the family — and persist every mark
+ * the engine touched. The deadline engine runs exclusively server-side.
+ */
+function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
+  const rules = loadRules(db);
+  const all = listMarks(db).filter((x) => x.id !== incoming.id);
+  const m = incoming;
+  all.push(m);
+  if (previous && previous.status !== m.status) applyStage(m, rules, m.status);
+  ensureRuleRows(m, rules, all);
+  m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+  const touched = all.filter((x) => x.id === m.id || x.irId === m.id);
+  const tx = db.transaction(() => touched.forEach((x) => saveMark(db, x)));
+  tx();
+  return m;
+}
+
+function computeAlerts(db: DB, alertDays: number, forCompany?: string): AlertRow[] {
+  const nowIso = todayISO();
+  const win = (iso: string) => !!iso && daysBetween(nowIso, iso) <= alertDays;
+  const rows: AlertRow[] = [];
+  for (const m of listMarks(db)) {
+    if (forCompany && m.owner !== forCompany) continue;
+    (m.actions || []).forEach((a) => {
+      if (a.alert && !a.done && a.alertDate)
+        rows.push({ date: a.alertDate, kind: 'Action', refType: 'mark', refId: m.id, mark: m.name || '(untitled)', jur: m.jurisdiction || '', text: a.text || 'Action alert' });
+    });
+    (m.dates || []).forEach((d) => {
+      if (d.done || !d.date) return;
+      if (win(d.date))
+        rows.push({
+          date: d.date,
+          kind: d.reminder ? 'Client reminder' : 'Deadline',
+          refType: 'mark',
+          refId: m.id,
+          mark: m.name || '(untitled)',
+          jur: m.jurisdiction || '',
+          text: (d.name || '').replace(/ — Reminder.*$/, ''),
+        });
+    });
+  }
+  for (const o of listOppositions(db)) {
+    if (forCompany && o.client !== forCompany) continue;
+    (o.dates || []).forEach((d) => {
+      if (d.done || !d.date || d.suspend) return;
+      if (win(d.date))
+        rows.push({ date: d.date, kind: 'Opposition', refType: 'opposition', refId: o.id, mark: o.name || '(opposition)', jur: o.jurisdiction || '', text: d.name || '' });
+    });
+  }
+  rows.sort((a, b) => (a.date < b.date ? -1 : 1));
+  rows.forEach((r) => (r.overdue = daysBetween(r.date, nowIso) > 1));
+  return rows;
+}
+
+export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: string } = {}): Express {
+  const app = express();
+  const secret = getSecret(db);
+  const uploadsDir = opts.uploadsDir || path.resolve('uploads');
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  app.use(express.json({ limit: '25mb' }));
+  app.use(cookieParser());
+
+  const view = requireStaff(db, 'view');
+  const edit = requireStaff(db, 'edit');
+  const full = requireStaff(db, 'full');
+
+  // ---- auth ----------------------------------------------------------------
+
+  app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body || {};
+    const row = db
+      .prepare(`SELECT id, name, level, password_hash FROM staff_users WHERE name=? COLLATE NOCASE`)
+      .get(String(username || '')) as { id: string; name: string; level: StaffLevel; password_hash: string } | undefined;
+    if (!row || !checkPassword(String(password || ''), row.password_hash)) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+    if (row.level === 'No Access') return res.status(403).json({ error: 'Access disabled' });
+    const session = makeSession({ kind: 'staff', id: row.id, name: row.name, level: row.level });
+    setSessionCookie(res, secret, session);
+    res.json({ name: row.name, level: row.level });
+  });
+
+  app.post('/api/auth/client-login', (req, res) => {
+    const { userId, password } = req.body || {};
+    const row = db
+      .prepare(`SELECT company, password_hash, active FROM client_access WHERE user_id=?`)
+      .get(String(userId || '')) as { company: string; password_hash: string; active: number } | undefined;
+    if (!row || !row.active || !checkPassword(String(password || ''), row.password_hash)) {
+      return res.status(401).json({ error: 'Invalid login' });
+    }
+    const session = makeSession({ kind: 'client', company: row.company });
+    setSessionCookie(res, secret, session);
+    res.json({ company: row.company });
+  });
+
+  app.post('/api/auth/logout', (_req, res) => {
+    clearSessionCookie(res);
+    res.json({ ok: true });
+  });
+
+  app.get('/api/auth/me', (req, res) => {
+    const session = readSession(db, req);
+    if (!session) return res.status(401).json({ error: 'Not signed in' });
+    if (session.kind === 'staff') return res.json({ kind: 'staff', name: session.name, level: session.level });
+    res.json({ kind: 'client', company: session.company });
+  });
+
+  // ---- marks ---------------------------------------------------------------
+
+  app.get('/api/marks', view, (_req, res) => res.json(listMarks(db)));
+
+  app.get('/api/marks/:id', view, (req, res) => {
+    const m = getMark(db, req.params.id);
+    if (!m) return res.status(404).json({ error: 'Not found' });
+    res.json(m);
+  });
+
+  app.post('/api/marks', edit, (req, res) => {
+    const m = blankMark(req.body || {});
+    saveMark(db, m);
+    res.status(201).json(m);
+  });
+
+  app.put('/api/marks/:id', edit, (req, res) => {
+    const previous = getMark(db, req.params.id);
+    if (!previous) return res.status(404).json({ error: 'Not found' });
+    const incoming = { ...clone(req.body), id: req.params.id } as Mark;
+    res.json(processMarkWrite(db, incoming, previous));
+  });
+
+  app.delete('/api/marks/:id', edit, (req, res) => {
+    deleteMark(db, req.params.id);
+    res.json({ ok: true });
+  });
+
+  /**
+   * From an AU/NZ basic case, spawn the linked Madrid International
+   * Registration; with {country} also add a designation case under the IR.
+   */
+  app.post('/api/marks/:id/madrid', edit, (req, res) => {
+    const basic = getMark(db, req.params.id);
+    if (!basic) return res.status(404).json({ error: 'Not found' });
+    const country = req.body?.country ? String(req.body.country) : null;
+    const td = todayISO();
+    const fam = basic.madridId || `fam-${basic.id}`;
+    basic.madridId = fam;
+    const all = listMarks(db);
+    let ir = all.find((x) => x.madridId === fam && x.jurisdiction === 'Madrid Protocol (WIPO)');
+    const ownerBits: Partial<Mark> = {
+      owner: basic.owner,
+      ownerType: basic.ownerType,
+      ownerFirst: basic.ownerFirst,
+      ownerMiddle: basic.ownerMiddle,
+      ownerLast: basic.ownerLast,
+      address1: basic.address1,
+      address2: basic.address2,
+      city: basic.city,
+      state: basic.state,
+      zip: basic.zip,
+      country: basic.country,
+      phone: basic.phone,
+    };
+    const created: Mark[] = [];
+    if (!ir) {
+      if (!['Australia', 'New Zealand'].includes(basic.jurisdiction)) {
+        return res.status(400).json({ error: 'A Madrid case can only be filed from an Australian or New Zealand basic application' });
+      }
+      ir = blankMark({
+        id: newId('ir'),
+        name: basic.name,
+        jurisdiction: 'Madrid Protocol (WIPO)',
+        status: 'Pending',
+        filingBasis: 'Madrid Protocol',
+        type: basic.type,
+        wordText: basic.wordText || '',
+        classes: basic.classes,
+        goods: basic.goods,
+        disclaimers: basic.disclaimers,
+        matter: basic.matter,
+        clientDocket: basic.clientDocket,
+        comments: `Based on ${basic.jurisdiction} case ${basic.registration || basic.application || ''}`,
+        madridId: fam,
+        basicId: basic.id,
+        treaty: { basis: 'Madrid Protocol', date: td, desigs: [] },
+        dates: [{ name: 'Application Filed', date: td, done: false, auInput: true }],
+        contacts: clone(basic.contacts || []),
+        image: basic.image || null,
+        ...ownerBits,
+      });
+      created.push(ir);
+    }
+    if (country) {
+      const cp = { classes: true, goods: true, disclaimers: true, contacts: true, ...(basic.madridCopy || {}) };
+      const exists = all.some((x) => x.irId === ir!.id && x.jurisdiction === country);
+      if (!exists) {
+        created.push(
+          blankMark({
+            id: newId('des'),
+            name: basic.name,
+            jurisdiction: country,
+            status: 'Pending',
+            filingBasis: 'Madrid Protocol',
+            type: basic.type,
+            wordText: basic.wordText || '',
+            classes: cp.classes ? basic.classes : '',
+            goods: cp.goods ? basic.goods : '',
+            disclaimers: cp.disclaimers ? basic.disclaimers : '',
+            matter: basic.matter,
+            clientDocket: basic.clientDocket,
+            comments: `Designation under Madrid IR (basic: ${basic.name})`,
+            madridId: fam,
+            irId: ir.id,
+            treaty: { basis: 'Madrid Protocol', date: td, desigs: [] },
+            dates: [{ name: 'Application Filed', date: td, done: false, auInput: true }],
+            contacts: cp.contacts ? clone(basic.contacts || []) : [],
+            ...ownerBits,
+          })
+        );
+      }
+    }
+    const tx = db.transaction(() => {
+      saveMark(db, basic);
+      created.forEach((x) => saveMark(db, x));
+    });
+    tx();
+    // Propagate any existing IR renewal to a newly created designation.
+    created.filter((x) => x.irId).forEach((x) => processMarkWrite(db, x, x));
+    res.json({ ir: getMark(db, ir.id), created: created.map((x) => getMark(db, x.id)) });
+  });
+
+  app.get('/api/marks/:id/correspondence', view, (req, res) => {
+    res.json(db.prepare(`SELECT * FROM correspondence WHERE mark_id=? ORDER BY sent_at DESC`).all(req.params.id));
+  });
+
+  app.post('/api/marks/:id/correspondence', edit, (req, res) => {
+    const { to = '', subject = '', body = '' } = req.body || {};
+    const who = req.session && req.session.kind === 'staff' ? req.session.name : '';
+    db.prepare(`INSERT INTO correspondence(mark_id, sent_at, to_email, subject, body, user_name) VALUES(?,?,?,?,?,?)`).run(
+      req.params.id,
+      new Date().toISOString(),
+      String(to),
+      String(subject),
+      String(body),
+      who
+    );
+    res.status(201).json({ ok: true });
+  });
+
+  // ---- oppositions ---------------------------------------------------------
+
+  app.get('/api/oppositions', view, (_req, res) => res.json(listOppositions(db)));
+
+  app.post('/api/oppositions', edit, (req, res) => {
+    const o: Opposition = {
+      id: newId('o'),
+      name: 'New opposition',
+      client: '',
+      opponent: '',
+      proceeding: '',
+      jurisdiction: 'Australia',
+      status: 'Opposition filed',
+      clientIsPlaintiff: false,
+      notes: '',
+      clientMarks: [],
+      oppMarks: [],
+      dates: [],
+      contacts: [],
+      ...(req.body || {}),
+    };
+    saveOpposition(db, o);
+    res.status(201).json(o);
+  });
+
+  app.put('/api/oppositions/:id', edit, (req, res) => {
+    if (!getOpposition(db, req.params.id)) return res.status(404).json({ error: 'Not found' });
+    const o = { ...clone(req.body), id: req.params.id } as Opposition;
+    saveOpposition(db, o);
+    res.json(o);
+  });
+
+  app.delete('/api/oppositions/:id', edit, (req, res) => {
+    deleteOpposition(db, req.params.id);
+    res.json({ ok: true });
+  });
+
+  /**
+   * "Get Dates From Template": if the jurisdiction has a researched opposition
+   * schedule and an anchor date is supplied, generate the chained timeline
+   * (with the statutory notes/citations attached); otherwise append the
+   * opposition master date list. Existing rows are never duplicated.
+   */
+  app.post('/api/oppositions/:id/dates-from-template', edit, (req, res) => {
+    const o = getOpposition(db, req.params.id);
+    if (!o) return res.status(404).json({ error: 'Not found' });
+    o.dates = o.dates || [];
+    const sched = oppSchedule(o.jurisdiction);
+    const anchorDate = req.body?.anchorDate ? String(req.body.anchorDate) : '';
+    if (sched && anchorDate) {
+      const resolved: Record<string, string> = {};
+      const push = (name: string, date: string, note: string, email = false) => {
+        if (!o.dates.some((x) => x.name === name)) {
+          o.dates.push({ date, name, note, done: false, email, suspend: false } as OppositionDate);
+        }
+        resolved[name] = date;
+      };
+      push(sched.anchor, anchorDate, sched.role);
+      for (const s of sched.steps) {
+        const fromDate = s.from === 'anchor' ? anchorDate : resolved[s.from] || '';
+        const date = fromDate ? shift(fromDate, s.off, s.unit === 'd' ? 'days' : 'months') : '';
+        push(s.name, date, s.note, true);
+      }
+    } else {
+      for (const md of getOppDatesMaster(db)) {
+        if (o.dates.some((x) => (x.name || '') === md.name)) continue;
+        o.dates.push({ date: '', name: md.name, note: '', done: false, email: !!md.email, suspend: false });
+      }
+    }
+    saveOpposition(db, o);
+    res.json(o);
+  });
+
+  // ---- companies (Contacts tab) --------------------------------------------
+
+  app.get('/api/companies', view, (_req, res) => res.json(listCompanies(db)));
+
+  app.post('/api/companies', edit, (req, res) => {
+    const c: Company = {
+      id: newId('c'),
+      type: 'Company',
+      name: '',
+      address: '',
+      address2: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: '',
+      phone: '',
+      email: '',
+      notes: '',
+      contacts: [],
+      ...(req.body || {}),
+    };
+    saveCompany(db, c);
+    res.status(201).json(c);
+  });
+
+  app.put('/api/companies/:id', edit, (req, res) => {
+    if (!getCompany(db, req.params.id)) return res.status(404).json({ error: 'Not found' });
+    const c = { ...clone(req.body), id: req.params.id } as Company;
+    saveCompany(db, c);
+    res.json(c);
+  });
+
+  app.delete('/api/companies/:id', edit, (req, res) => {
+    deleteCompany(db, req.params.id);
+    res.json({ ok: true });
+  });
+
+  // ---- alerts ---------------------------------------------------------------
+
+  app.get('/api/alerts', view, (req, res) => {
+    const days = Math.max(7, Math.min(365, parseInt(String(req.query.days || '30'), 10) || 30));
+    res.json(computeAlerts(db, days));
+  });
+
+  // ---- rules / preferences --------------------------------------------------
+
+  app.get('/api/rules', view, (_req, res) => {
+    const row = db.prepare(`SELECT value FROM meta WHERE key='rulesVersion'`).get() as { value: string } | undefined;
+    res.json({ rulesVersion: row ? parseInt(row.value, 10) : null, rules: loadRules(db) });
+  });
+
+  app.put('/api/rules/:jurisdiction', full, (req, res) => {
+    const list = Array.isArray(req.body?.rules) ? req.body.rules : null;
+    if (!list) return res.status(400).json({ error: 'rules array required' });
+    saveJurisdictionRules(db, req.params.jurisdiction, list);
+    res.json({ ok: true });
+  });
+
+  app.get('/api/opp-dates-master', view, (_req, res) => res.json(getOppDatesMaster(db)));
+  app.put('/api/opp-dates-master', full, (req, res) => {
+    if (!Array.isArray(req.body)) return res.status(400).json({ error: 'array required' });
+    setOppDatesMaster(db, req.body);
+    res.json({ ok: true });
+  });
+
+  // ---- email templates -------------------------------------------------------
+
+  app.get('/api/templates', view, (_req, res) => {
+    res.json((db.prepare(`SELECT doc FROM email_templates`).all() as { doc: string }[]).map((r) => JSON.parse(r.doc)));
+  });
+
+  app.put('/api/templates/:id', full, (req, res) => {
+    const t = { ...req.body, id: req.params.id };
+    db.prepare(`INSERT INTO email_templates(id,doc) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET doc=excluded.doc`).run(t.id, JSON.stringify(t));
+    res.json(t);
+  });
+
+  // ---- settings & users ------------------------------------------------------
+
+  app.get('/api/settings', view, (_req, res) => res.json(getFirmSettings(db)));
+  app.put('/api/settings', full, (req, res) => {
+    setFirmSettings(db, req.body || {});
+    res.json(getFirmSettings(db));
+  });
+
+  app.get('/api/users', full, (_req, res) => {
+    res.json(db.prepare(`SELECT id, name, level FROM staff_users ORDER BY name`).all());
+  });
+
+  app.post('/api/users', full, (req, res) => {
+    const { name, level = 'Edit Only', password } = req.body || {};
+    if (!name || !password) return res.status(400).json({ error: 'name and password required' });
+    const id = newId('u');
+    try {
+      db.prepare(`INSERT INTO staff_users(id,name,level,password_hash) VALUES(?,?,?,?)`).run(id, String(name), String(level), hashPassword(String(password)));
+    } catch {
+      return res.status(409).json({ error: 'User name already exists' });
+    }
+    res.status(201).json({ id, name, level });
+  });
+
+  app.put('/api/users/:id', full, (req, res) => {
+    const { name, level, password } = req.body || {};
+    const row = db.prepare(`SELECT id FROM staff_users WHERE id=?`).get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    if (name) db.prepare(`UPDATE staff_users SET name=? WHERE id=?`).run(String(name), req.params.id);
+    if (level) db.prepare(`UPDATE staff_users SET level=? WHERE id=?`).run(String(level), req.params.id);
+    if (password) db.prepare(`UPDATE staff_users SET password_hash=? WHERE id=?`).run(hashPassword(String(password)), req.params.id);
+    res.json(db.prepare(`SELECT id, name, level FROM staff_users WHERE id=?`).get(req.params.id));
+  });
+
+  app.delete('/api/users/:id', full, (req, res) => {
+    db.prepare(`DELETE FROM staff_users WHERE id=?`).run(req.params.id);
+    res.json({ ok: true });
+  });
+
+  // ---- client extranet access -----------------------------------------------
+
+  app.get('/api/client-access', full, (_req, res) => {
+    res.json(db.prepare(`SELECT id, company, user_id AS userId, active, created_at AS createdAt FROM client_access ORDER BY created_at DESC`).all());
+  });
+
+  /** Invite a company: unique login id + generated password (returned once, stored hashed). */
+  app.post('/api/client-access', full, (req, res) => {
+    const company = String(req.body?.company || '').trim();
+    if (!company) return res.status(400).json({ error: 'company required' });
+    const uid = company.replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toLowerCase() + Math.floor(10 + Math.random() * 89);
+    const password = generatePassword();
+    const id = newId('ca');
+    db.prepare(`INSERT INTO client_access(id, company, user_id, password_hash, active, created_at) VALUES(?,?,?,?,1,?)`).run(
+      id,
+      company,
+      uid,
+      hashPassword(password),
+      new Date().toISOString()
+    );
+    res.status(201).json({ id, company, userId: uid, password, active: 1 });
+  });
+
+  app.post('/api/client-access/:id/regenerate', full, (req, res) => {
+    const row = db.prepare(`SELECT id FROM client_access WHERE id=?`).get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    const password = generatePassword();
+    db.prepare(`UPDATE client_access SET password_hash=? WHERE id=?`).run(hashPassword(password), req.params.id);
+    res.json({ password });
+  });
+
+  app.put('/api/client-access/:id', full, (req, res) => {
+    db.prepare(`UPDATE client_access SET active=? WHERE id=?`).run(req.body?.active ? 1 : 0, req.params.id);
+    res.json({ ok: true });
+  });
+
+  app.delete('/api/client-access/:id', full, (req, res) => {
+    db.prepare(`DELETE FROM client_access WHERE id=?`).run(req.params.id);
+    res.json({ ok: true });
+  });
+
+  // ---- client extranet (read-only, scoped to the signed-in company) ---------
+
+  app.get('/api/portal/marks', requireClient(db), (req, res) => {
+    const company = (req.session as { company: string }).company;
+    res.json(listMarks(db).filter((m) => m.owner === company));
+  });
+
+  app.get('/api/portal/oppositions', requireClient(db), (req, res) => {
+    const company = (req.session as { company: string }).company;
+    res.json(listOppositions(db).filter((o) => o.client === company));
+  });
+
+  // ---- file uploads (documents, mark images) --------------------------------
+
+  const upload = multer({
+    storage: multer.diskStorage({
+      destination: uploadsDir,
+      filename: (_req, file, cb) => cb(null, `${randomBytes(8).toString('hex')}${path.extname(file.originalname).slice(0, 12)}`),
+    }),
+    limits: { fileSize: 25 * 1024 * 1024 },
+  });
+
+  app.post('/api/files', edit, upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'file required' });
+    res.status(201).json({ url: `/files/${req.file.filename}`, fileName: req.file.originalname });
+  });
+
+  app.use('/files', (req, res, next) => {
+    const session = readSession(db, req);
+    if (!session) return res.status(401).json({ error: 'Not signed in' });
+    next();
+  });
+  app.use('/files', express.static(uploadsDir));
+
+  // ---- static client (production build) -------------------------------------
+
+  if (opts.clientDist && fs.existsSync(opts.clientDist)) {
+    app.use(express.static(opts.clientDist));
+    app.get(/^\/(?!api\/|files\/).*/, (_req, res) => res.sendFile(path.join(opts.clientDist!, 'index.html')));
+  }
+
+  return app;
+}

@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif}a{color:#2a78d6}a:hover{color:#1a5cab}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}.dv-note{max-width:760px;font:400 12px/1.55 system-ui,sans-serif;color:rgba(0,0,0,.6);margin:0 0 24px}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}</style></helmet>
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">Modernised screens — Trademarks List &amp; Owner &amp; Dates</span></div>
+<p class="dv-note">Same fields, same layout logic as your Revaware screens, restyled to match <a href="#2a">2a</a>. Filters move into pills + dropdowns, the bottom "Select View" radios become pills, and the matter detail groups the form into cards with the date schedule alongside. Approve these and I'll do Oppositions, Companies, Reports, More Information and Treaty Filings, then build the whole thing working.</p>
+<div class="dv-opts"><div class="dv-opt" id="3a"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>Trademarks List — modernised</div>
+<div class="dv-card" style="width:1240px;font-family:'Instrument Sans',sans-serif;background:#fbfbfa">
+  <div style="display:flex;align-items:center;gap:26px;padding:14px 28px;border-bottom:1px solid #e7e6e2;background:#fff">
+    <div style="font-weight:700;font-size:16px;letter-spacing:-0.02em;color:#16233b;white-space:nowrap">Brandu<span style="color:#4f63e7">IP</span></div>
+    <div style="display:flex;gap:22px;font-size:13.5px;color:#5b6472;white-space:nowrap"><span style="color:#16233b;font-weight:600;border-bottom:2px solid #4f63e7;padding-bottom:12px;margin-bottom:-15px">Trademarks</span><span>Oppositions</span><span>Companies</span><span>Reports</span><span>Preferences</span></div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+      <div style="display:flex;align-items:center;gap:8px;background:#f1f0ee;border-radius:8px;padding:7px 12px;width:220px;color:#8a8f98;font-size:13px;white-space:nowrap">⌕ Search marks, numbers, owners…</div>
+      <div style="width:30px;height:30px;border-radius:50%;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">SL</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:24px;padding:0 28px;border-bottom:1px solid #e7e6e2;background:#fff;font-size:13px;color:#5b6472"><span style="padding:11px 0;color:#16233b;font-weight:600;border-bottom:2px solid #4f63e7;white-space:nowrap">Trademarks List</span><span style="padding:11px 0;white-space:nowrap">Owner & Dates</span><span style="padding:11px 0;white-space:nowrap">More Information</span><span style="padding:11px 0;white-space:nowrap">Treaty Filings</span><span style="padding:11px 0;white-space:nowrap">Status Check</span></div>
+  <div style="display:flex;align-items:center;gap:10px;padding:16px 28px 12px">
+    <div style="font-size:13px;font-weight:600;color:#16233b;background:#eceefc;border:1px solid #d6daf7;border-radius:20px;padding:5px 14px;white-space:nowrap">All marks</div>
+    <div style="font-size:13px;color:#5b6472;border:1px solid #e7e6e2;border-radius:20px;padding:5px 14px;background:#fff;white-space:nowrap">Alerts</div>
+    <div style="font-size:13px;color:#5b6472;border:1px solid #e7e6e2;border-radius:20px;padding:5px 14px;background:#fff;white-space:nowrap">Email alerts</div>
+    <div style="font-size:13px;color:#5b6472;white-space:nowrap;margin-left:8px">Jurisdiction ▾ &nbsp; Status ▾ &nbsp; Company ▾ &nbsp; Filing basis ▾ &nbsp; Columns ▾</div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <div style="border:1px solid #d5d4cf;border-radius:7px;padding:6px 13px;font-size:12.5px;color:#3d444c;background:#fff;white-space:nowrap">Print list</div>
+      <div style="border:1px solid #d5d4cf;border-radius:7px;padding:6px 13px;font-size:12.5px;color:#3d444c;background:#fff;white-space:nowrap">Create opposition</div>
+      <div style="background:#4f63e7;color:#fff;border-radius:7px;padding:6px 13px;font-size:12.5px;font-weight:600;white-space:nowrap">+ New trademark</div>
+    </div>
+  </div>
+  <div style="margin:0 28px 14px;background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:9px 18px;font-size:10.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2">
+      <div>Jurisdiction ↑</div><div>Trademark</div><div>Application</div><div>Registration</div><div>Status</div><div>Company</div><div>Filing basis</div><div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">Pay the gap and go</div>
+    <div style="color:#4f63e7">2654270</div>
+    <div style="color:#c8c7c2">—</div>
+    <div><span style="background:#eef0f3;color:#5b6472;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Pending</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">PetSure (Australia) Pty Ltd</div>
+    <div style="color:#5b6472">N/A</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">FLUFFY.CO Logo</div>
+    <div style="color:#4f63e7">2293891</div>
+    <div style="color:#c8c7c2">—</div>
+    <div><span style="background:#f4f1ea;color:#8a8f98;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Lapsed</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mei Wang and Hong Cheng AU…</div>
+    <div style="color:#5b6472">N/A</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">PBCC Asset Services</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#333a45">2034803</div>
+    <div><span style="background:#e8f4ec;color:#1d7a3f;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Registered</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Plymouth Brethren Christian Chu…</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee;background:#eef0fc">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">ScoliBrace</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#333a45">1609276</div>
+    <div><span style="background:#e8f4ec;color:#1d7a3f;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Registered</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">ScoliCare IP Pty Ltd</div>
+    <div style="color:#5b6472">N/A</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">THE TRADEMARK FACTORY</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#333a45">1684705</div>
+    <div><span style="background:#e8f4ec;color:#1d7a3f;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Registered</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Natalie Murray-Jones</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">LUNA Logo</div>
+    <div style="color:#4f63e7">2667437</div>
+    <div style="color:#c8c7c2">—</div>
+    <div><span style="background:#eef0f3;color:#5b6472;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Pending</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">PetSure (Australia) Pty Ltd</div>
+    <div style="color:#5b6472">Divisional</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">RIBS & BURGERS logo</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#333a45">1440276</div>
+    <div><span style="background:#e8f4ec;color:#1d7a3f;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Registered</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Blue Coral Concepts Pty Ltd</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">BEANS OF A MADMAN</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#333a45">1607290</div>
+    <div><span style="background:#f4f1ea;color:#8a8f98;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">File Transferred</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Primo Products Pty Ltd</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">BUTCHER & THE FARMER</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#333a45">1670674</div>
+    <div><span style="background:#fdf3e4;color:#a06414;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Allow to lapse</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Blue Coral Concepts Pty Ltd</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">3ABN</div>
+    <div style="color:#4f63e7">IR No.1277268</div>
+    <div style="color:#333a45">1740290</div>
+    <div><span style="background:#f4f1ea;color:#8a8f98;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">File Transferred</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Three Angels Broadcasting Net…</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">ReiDDose</div>
+    <div style="color:#4f63e7">2674232</div>
+    <div style="color:#c8c7c2">—</div>
+    <div><span style="background:#eef0f3;color:#5b6472;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Pending</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Blake Sheldrick</div>
+    <div style="color:#5b6472">TTM</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">DOCLIO</div>
+    <div style="color:#4f63e7">2651328</div>
+    <div style="color:#c8c7c2">—</div>
+    <div><span style="background:#eceefc;color:#4f63e7;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Accepted</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">LittleBird Australia Pty Ltd</div>
+    <div style="color:#5b6472">TTM</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">RAFFI 100% NATURAL DOG COOKIES</div>
+    <div style="color:#4f63e7">2629351</div>
+    <div style="color:#c8c7c2">—</div>
+    <div><span style="background:#fdf3e4;color:#a06414;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Watching</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Marc Nieuwenhuys</div>
+    <div style="color:#5b6472">N/A</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div><div style="display:grid;grid-template-columns:110px 2fr 1fr 1fr 1.15fr 1.8fr 0.9fr 36px;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee">
+    <div style="color:#5b6472">Australia</div>
+    <div style="font-weight:600;color:#16233b">HOME CRAFTOLOGY Logo</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#333a45">2052975</div>
+    <div><span style="background:#e8f4ec;color:#1d7a3f;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Registered</span></div>
+    <div style="color:#5b6472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Christopher Evers</div>
+    <div style="color:#c8c7c2">—</div>
+    <div style="color:#c2372e;text-align:center">✕</div>
+  </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;padding:0 28px 20px;font-size:12.5px;color:#5b6472">
+    <span>Record 1,566 of 4,570</span>
+    <div style="display:flex;gap:4px"><span style="border:1px solid #e7e6e2;border-radius:6px;padding:3px 9px;background:#fff">⇤</span><span style="border:1px solid #e7e6e2;border-radius:6px;padding:3px 9px;background:#fff">←</span><span style="border:1px solid #e7e6e2;border-radius:6px;padding:3px 9px;background:#fff">→</span><span style="border:1px solid #e7e6e2;border-radius:6px;padding:3px 9px;background:#fff">⇥</span></div>
+    <span style="margin-left:auto">Filters applied: none · <span style="color:#4f63e7">Clear filters</span></span>
+  </div>
+</div></div><div class="dv-opt" id="3b"><div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>Owner &amp; Dates — matter detail, modernised</div>
+<div class="dv-card" style="width:1240px;font-family:'Instrument Sans',sans-serif;background:#fbfbfa">
+  <div style="display:flex;align-items:center;gap:26px;padding:14px 28px;border-bottom:1px solid #e7e6e2;background:#fff">
+    <div style="font-weight:700;font-size:16px;letter-spacing:-0.02em;color:#16233b;white-space:nowrap">Brandu<span style="color:#4f63e7">IP</span></div>
+    <div style="display:flex;gap:22px;font-size:13.5px;color:#5b6472;white-space:nowrap"><span style="color:#16233b;font-weight:600;border-bottom:2px solid #4f63e7;padding-bottom:12px;margin-bottom:-15px">Trademarks</span><span>Oppositions</span><span>Companies</span><span>Reports</span><span>Preferences</span></div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+      <div style="display:flex;align-items:center;gap:8px;background:#f1f0ee;border-radius:8px;padding:7px 12px;width:220px;color:#8a8f98;font-size:13px;white-space:nowrap">⌕ Search marks, numbers, owners…</div>
+      <div style="width:30px;height:30px;border-radius:50%;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">SL</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:24px;padding:0 28px;border-bottom:1px solid #e7e6e2;background:#fff;font-size:13px;color:#5b6472"><span style="padding:11px 0;white-space:nowrap">Trademarks List</span><span style="padding:11px 0;color:#16233b;font-weight:600;border-bottom:2px solid #4f63e7;white-space:nowrap">Owner & Dates</span><span style="padding:11px 0;white-space:nowrap">More Information</span><span style="padding:11px 0;white-space:nowrap">Treaty Filings</span><span style="padding:11px 0;white-space:nowrap">Status Check</span></div>
+  <div style="display:flex;align-items:center;gap:14px;padding:18px 28px 4px">
+    <div style="font-size:22px;font-weight:700;color:#16233b;letter-spacing:-0.01em">ScoliBrace</div>
+    <span style="background:#e8f4ec;color:#1d7a3f;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">Registered</span>
+    <span style="font-size:12px;color:#4f63e7;background:#eceefc;border-radius:12px;padding:3px 10px;font-weight:600;white-space:nowrap">Part of a treaty filing</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px;color:#5b6472;white-space:nowrap">
+      <span style="border:1px solid #d5d4cf;border-radius:7px;padding:6px 13px;background:#fff">🖶 Print</span>
+      <span style="border:1px solid #e7e6e2;border-radius:6px;padding:5px 10px;background:#fff">← Previous</span>
+      <span>1,566 of 4,570</span>
+      <span style="border:1px solid #e7e6e2;border-radius:6px;padding:5px 10px;background:#fff">Next →</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:20px;padding:14px 28px 24px;align-items:flex-start">
+    <div style="flex:1.7;display:flex;flex-direction:column;gap:16px">
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:16px 18px">
+        <div style="font-size:12px;font-weight:700;color:#16233b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Mark &amp; registration</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 14px">
+          <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Trademark name</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ScoliBrace</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Type</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Stylised</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Jurisdiction</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Australia</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Application</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#c8c7c2;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Registration</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">1609276</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Classes</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Class 10</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Filing basis</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">N/A</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Status</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Registered</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Reg. type</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#c8c7c2;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div></div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:16px 18px">
+        <div style="font-size:12px;font-weight:700;color:#16233b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Owner &amp; matter</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 14px">
+          <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Company / owner</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ScoliCare IP Pty Ltd</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">City</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Kogarah</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">State</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">NSW</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Zip / postal</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">1485</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Country</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Australia</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Main phone</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#c8c7c2;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">File / matter</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#16233b;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">2469</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Our docket</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#c8c7c2;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div></div><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:11px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em">Client docket</div><div style="border:1px solid #e2e1dc;border-radius:7px;padding:7px 11px;font-size:13px;color:#c8c7c2;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div></div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #e7e6e2">
+          <div style="font-size:12px;font-weight:700;color:#16233b;text-transform:uppercase;letter-spacing:0.06em">Trademark actions</div>
+          <div style="font-size:12.5px;color:#4f63e7;font-weight:600;white-space:nowrap">+ Add action</div>
+        </div>
+        <div style="display:flex;gap:12px;padding:9px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px;align-items:baseline">
+    <div style="color:#8a8f98;white-space:nowrap;width:88px;flex-shrink:0">07 Jun 2021</div>
+    <div style="flex:1;color:#333a45;line-height:1.45">Full assignment from ScoliCare Clinics Pty Ltd to ScoliCare IP Pty Ltd</div>
+    <div style="color:#1d7a3f;flex-shrink:0">✓ done</div>
+  </div><div style="display:flex;gap:12px;padding:9px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px;align-items:baseline">
+    <div style="color:#8a8f98;white-space:nowrap;width:88px;flex-shrink:0">03 Jan 2024</div>
+    <div style="flex:1;color:#333a45;line-height:1.45">Does he want to renew $600+GST and $400 govt. Email sent 5/10</div>
+    <div style="color:#1d7a3f;flex-shrink:0">✓ done</div>
+  </div><div style="display:flex;gap:12px;padding:9px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px;align-items:baseline">
+    <div style="color:#8a8f98;white-space:nowrap;width:88px;flex-shrink:0">13 Feb 2024</div>
+    <div style="flex:1;color:#333a45;line-height:1.45">Waiting on payment of inv 536 to renew registration</div>
+    <div style="color:#1d7a3f;flex-shrink:0">✓ done</div>
+  </div>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #e7e6e2">
+          <div style="font-size:12px;font-weight:700;color:#16233b;text-transform:uppercase;letter-spacing:0.06em">Contacts</div>
+          <div style="font-size:12.5px;color:#4f63e7;font-weight:600;white-space:nowrap">+ Add contact</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.2fr 1.2fr 0.9fr 1fr 1.4fr;padding:8px 16px;font-size:10.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #f1f0ee">
+          <div>Contact</div><div>Company</div><div>Position</div><div>Phone</div><div>Email</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.2fr 1.2fr 0.9fr 1fr 1.4fr;padding:9px 16px;font-size:12.5px;color:#333a45;border-bottom:1px solid #f1f0ee">
+          <div style="font-weight:500;color:#16233b">Administrator, TM</div><div style="color:#4f63e7">BrandU Legal</div><div>Administrator</div><div>+61 2 9499 9229</div><div style="color:#4f63e7">IP@brandulegal.com.au</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.2fr 1.2fr 0.9fr 1fr 1.4fr;padding:9px 16px;font-size:12.5px;color:#333a45">
+          <div style="font-weight:500;color:#16233b">Lyme, Andrew</div><div style="color:#4f63e7">ScoliCare IP Pty Ltd</div><div>Client</div><div style="color:#c8c7c2">—</div><div style="color:#4f63e7">andrew.lyme@scolicare.com</div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:16px">
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #e7e6e2">
+          <div style="font-size:12px;font-weight:700;color:#16233b;text-transform:uppercase;letter-spacing:0.06em">Dates</div>
+          <div style="display:flex;gap:10px;font-size:12.5px;color:#4f63e7;font-weight:600;white-space:nowrap"><span>+ Add dates</span><span style="color:#5b6472">Re-order</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;background:#1d7a3f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div>
+    <div style="flex:1;color:#16233b;font-weight:500">Application Filed</div>
+    <div style="color:#5b6472;white-space:nowrap">04 Mar 2014</div>
+    <div style="color:#c2372e">✕</div>
+  </div><div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;background:#1d7a3f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div>
+    <div style="flex:1;color:#16233b;font-weight:500">Reminder for Convention Priority</div>
+    <div style="color:#5b6472;white-space:nowrap">05 Aug 2014</div>
+    <div style="color:#c2372e">✕</div>
+  </div><div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;background:#1d7a3f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div>
+    <div style="flex:1;color:#16233b;font-weight:500">Convention Priority Deadline</div>
+    <div style="color:#5b6472;white-space:nowrap">04 Sep 2014</div>
+    <div style="color:#c2372e">✕</div>
+  </div><div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;background:#1d7a3f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div>
+    <div style="flex:1;color:#16233b;font-weight:500">Registration Date</div>
+    <div style="color:#5b6472;white-space:nowrap">18 Nov 2014</div>
+    <div style="color:#c2372e">✕</div>
+  </div><div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;background:#1d7a3f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div>
+    <div style="flex:1;color:#16233b;font-weight:500">Renewal Deadline</div>
+    <div style="color:#5b6472;white-space:nowrap">04 Mar 2024</div>
+    <div style="color:#c2372e">✕</div>
+  </div><div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;border:1.5px solid #d5d4cf;background:#fff"></div>
+    <div style="flex:1;color:#16233b;font-weight:500">Renewal Reminder</div>
+    <div style="color:#5b6472;white-space:nowrap">04 Sep 2033</div>
+    <div style="color:#c2372e">✕</div>
+  </div><div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;border:1.5px solid #d5d4cf;background:#fff"></div>
+    <div style="flex:1;color:#16233b;font-weight:500">Renewal Reminder - Final</div>
+    <div style="color:#5b6472;white-space:nowrap">04 Feb 2034</div>
+    <div style="color:#c2372e">✕</div>
+  </div><div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;border:1.5px solid #d5d4cf;background:#fff"></div>
+    <div style="flex:1;color:#16233b;font-weight:500">Renewal Deadline</div>
+    <div style="color:#5b6472;white-space:nowrap">04 Mar 2034</div>
+    <div style="color:#c2372e">✕</div>
+  </div><div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f1f0ee;font-size:12.5px">
+    <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;border:1.5px solid #d5d4cf;background:#fff"></div>
+    <div style="flex:1;color:#16233b;font-weight:500">6 Month Renewal Grace Period</div>
+    <div style="color:#5b6472;white-space:nowrap">04 Sep 2034</div>
+    <div style="color:#c2372e">✕</div>
+  </div>
+        <div style="padding:10px 16px;font-size:12px;color:#8a8f98">Show related dates →</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:14px 16px">
+        <div style="font-size:12px;font-weight:700;color:#16233b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Mark graphic</div>
+        <div style="border:1.5px dashed #d5d4cf;border-radius:8px;padding:26px 16px;text-align:center;color:#8a8f98;font-size:12.5px;line-height:1.5">Drop mark image here<br>or <span style="color:#4f63e7;font-weight:600">browse files</span></div>
+      </div>
+    </div>
+  </div>
+</div></div></div>
+<p class="dv-next">Adjustments welcome — e.g. "more compact rows", "different accent", "keep the red delete ✕ off the list".</p>
+</section>
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Modernised Revaware — same structure, same functionality</span></div>
+<p class="dv-note">A 1:1 modernisation of your screenshot (Preferences → Trademark Date Templates): same nav, same tabs, same master-date table with alert/extranet/email flags and days-before, same jurisdiction mapping panel, same five view modes — restyled clean and current. If you're happy with this treatment, upload screenshots of the other screens (Trademarks list, matter detail, Oppositions, Companies, Reports) and I'll modernise each the same way, then build it all working.</p>
+<div class="dv-opts">
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Preferences · Trademark Date Templates</div>
+<div class="dv-card" style="width:1240px;font-family:'Instrument Sans',sans-serif;background:#fbfbfa">
+  <div style="display:flex;align-items:center;gap:26px;padding:14px 28px;border-bottom:1px solid #e7e6e2;background:#fff">
+    <div style="font-weight:700;font-size:16px;letter-spacing:-0.02em;color:#16233b;white-space:nowrap">Brandu<span style="color:#4f63e7">IP</span></div>
+    <div style="display:flex;gap:22px;font-size:13.5px;color:#5b6472;white-space:nowrap">
+      <span>Trademarks</span><span>Oppositions</span><span>Companies</span><span>Reports</span><span style="color:#16233b;font-weight:600;border-bottom:2px solid #4f63e7;padding-bottom:12px;margin-bottom:-15px">Preferences</span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+      <div style="display:flex;align-items:center;gap:8px;background:#f1f0ee;border-radius:8px;padding:7px 12px;width:220px;color:#8a8f98;font-size:13px;white-space:nowrap">⌕ Search…</div>
+      <div style="width:30px;height:30px;border-radius:50%;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">SL</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:24px;padding:0 28px;border-bottom:1px solid #e7e6e2;background:#fff;font-size:13px;color:#5b6472">
+    <span style="padding:11px 0;color:#16233b;font-weight:600;border-bottom:2px solid #4f63e7;white-space:nowrap">Trademark Date Templates</span>
+    <span style="padding:11px 0;white-space:nowrap">Settings and Users</span>
+    <span style="padding:11px 0;white-space:nowrap">IPTracker Settings</span>
+  </div>
+  <div style="display:flex;gap:20px;padding:22px 28px 12px;align-items:flex-start">
+    <div style="flex:1.5;background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e7e6e2">
+        <div style="font-size:15px;font-weight:700;color:#16233b;letter-spacing:-0.01em">Trademark dates</div>
+        <div style="background:#4f63e7;color:#fff;border-radius:7px;padding:6px 13px;font-size:12.5px;font-weight:600;white-space:nowrap">+ Add date</div>
+      </div>
+      <div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:9px 14px;font-size:10.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2;text-align:center">
+        <div></div><div style="text-align:left">Master date name</div><div>Include in alerts</div><div>On extranet</div><div>Email alert</div><div>Days before</div><div></div>
+      </div>
+      <div style="max-height:560px;overflow:auto"><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45;background:#eef0fc"><div style="color:#a9aeb6;font-size:12px">1</div><div style="font-weight:500;color:#16233b">First Use Commerce</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">2</div><div style="font-weight:500;color:#16233b">First Use Interstate</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">3</div><div style="font-weight:500;color:#16233b">Application Filed</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">0</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">4</div><div style="font-weight:500;color:#16233b">OA Maintenance Reminder</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">30</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">5</div><div style="font-weight:500;color:#16233b">OA Issued</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">30</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">6</div><div style="font-weight:500;color:#16233b">OA received</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">7</div><div style="font-weight:500;color:#16233b">OA Response Due</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">30</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">8</div><div style="font-weight:500;color:#16233b">OA response lodged</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">9</div><div style="font-weight:500;color:#16233b">2nd OA issued</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">10</div><div style="font-weight:500;color:#16233b">2nd OA response lodged</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">11</div><div style="font-weight:500;color:#16233b">2nd OA response due</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">30</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">12</div><div style="font-weight:500;color:#16233b">Application Accepted</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">13</div><div style="font-weight:500;color:#16233b">Publication Date</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">14</div><div style="font-weight:500;color:#16233b">Opposition filed</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">15</div><div style="font-weight:500;color:#16233b">Opposition response due</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">10</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">16</div><div style="font-weight:500;color:#16233b">Opposition period expires</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">17</div><div style="font-weight:500;color:#16233b">Opposition response lodged</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">18</div><div style="font-weight:500;color:#16233b">Opposition update</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">19</div><div style="font-weight:500;color:#16233b">Hearing date</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">20</div><div style="font-weight:500;color:#16233b">Hearing Deadline</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">10</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">21</div><div style="font-weight:500;color:#16233b">Registration Fee Due</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">30</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">22</div><div style="font-weight:500;color:#16233b">Registration Date</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#c8c7c2">—</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">23</div><div style="font-weight:500;color:#16233b">Maintenance Date - Affidavit of Use</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">30</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">24</div><div style="font-weight:500;color:#16233b">Renewal Reminder</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">180</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div><div style="display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 76px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f0ee;font-size:13px;color:#333a45"><div style="color:#a9aeb6;font-size:12px">25</div><div style="font-weight:500;color:#16233b">Renewal Deadline</div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">✓</div></div><div style="display:flex;justify-content:center"><div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #d5d4cf;background:#fff"></div></div><div style="text-align:center;color:#16233b">60</div><div style="display:flex;gap:10px;justify-content:flex-end;font-size:12px"><span style="color:#4f63e7;font-weight:500">Edit</span><span style="color:#c2372e">✕</span></div></div></div>
+    </div>
+    <div style="flex:1;background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+      <div style="padding:14px 16px;border-bottom:1px solid #e7e6e2;display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="font-size:15px;font-weight:700;color:#16233b;letter-spacing:-0.01em;white-space:nowrap">Jurisdiction dates</div>
+        <div style="display:flex;align-items:center;gap:8px;border:1px solid #d5d4cf;border-radius:7px;padding:6px 12px;font-size:13px;color:#5b6472;background:#fbfbfa;white-space:nowrap">Select jurisdiction ▾</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 90px;padding:9px 16px;font-size:10.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2">
+        <div>Jurisdiction date</div><div style="text-align:center">Date email</div>
+      </div>
+      <div style="padding:60px 24px;text-align:center;color:#8a8f98;font-size:13px;line-height:1.6">Choose a jurisdiction to view and edit its mapped dates,<br>or copy the master dates across.</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:8px 28px 24px">
+    <div style="font-size:12px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap">View</div>
+    <div style="display:flex;gap:4px;background:#f1f0ee;border-radius:9px;padding:4px">
+      <div style="padding:7px 16px;font-size:12.5px;border-radius:7px;white-space:nowrap;background:#fff;color:#16233b;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)">Add / edit master dates</div><div style="padding:7px 16px;font-size:12.5px;border-radius:7px;white-space:nowrap;color:#5b6472">Copy dates to jurisdiction</div><div style="padding:7px 16px;font-size:12.5px;border-radius:7px;white-space:nowrap;color:#5b6472">Edit jurisdiction dates</div><div style="padding:7px 16px;font-size:12.5px;border-radius:7px;white-space:nowrap;color:#5b6472">Re-order dates</div><div style="padding:7px 16px;font-size:12.5px;border-radius:7px;white-space:nowrap;color:#5b6472">Edit treaty participants</div>
+    </div>
+  </div>
+</div></div>
+</div>
+<p class="dv-next">Next: upload the other Revaware screens and I'll modernise them in this same style — or say "adjust the accent colour / density" first.</p>
+</section>
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Three directions for the Brandu trade mark database</span></div>
+<p class="dv-note">Assumptions from your Revaware screenshot + answers: matters carry jurisdiction-specific date sets (OA responses, oppositions, renewals) with days-before alerts; 2–10k marks; desktop; attorneys + paralegals + a client portal later. Each direction shows the main workspace — deadlines and the matter list — with different density and tone. Pick one (or mix parts) and I'll design the full screen set, then build it working.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Ledger — clean &amp; calm, deadlines woven into the list</div>
+<div class="dv-card" style="width:1240px;font-family:'Instrument Sans',sans-serif;background:#fbfbfa">
+  <div style="display:flex;align-items:center;gap:28px;padding:14px 28px;border-bottom:1px solid #e7e6e2;background:#fff">
+    <div style="font-weight:700;font-size:16px;letter-spacing:-0.02em;color:#16233b">Brandu<span style="color:#4f63e7">IP</span></div>
+    <div style="display:flex;gap:22px;font-size:13.5px;color:#5b6472;white-space:nowrap;flex-shrink:0">
+      <span style="color:#16233b;font-weight:600;border-bottom:2px solid #4f63e7;padding-bottom:12px;margin-bottom:-15px">Trade marks</span><span>Deadlines</span><span>Clients</span><span>Reports</span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+      <div style="display:flex;align-items:center;gap:8px;background:#f1f0ee;border-radius:8px;padding:7px 12px;width:260px;color:#8a8f98;font-size:13px">⌕ Search marks, numbers, owners…</div>
+      <div style="width:30px;height:30px;border-radius:50%;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">SL</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:14px;padding:20px 28px 0">
+    <div style="flex:1;background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:14px 18px"><div style="font-size:12px;color:#8a8f98">Due this week</div><div style="font-size:26px;font-weight:700;color:#c2372e;letter-spacing:-0.02em">4</div></div>
+    <div style="flex:1;background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:14px 18px"><div style="font-size:12px;color:#8a8f98">Due in 30 days</div><div style="font-size:26px;font-weight:700;color:#16233b;letter-spacing:-0.02em">17</div></div>
+    <div style="flex:1;background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:14px 18px"><div style="font-size:12px;color:#8a8f98">Renewals this quarter</div><div style="font-size:26px;font-weight:700;color:#16233b;letter-spacing:-0.02em">32</div></div>
+    <div style="flex:1;background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:14px 18px"><div style="font-size:12px;color:#8a8f98">Active marks</div><div style="font-size:26px;font-weight:700;color:#16233b;letter-spacing:-0.02em">3,482</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding:18px 28px 12px">
+    <div style="font-size:13px;font-weight:600;color:#16233b;background:#eceefc;border:1px solid #d6daf7;border-radius:20px;padding:5px 14px;white-space:nowrap">All matters</div>
+    <div style="font-size:13px;color:#5b6472;border:1px solid #e7e6e2;border-radius:20px;padding:5px 14px;background:#fff;white-space:nowrap">Needs action</div>
+    <div style="font-size:13px;color:#5b6472;border:1px solid #e7e6e2;border-radius:20px;padding:5px 14px;background:#fff;white-space:nowrap">Pending OA</div>
+    <div style="font-size:13px;color:#5b6472;border:1px solid #e7e6e2;border-radius:20px;padding:5px 14px;background:#fff;white-space:nowrap">In opposition</div>
+    <div style="font-size:13px;color:#5b6472;border:1px solid #e7e6e2;border-radius:20px;padding:5px 14px;background:#fff;white-space:nowrap">Renewals</div>
+    <div style="margin-left:auto;font-size:13px;color:#5b6472;white-space:nowrap">Jurisdiction ▾ &nbsp; Class ▾ &nbsp; Owner ▾</div>
+  </div>
+  <div style="margin:0 28px 24px;background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:2.2fr 1fr 0.8fr 1.4fr 1.1fr 1.3fr;padding:10px 18px;font-size:11.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2">
+      <div>Mark</div><div>Number</div><div>Classes</div><div>Owner</div><div>Status</div><div>Next deadline</div>
+    </div>
+    <div style="display:grid;grid-template-columns:2.2fr 1fr 0.8fr 1.4fr 1.1fr 1.3fr;padding:13px 18px;font-size:13.5px;color:#333a45;border-bottom:1px solid #f1f0ee;align-items:center">
+      <div><div style="font-weight:600;color:#16233b">SOLARA</div><div style="font-size:12px;color:#8a8f98">AU · word mark</div></div><div>2387411</div><div>9, 42</div><div>Solara Energy Pty Ltd</div><div><span style="background:#fdeceb;color:#c2372e;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px">OA due</span></div><div style="font-weight:600;color:#c2372e">22 Jul · in 3 days</div>
+    </div>
+    <div style="display:grid;grid-template-columns:2.2fr 1fr 0.8fr 1.4fr 1.1fr 1.3fr;padding:13px 18px;font-size:13.5px;color:#333a45;border-bottom:1px solid #f1f0ee;align-items:center">
+      <div><div style="font-weight:600;color:#16233b">HAVEN &amp; CO</div><div style="font-size:12px;color:#8a8f98">NZ · word mark</div></div><div>1245880</div><div>25, 35</div><div>Haven Retail Group</div><div><span style="background:#fdf3e4;color:#a06414;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px">Opposition</span></div><div style="font-weight:600;color:#a06414">04 Aug · in 16 days</div>
+    </div>
+    <div style="display:grid;grid-template-columns:2.2fr 1fr 0.8fr 1.4fr 1.1fr 1.3fr;padding:13px 18px;font-size:13.5px;color:#333a45;border-bottom:1px solid #f1f0ee;align-items:center">
+      <div><div style="font-weight:600;color:#16233b">NIMBUS PAY</div><div style="font-size:12px;color:#8a8f98">Madrid · word + device</div></div><div>1789023</div><div>36</div><div>Nimbus Financial Inc</div><div><span style="background:#e8f4ec;color:#1d7a3f;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px">Registered</span></div><div>Renewal · 12 Feb 2027</div>
+    </div>
+    <div style="display:grid;grid-template-columns:2.2fr 1fr 0.8fr 1.4fr 1.1fr 1.3fr;padding:13px 18px;font-size:13.5px;color:#333a45;border-bottom:1px solid #f1f0ee;align-items:center">
+      <div><div style="font-weight:600;color:#16233b">WATTLE LANE</div><div style="font-size:12px;color:#8a8f98">AU · word mark</div></div><div>2401177</div><div>30, 43</div><div>Wattle Lane Foods</div><div><span style="background:#eef0f3;color:#5b6472;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px">Filed</span></div><div>Exam · est. Oct 2026</div>
+    </div>
+    <div style="display:grid;grid-template-columns:2.2fr 1fr 0.8fr 1.4fr 1.1fr 1.3fr;padding:13px 18px;font-size:13.5px;color:#333a45;align-items:center">
+      <div><div style="font-weight:600;color:#16233b">KORU HEALTH</div><div style="font-size:12px;color:#8a8f98">NZ / AU · series</div></div><div>1198237</div><div>5, 44</div><div>Koru Health Ltd</div><div><span style="background:#e8f4ec;color:#1d7a3f;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px">Registered</span></div><div style="font-weight:600;color:#a06414">Renewal · 30 Sep · 73 days</div>
+    </div>
+  </div>
+</div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Cockpit — dense split view, everything one click away</div>
+<div class="dv-card" style="width:1240px;font-family:'IBM Plex Sans',sans-serif;background:#f5f6f7;display:flex">
+  <div style="width:52px;background:#14201c;display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:18px;color:#8fa89d;font-size:15px">
+    <div style="width:28px;height:28px;border-radius:7px;background:#2e7d5b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">B</div>
+    <div style="color:#fff">▦</div><div>◷</div><div>◎</div><div>▤</div><div style="margin-top:auto">⚙</div>
+  </div>
+  <div style="width:388px;border-right:1px solid #e2e4e6;background:#fff;display:flex;flex-direction:column">
+    <div style="padding:12px 14px;border-bottom:1px solid #eceef0">
+      <div style="display:flex;align-items:center;gap:8px;background:#f1f2f4;border-radius:6px;padding:7px 10px;color:#8a9097;font-size:12.5px;white-space:nowrap">⌕ Search 3,482 marks… <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:#fff;border:1px solid #dfe2e5;border-radius:4px;padding:1px 5px">/</span></div>
+      <div style="display:flex;gap:6px;margin-top:9px;font-size:11.5px">
+        <span style="background:#14201c;color:#fff;border-radius:5px;padding:3px 9px;font-weight:500">Action queue · 21</span>
+        <span style="border:1px solid #dfe2e5;border-radius:5px;padding:3px 9px;color:#5c636b">All</span>
+        <span style="border:1px solid #dfe2e5;border-radius:5px;padding:3px 9px;color:#5c636b">Watching</span>
+      </div>
+    </div>
+    <div style="padding:8px 14px;background:#fbf3f2;border-left:3px solid #b23c31;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600;color:#1b2228">SOLARA</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#b23c31;font-weight:500">3d</span></div>
+      <div style="font-size:11.5px;color:#6b727a">AU 2387411 · OA response due 22 Jul</div>
+    </div>
+    <div style="padding:8px 14px;border-bottom:1px solid #f1f2f4;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600;color:#1b2228">HAVEN &amp; CO</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#a06414;font-weight:500">16d</span></div>
+      <div style="font-size:11.5px;color:#6b727a">NZ 1245880 · Opposition response 04 Aug</div>
+    </div>
+    <div style="padding:8px 14px;border-bottom:1px solid #f1f2f4;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600;color:#1b2228">FERNWOOD</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#a06414;font-weight:500">21d</span></div>
+      <div style="font-size:11.5px;color:#6b727a">UK 00399812 · Registration fee 09 Aug</div>
+    </div>
+    <div style="padding:8px 14px;border-bottom:1px solid #f1f2f4;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600;color:#1b2228">KORU HEALTH</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#5c636b">73d</span></div>
+      <div style="font-size:11.5px;color:#6b727a">NZ 1198237 · Renewal 30 Sep</div>
+    </div>
+    <div style="padding:8px 14px;border-bottom:1px solid #f1f2f4;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600;color:#1b2228">NIMBUS PAY</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#5c636b">89d</span></div>
+      <div style="font-size:11.5px;color:#6b727a">Madrid 1789023 · Affidavit of use (US) 16 Oct</div>
+    </div>
+    <div style="padding:10px 14px;font-size:11.5px;color:#8a9097">+ 16 more in queue</div>
+  </div>
+  <div style="flex:1;padding:20px 26px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <div>
+        <div style="font-size:22px;font-weight:600;color:#1b2228;letter-spacing:-0.01em">SOLARA <span style="font-size:12px;font-weight:500;color:#fff;background:#b23c31;border-radius:4px;padding:2px 8px;vertical-align:3px">OA due in 3 days</span></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6b727a;margin-top:3px">AU 2387411 · classes 9, 42 · Solara Energy Pty Ltd</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <div style="border:1px solid #dfe2e5;border-radius:6px;padding:6px 12px;font-size:12.5px;color:#3d444c;background:#fff">Log document</div>
+        <div style="background:#2e7d5b;color:#fff;border-radius:6px;padding:6px 12px;font-size:12.5px;font-weight:500">Record response ▾</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px">
+      <div style="flex:1.4;background:#fff;border:1px solid #e2e4e6;border-radius:8px;padding:14px 16px">
+        <div style="font-size:11px;font-weight:600;color:#8a9097;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Date history</div>
+        <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #f1f2f4;font-size:12.5px"><span style="font-family:'IBM Plex Mono',monospace;color:#6b727a;width:80px;flex-shrink:0">14 Mar 25</span><span style="color:#1b2228;white-space:nowrap">Application filed</span><span style="margin-left:auto;color:#2e7d5b">✓</span></div>
+        <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #f1f2f4;font-size:12.5px"><span style="font-family:'IBM Plex Mono',monospace;color:#6b727a;width:80px;flex-shrink:0">02 Jun 25</span><span style="color:#1b2228;white-space:nowrap">OA issued — s44 citation</span><span style="margin-left:auto;color:#2e7d5b">✓</span></div>
+        <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #f1f2f4;font-size:12.5px;background:#fbf3f2;margin:0 -16px;padding-left:16px;padding-right:16px"><span style="font-family:'IBM Plex Mono',monospace;color:#b23c31;width:80px;font-weight:500;flex-shrink:0">22 Jul 26</span><span style="color:#1b2228;font-weight:600;white-space:nowrap">OA response due</span><span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;color:#b23c31;font-weight:500">3d</span></div>
+        <div style="display:flex;gap:10px;padding:6px 0;font-size:12.5px"><span style="font-family:'IBM Plex Mono',monospace;color:#9aa0a7;width:80px">—</span><span style="color:#9aa0a7">Acceptance → advertisement → registration</span></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:16px">
+        <div style="background:#fff;border:1px solid #e2e4e6;border-radius:8px;padding:14px 16px">
+          <div style="font-size:11px;font-weight:600;color:#8a9097;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Family</div>
+          <div style="font-size:12.5px;color:#1b2228;display:flex;justify-content:space-between;padding:4px 0"><span>SOLARA — NZ</span><span style="color:#2e7d5b">Registered</span></div>
+          <div style="font-size:12.5px;color:#1b2228;display:flex;justify-content:space-between;padding:4px 0"><span>SOLARA — Madrid (EU, UK, US)</span><span style="color:#6b727a">Pending</span></div>
+          <div style="font-size:12.5px;color:#1b2228;display:flex;justify-content:space-between;padding:4px 0"><span>SOLARA &amp; device — AU</span><span style="color:#2e7d5b">Registered</span></div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e4e6;border-radius:8px;padding:14px 16px">
+          <div style="font-size:11px;font-weight:600;color:#8a9097;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Notes</div>
+          <div style="font-size:12.5px;color:#3d444c;line-height:1.5">Client instructed to argue honest concurrent use re cited mark 2201458. Draft with M. Chen.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Docket — deadlines-first morning view, warm &amp; editorial</div>
+<div class="dv-card" style="width:1240px;font-family:'Instrument Sans',sans-serif;background:#faf7f2">
+  <div style="display:flex;align-items:baseline;gap:28px;padding:22px 36px 0">
+    <div style="font-family:'Source Serif 4',serif;font-size:21px;font-weight:600;color:#2b241c">Brandu</div>
+    <div style="display:flex;gap:20px;font-size:13.5px;color:#7a6f5f">
+      <span style="color:#2b241c;font-weight:600">Today</span><span>Marks</span><span>Clients</span><span>Renewals</span><span>Reports</span>
+    </div>
+    <div style="margin-left:auto;font-size:13px;color:#7a6f5f">⌕ Search &nbsp;&nbsp; <span style="background:#2b241c;color:#faf7f2;border-radius:18px;padding:6px 14px;font-size:12.5px;font-weight:500">+ New matter</span></div>
+  </div>
+  <div style="padding:26px 36px 8px">
+    <div style="font-family:'Source Serif 4',serif;font-size:30px;font-weight:600;color:#2b241c;letter-spacing:-0.01em">Sunday 19 July</div>
+    <div style="font-size:14px;color:#7a6f5f;margin-top:4px">4 deadlines this week · 17 in the next 30 days · nothing overdue</div>
+  </div>
+  <div style="display:flex;gap:18px;padding:18px 36px 8px">
+    <div style="flex:1.15;background:#fff;border:1px solid #eae4d9;border-radius:14px;padding:18px 20px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px"><div style="font-size:13px;font-weight:700;color:#2b241c;text-transform:uppercase;letter-spacing:0.07em">This week</div><div style="font-size:12px;color:#b5543b;font-weight:600">4 items</div></div>
+      <div style="display:flex;gap:12px;padding:11px 0;border-bottom:1px solid #f3efe7;align-items:center">
+        <div style="width:44px;text-align:center;background:#f8e9e4;border-radius:9px;padding:5px 0"><div style="font-size:16px;font-weight:700;color:#b5543b;line-height:1">22</div><div style="font-size:9.5px;color:#b5543b;font-weight:600">JUL</div></div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#2b241c">SOLARA — OA response due</div><div style="font-size:12px;color:#7a6f5f">AU 2387411 · Solara Energy · with M. Chen</div></div>
+        <div style="font-size:12px;color:#b5543b;font-weight:600">3 days</div>
+      </div>
+      <div style="display:flex;gap:12px;padding:11px 0;border-bottom:1px solid #f3efe7;align-items:center">
+        <div style="width:44px;text-align:center;background:#f6f2ea;border-radius:9px;padding:5px 0"><div style="font-size:16px;font-weight:700;color:#2b241c;line-height:1">23</div><div style="font-size:9.5px;color:#7a6f5f;font-weight:600">JUL</div></div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#2b241c">ORCHARD ST — evidence of use filing</div><div style="font-size:12px;color:#7a6f5f">US 97/442810 · Orchard Street LLC · with S. Lee</div></div>
+        <div style="font-size:12px;color:#7a6f5f;font-weight:600">4 days</div>
+      </div>
+      <div style="display:flex;gap:12px;padding:11px 0;border-bottom:1px solid #f3efe7;align-items:center">
+        <div style="width:44px;text-align:center;background:#f6f2ea;border-radius:9px;padding:5px 0"><div style="font-size:16px;font-weight:700;color:#2b241c;line-height:1">24</div><div style="font-size:9.5px;color:#7a6f5f;font-weight:600">JUL</div></div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#2b241c">VELVET FIG — opposition period closes</div><div style="font-size:12px;color:#7a6f5f">AU 2395602 · watch only</div></div>
+        <div style="font-size:12px;color:#7a6f5f;font-weight:600">5 days</div>
+      </div>
+      <div style="display:flex;gap:12px;padding:11px 0;align-items:center">
+        <div style="width:44px;text-align:center;background:#f6f2ea;border-radius:9px;padding:5px 0"><div style="font-size:16px;font-weight:700;color:#2b241c;line-height:1">25</div><div style="font-size:9.5px;color:#7a6f5f;font-weight:600">JUL</div></div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#2b241c">HAVEN &amp; CO — client report due</div><div style="font-size:12px;color:#7a6f5f">NZ 1245880 · opposition status update</div></div>
+        <div style="font-size:12px;color:#7a6f5f;font-weight:600">6 days</div>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:18px">
+      <div style="background:#2b241c;border-radius:14px;padding:18px 20px;color:#faf7f2">
+        <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#cfc4b2;margin-bottom:10px">Renewals — next 90 days</div>
+        <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px solid rgba(250,247,242,.12)"><span style="white-space:nowrap">KORU HEALTH · NZ</span><span style="color:#e8b88a">30 Sep</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px solid rgba(250,247,242,.12)"><span style="white-space:nowrap">ATLAS ROW · AU</span><span style="color:#e8b88a">14 Oct</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0"><span style="white-space:nowrap">NIMBUS PAY · Madrid</span><span style="color:#e8b88a">12 Nov</span></div>
+        <div style="margin-top:12px;font-size:12.5px;color:#cfc4b2">View all 32 →</div>
+      </div>
+      <div style="background:#fff;border:1px solid #eae4d9;border-radius:14px;padding:18px 20px">
+        <div style="font-size:13px;font-weight:700;color:#2b241c;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px">Recently updated</div>
+        <div style="font-size:13.5px;color:#2b241c;padding:6px 0;border-bottom:1px solid #f3efe7">FERNWOOD · UK — <span style="color:#7a6f5f">registration fee reminder sent</span></div>
+        <div style="font-size:13.5px;color:#2b241c;padding:6px 0;border-bottom:1px solid #f3efe7">WATTLE LANE · AU — <span style="color:#7a6f5f">filing receipt logged</span></div>
+        <div style="font-size:13.5px;color:#2b241c;padding:6px 0">SOLARA · Madrid — <span style="color:#7a6f5f">designation added: UK</span></div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:10px 36px 26px;font-size:13px;color:#7a6f5f">Full matter list, search and client records live one tab over — same warm styling, table density like <a class="dv-oid" href="#1a">1a</a>.</div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#1a">1a</a> and design the matter detail page" · "mix <a class="dv-oid" href="#1c">1c</a>'s Today view with <a class="dv-oid" href="#1b">1b</a>'s split list" · "show me a darker option"</p>
+</section>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,141 @@
+/* Design tokens from the handoff README. */
+:root {
+  --accent: #d34b44;
+  --accent-dark: #b23b35;
+  --accent-text: #a83a33;
+  --accent-bg: #fbeceb;
+  --accent-border: #f0d3d0;
+  --heading: #16233b;
+  --body: #2b3542;
+  --muted: #59616c;
+  --placeholder: #8a8f98;
+  --page: #fbfbfa;
+  --card: #fff;
+  --hover-row: #faf3f2;
+  --panel: #faf9f7;
+  --border: #e7e6e2;
+  --border-2: #eeede9;
+  --border-3: #f1f0ee;
+  --danger: #c2372e;
+  --success: #1e7a3d;
+  --success-bg: #eaf5ee;
+  --defend-bg: #fdeeed;
+  --warn: #a06414;
+  --warn-bg: #fdf3e4;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--body);
+  font-family: 'Instrument Sans', -apple-system, sans-serif;
+  font-size: 13.5px;
+}
+
+h1, h2, h3 { color: var(--heading); }
+
+input, select, textarea, button { font-family: inherit; font-size: 13px; color: var(--body); }
+
+input[type='text'], input[type='date'], input[type='password'], input[type='email'], input[type='number'], select, textarea {
+  border: 1px solid var(--border-2);
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #fff;
+  outline-color: var(--accent);
+  width: 100%;
+}
+input::placeholder, textarea::placeholder { color: var(--placeholder); }
+textarea { resize: vertical; min-height: 64px; }
+
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 22px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.brand { font-weight: 700; font-size: 16px; color: var(--heading); margin-right: 18px; padding: 14px 0; letter-spacing: -0.01em; }
+.brand em { color: var(--accent); font-style: normal; }
+.tab {
+  background: none; border: none; cursor: pointer; padding: 15px 13px 12px;
+  font-size: 13.5px; font-weight: 500; color: var(--muted);
+  border-bottom: 2.5px solid transparent;
+}
+.tab.active { color: var(--accent-text); border-bottom-color: var(--accent); font-weight: 600; }
+.topbar .whoami { margin-left: auto; font-size: 12.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+
+.main { flex: 1; padding: 22px 24px 60px; max-width: 1380px; width: 100%; margin: 0 auto; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+.section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--heading); margin-bottom: 10px;
+}
+.hint { font-size: 12px; color: var(--muted); }
+
+.btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 7px;
+  padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.btn:hover { background: var(--accent-dark); }
+.btn.secondary { background: #fff; color: var(--body); border: 1px solid var(--border); }
+.btn.secondary:hover { background: var(--panel); }
+.btn.danger-link { background: none; border: none; color: var(--danger); padding: 2px 6px; font-weight: 500; }
+.btn.small { padding: 4px 10px; font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.field { margin-bottom: 10px; }
+.field > label { display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 14px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+table.list { width: 100%; border-collapse: collapse; }
+table.list th {
+  text-align: left; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); padding: 9px 10px; border-bottom: 1px solid var(--border); background: var(--panel);
+  cursor: pointer; user-select: none; white-space: nowrap;
+}
+table.list td { padding: 8px 10px; border-bottom: 1px solid var(--border-3); font-size: 13px; vertical-align: middle; }
+table.list tr.click { cursor: pointer; }
+table.list tr.click:hover td { background: var(--hover-row); }
+table.list td input, table.list td select { padding: 5px 7px; font-size: 12.5px; }
+
+.badge { font-size: 11px; font-weight: 600; padding: 2.5px 9px; border-radius: 10px; white-space: nowrap; display: inline-block; }
+.kind-chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+
+.filters { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.filters input[type='text'] { max-width: 260px; }
+.filters select { width: auto; max-width: 220px; }
+
+.back { background: none; border: none; color: var(--accent-text); cursor: pointer; font-size: 13px; font-weight: 600; padding: 0; margin-bottom: 12px; }
+
+.chip {
+  border: 1px solid var(--border); border-radius: 16px; background: #fff; color: var(--muted);
+  padding: 4px 12px; font-size: 12px; cursor: pointer;
+}
+.chip.on { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); font-weight: 600; }
+
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--page); }
+.login-card { width: 360px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+
+.done { color: var(--placeholder); text-decoration: line-through; }
+.overdue { color: var(--danger); font-weight: 600; }
+.mono { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.err { color: var(--danger); font-size: 12.5px; }
+.save-state { font-size: 12px; color: var(--muted); }
+
+.pref-layout { display: grid; grid-template-columns: 250px 1fr; gap: 16px; align-items: start; }
+.jur-item { display: flex; justify-content: space-between; padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.jur-item:hover { background: var(--panel); }
+.jur-item.on { background: #eef0fc; font-weight: 600; }
+
+.detail-cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .detail-cols { grid-template-columns: 1fr; } }
