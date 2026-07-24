@@ -1,0 +1,19 @@
+# One-click deploy to Render (https://render.com) — the managed-host alternative
+# to cPanel. Point a custom domain / subdomain at the service in the dashboard.
+services:
+  - type: web
+    name: brandu-tm-database
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+    disk:
+      # Persist the SQLite database and uploaded files across deploys.
+      name: brandu-data
+      mountPath: /app/data
+      sizeGB: 1

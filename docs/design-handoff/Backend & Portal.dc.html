@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#fbfbfa}a{color:#4f63e7}a:hover{color:#3a4cc4}*{box-sizing:border-box}</style>
+</helmet>
+<div style="font-family:'Instrument Sans',sans-serif;background:#fbfbfa;min-height:100vh;color:#16233b">
+  <div style="display:flex;align-items:center;gap:26px;padding:14px 28px;border-bottom:1px solid #e7e6e2;background:#fff;position:sticky;top:0;z-index:10">
+    <div style="font-weight:700;font-size:16px;letter-spacing:-0.02em;white-space:nowrap">Brandu<span style="color:#4f63e7">IP</span> <span style="font-weight:500;color:#8a8f98;font-size:13px">· Backend &amp; portal mockup</span></div>
+    <div style="display:flex;gap:22px;white-space:nowrap;margin-left:8px">
+      <sc-for list="{{ navTabs }}" as="n" hint-placeholder-count="3">
+        <div onClick="{{ n.onClick }}" style="font-size:13.5px;cursor:pointer;color:{{ n.color }};font-weight:{{ n.weight }};border-bottom:{{ n.bb }};padding-bottom:4px;margin-bottom:-4px">{{ n.label }}</div>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ isArch }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:22px 28px 30px;max-width:1200px">
+      <div style="font-size:18px;font-weight:700;letter-spacing:-0.01em;margin-bottom:4px">System architecture</div>
+      <div style="font-size:13px;color:#5b6472;margin-bottom:18px">Multi-user setup for attorneys, paralegals and clients. One database, role-scoped API.</div>
+      <div style="display:grid;grid-template-columns:1fr 34px 1fr 34px 1fr 34px 1fr;gap:0;align-items:stretch;margin-bottom:26px">
+        <sc-for list="{{ archCols }}" as="c" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:11px;font-weight:700;color:#8a8f98;text-transform:uppercase;letter-spacing:0.06em">{{ c.title }}</div>
+            <sc-for list="{{ c.items }}" as="b" hint-placeholder-count="2">
+              <div style="background:#fff;border:1px solid {{ b.border }};border-radius:10px;padding:12px 14px;flex:1">
+                <div style="font-size:13.5px;font-weight:700;color:#16233b;margin-bottom:3px">{{ b.name }}</div>
+                <div style="font-size:12px;color:#5b6472;line-height:1.45">{{ b.desc }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:{{ c.arrowDisp }};align-items:center;justify-content:center;color:#b8bcc4;font-size:18px">→</div>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden;margin-bottom:26px">
+        <div style="padding:13px 18px;border-bottom:1px solid #e7e6e2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Role permissions</div>
+        <div style="display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;gap:8px;padding:9px 18px;font-size:10.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2">
+          <div>Capability</div><div>Attorney</div><div>Paralegal</div><div>Client</div>
+        </div>
+        <sc-for list="{{ permRows }}" as="p" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;gap:8px;padding:8px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee;align-items:center">
+            <div>{{ p.cap }}</div>
+            <div style="color:{{ p.aC }};font-weight:600">{{ p.a }}</div>
+            <div style="color:{{ p.pC }};font-weight:600">{{ p.p }}</div>
+            <div style="color:{{ p.cC }};font-weight:600">{{ p.c }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+        <div style="padding:13px 18px;border-bottom:1px solid #e7e6e2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Core API endpoints</div>
+        <sc-for list="{{ endpoints }}" as="e" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:70px 340px 1fr;gap:12px;padding:8px 18px;font-size:12.5px;border-bottom:1px solid #f1f0ee;align-items:center">
+            <div style="font-weight:700;color:{{ e.mC }};font-family:ui-monospace,monospace;font-size:11.5px">{{ e.m }}</div>
+            <div style="font-family:ui-monospace,monospace;font-size:12px;color:#16233b">{{ e.path }}</div>
+            <div style="color:#5b6472">{{ e.desc }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isSchema }}" hint-placeholder-val="{{ false }}">
+    <div style="padding:22px 28px 30px">
+      <div style="font-size:18px;font-weight:700;letter-spacing:-0.01em;margin-bottom:4px">Database schema</div>
+      <div style="font-size:13px;color:#5b6472;margin-bottom:18px">PostgreSQL. Every field in the current prototype maps to a column here; ↗ marks foreign keys.</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;align-items:start">
+        <sc-for list="{{ tables }}" as="t" hint-placeholder-count="6">
+          <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden;border-top:3px solid {{ t.accent }}">
+            <div style="padding:10px 14px;border-bottom:1px solid #e7e6e2">
+              <div style="font-family:ui-monospace,monospace;font-size:13px;font-weight:700;color:#16233b">{{ t.name }}</div>
+              <div style="font-size:11.5px;color:#8a8f98;margin-top:2px">{{ t.desc }}</div>
+            </div>
+            <sc-for list="{{ t.cols }}" as="col" hint-placeholder-count="5">
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:5px 14px;border-bottom:1px solid #f6f5f2;font-size:12px;align-items:baseline">
+                <div style="font-family:ui-monospace,monospace;color:{{ col.nC }};font-weight:{{ col.nW }}">{{ col.n }}</div>
+                <div style="color:#8a8f98;font-size:11px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ col.t }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isRegSync }}" hint-placeholder-val="{{ false }}">
+    <div style="padding:22px 28px 34px;max-width:1160px">
+      <div style="font-size:18px;font-weight:700;letter-spacing:-0.01em;margin-bottom:4px">Register sync — live IP-office data, no paid APIs</div>
+      <div style="font-size:13px;color:#5b6472;margin-bottom:20px;max-width:820px">Deadlines and statuses are reconciled against each office's <b>publicly available</b> register — bulk open-data files and public search/Bulletin pages — so human data-entry error is caught automatically. No commercial API subscription required.</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:0;align-items:stretch;margin-bottom:26px">
+        <sc-for list="{{ syncSteps }}" as="s" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column;gap:8px;padding-right:10px">
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;border-radius:50%;background:#4f63e7;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ s.n }}</div><div style="font-size:13px;font-weight:700;color:#16233b">{{ s.name }}</div></div>
+            <div style="font-size:11.5px;color:#5b6472;line-height:1.45">{{ s.desc }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden;margin-bottom:24px">
+        <div style="padding:13px 18px;border-bottom:1px solid #e7e6e2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Public data sources per jurisdiction</div>
+        <div style="display:grid;grid-template-columns:1.1fr 2.6fr 1.7fr 1fr;gap:10px;padding:9px 18px;font-size:10.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2">
+          <div>Jurisdiction</div><div>Public source</div><div>Method</div><div>Cadence</div>
+        </div>
+        <sc-for list="{{ syncSources }}" as="s" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:1.1fr 2.6fr 1.7fr 1fr;gap:10px;padding:9px 18px;font-size:12.5px;border-bottom:1px solid #f1f0ee;align-items:center">
+            <div style="font-weight:700;color:#16233b">{{ s.jur }}</div>
+            <div style="color:#5b6472;line-height:1.4">{{ s.source }}</div>
+            <div style="color:#5b6472">{{ s.method }}</div>
+            <div style="color:#4f63e7;font-weight:600">{{ s.cadence }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+        <div style="padding:13px 18px;border-bottom:1px solid #e7e6e2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Reconciliation rules — the error safety net</div>
+        <sc-for list="{{ reconRules }}" as="r" hint-placeholder-count="5">
+          <div style="display:flex;gap:12px;padding:11px 18px;border-bottom:1px solid #f1f0ee;align-items:baseline">
+            <div style="font-size:13px;font-weight:700;color:#16233b;min-width:250px">{{ r.t }}</div>
+            <div style="font-size:12.5px;color:#5b6472;line-height:1.45;flex:1">{{ r.d }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#fdf3e4;border:1px solid #f0dfc0;border-radius:10px;padding:13px 16px;margin-top:18px;font-size:12.5px;color:#7a5a1e;line-height:1.55">
+        <b>Note on public scraping:</b> public register scraping is subject to each office's terms of use and page-structure changes; build each source as an isolated adapter with health checks so a layout change on one office never breaks the others. Where an office later offers a free official bulk feed, swap that adapter to it. This keeps the system API-free today while staying upgrade-ready.
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+    <div style="padding:22px 28px 34px;max-width:1080px">
+      <div style="font-size:18px;font-weight:700;letter-spacing:-0.01em;margin-bottom:4px">Vs. commercial trade mark systems</div>
+      <div style="font-size:13px;color:#5b6472;margin-bottom:20px;max-width:820px">How this build compares to CPA/Memotech, Anaqua, Alt Legal, Clarivate IPfolio, WebTMS and Dennemeyer.</div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden;margin-bottom:24px">
+        <div style="display:grid;grid-template-columns:2fr 1.6fr 1.6fr;gap:10px;padding:9px 18px;font-size:10.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2">
+          <div>Capability</div><div>This system</div><div>Commercial norm</div>
+        </div>
+        <sc-for list="{{ compareRows }}" as="r" hint-placeholder-count="10">
+          <div style="display:grid;grid-template-columns:2fr 1.6fr 1.6fr;gap:10px;padding:9px 18px;font-size:12.5px;border-bottom:1px solid #f1f0ee;align-items:center">
+            <div style="font-weight:600;color:#16233b">{{ r.cap }}</div>
+            <div style="color:{{ r.oursColor }};font-weight:600">{{ r.ours }}</div>
+            <div style="color:#5b6472">{{ r.norm }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden">
+        <div style="padding:13px 18px;border-bottom:1px solid #e7e6e2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Must-haves for parity (real-build priorities)</div>
+        <sc-for list="{{ parityItems }}" as="p" hint-placeholder-count="6">
+          <div style="display:flex;gap:10px;padding:10px 18px;border-bottom:1px solid #f1f0ee;align-items:baseline;font-size:12.5px;color:#5b6472;line-height:1.45"><span style="color:#4f63e7;font-weight:700">→</span><div style="flex:1">{{ p }}</div></div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isPortal }}" hint-placeholder-val="{{ false }}">
+    <div style="padding:22px 28px 34px;max-width:1120px;margin:0 auto">
+      <div style="font-size:18px;font-weight:700;letter-spacing:-0.01em;margin-bottom:4px">Client portal</div>
+      <div style="font-size:13px;color:#5b6472;margin-bottom:18px">What a client sees when they log in — their own portfolio only, read-only except renewal instructions.</div>
+      <div style="background:#fff;border:1px solid #d5d4cf;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(22,35,59,0.08)">
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:#f1f0ee;border-bottom:1px solid #e7e6e2">
+          <div style="width:10px;height:10px;border-radius:50%;background:#e0dedb"></div><div style="width:10px;height:10px;border-radius:50%;background:#e0dedb"></div><div style="width:10px;height:10px;border-radius:50%;background:#e0dedb"></div>
+          <div style="margin-left:12px;background:#fff;border-radius:6px;padding:3px 14px;font-size:11.5px;color:#8a8f98;font-family:ui-monospace,monospace">portal.branduip.com.au</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:13px 26px;border-bottom:1px solid #e7e6e2">
+          <div style="font-weight:700;font-size:15px;letter-spacing:-0.02em">Brandu<span style="color:#4f63e7">IP</span> <span style="font-weight:500;color:#8a8f98;font-size:12px">Client Portal</span></div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:#5b6472">{{ clientName }}<div style="width:28px;height:28px;border-radius:50%;background:#16233b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600">{{ clientInitials }}</div></div>
+        </div>
+        <div style="padding:22px 26px 26px;background:#fbfbfa">
+          <div style="font-size:19px;font-weight:700;letter-spacing:-0.01em;margin-bottom:14px">Your trademark portfolio</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
+            <sc-for list="{{ statCards }}" as="s" hint-placeholder-count="3">
+              <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:14px 16px">
+                <div style="font-size:26px;font-weight:700;color:{{ s.color }};letter-spacing:-0.02em">{{ s.value }}</div>
+                <div style="font-size:12.5px;color:#5b6472;margin-top:2px">{{ s.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="background:#fff;border:1px solid #f0c8a0;border-radius:10px;padding:16px 18px;margin-bottom:18px;display:{{ instrDisp }}">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="background:#fdf1e3;color:#b06514;font-size:11px;font-weight:700;padding:3px 9px;border-radius:11px;text-transform:uppercase;letter-spacing:0.05em">Action required</span><div style="font-size:14px;font-weight:700">Renewal instruction — ACME &amp; Device (AU 1284755)</div></div>
+            <div style="font-size:13px;color:#5b6472;line-height:1.5;margin-bottom:12px">The Australian registration is due for renewal on <b style="color:#16233b">14 Oct 2026</b>. Official fee for classes 29, 30: AUD 800. Please instruct us by 14 Sep 2026.</div>
+            <div style="display:flex;gap:8px">
+              <div onClick="{{ instructRenew }}" style="background:#4f63e7;color:#fff;border-radius:7px;padding:7px 15px;font-size:12.5px;font-weight:600;cursor:pointer">Renew — proceed</div>
+              <div onClick="{{ instructLapse }}" style="border:1px solid #d5d4cf;background:#fff;color:#3d444c;border-radius:7px;padding:7px 15px;font-size:12.5px;cursor:pointer">Do not renew</div>
+              <div onClick="{{ instructDiscuss }}" style="border:1px solid #d5d4cf;background:#fff;color:#3d444c;border-radius:7px;padding:7px 15px;font-size:12.5px;cursor:pointer">Discuss with attorney</div>
+            </div>
+          </div>
+          <div style="background:#eef6ee;border:1px solid #bcd9bc;border-radius:10px;padding:12px 18px;margin-bottom:18px;font-size:13px;color:#2e6b30;display:{{ instrDoneDisp }}">✓ Instruction received — {{ instrResult }}. Your attorney has been notified.</div>
+          <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;overflow:hidden;margin-bottom:18px">
+            <div style="padding:12px 18px;border-bottom:1px solid #e7e6e2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Your marks</div>
+            <div style="display:grid;grid-template-columns:100px 1.8fr 1fr 1.1fr 1fr;gap:8px;padding:8px 18px;font-size:10.5px;font-weight:600;color:#8a8f98;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e7e6e2">
+              <div>Country</div><div>Mark</div><div>Registration</div><div>Status</div><div>Next renewal</div>
+            </div>
+            <sc-for list="{{ portfolioRows }}" as="r" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:100px 1.8fr 1fr 1.1fr 1fr;gap:8px;padding:9px 18px;font-size:13px;color:#333a45;border-bottom:1px solid #f1f0ee;align-items:center" style-hover="background:#f6f7fb">
+                <div style="color:#5b6472">{{ r.jur }}</div>
+                <div style="font-weight:600;color:#16233b">{{ r.name }}</div>
+                <div style="color:#5b6472">{{ r.reg }}</div>
+                <div><span style="background:{{ r.bg }};color:{{ r.fg }};font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap">{{ r.status }}</span></div>
+                <div style="color:{{ r.renC }}">{{ r.renewal }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="background:#fff;border:1px solid #e7e6e2;border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px">
+            <div style="width:34px;height:34px;border-radius:50%;background:#4f63e7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">SL</div>
+            <div style="flex:1"><div style="font-size:13.5px;font-weight:700">Your attorney — Sarah Lim</div><div style="font-size:12.5px;color:#5b6472">Questions about your portfolio? Send a secure message.</div></div>
+            <div style="border:1px solid #d6daf7;background:#eceefc;color:#4f63e7;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:600;cursor:pointer">Message attorney</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Architecture&quot;,&quot;options&quot;:[&quot;Architecture&quot;,&quot;Data schema&quot;,&quot;Client portal&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Mockup&quot;},&quot;clientName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Acme Foods Pty Ltd&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Portal&quot;}}">
+class Component extends DCLogic {
+  state = { tab: null, instructed: null };
+  renderVals() {
+    const tab = this.state.tab ?? this.props.defaultTab ?? 'Architecture';
+    const tabs = ['Architecture', 'Data schema', 'Register sync', 'Vs. commercial', 'Client portal'];
+    const navTabs = tabs.map(label => ({
+      label,
+      onClick: () => this.setState({ tab: label }),
+      color: label === tab ? '#16233b' : '#5b6472',
+      weight: label === tab ? 700 : 400,
+      bb: label === tab ? '2px solid #4f63e7' : '2px solid transparent'
+    }));
+    const yes = { v: '✓', c: '#2e7d32' }, no = { v: '—', c: '#c2c6cd' }, own = { v: 'Own only', c: '#b06514' };
+    const perm = (cap, a, p, c) => ({ cap, a: a.v, aC: a.c, p: p.v, pC: p.c, c: c.v, cC: c.c });
+    const permRows = [
+      perm('View all cases (all clients)', yes, yes, no),
+      perm('View own company portfolio', yes, yes, yes),
+      perm('Create & edit case data', yes, yes, no),
+      perm('Delete cases', yes, no, no),
+      perm('Manage jurisdiction date rules & email templates', yes, no, no),
+      perm('Upload documents', yes, yes, own),
+      perm('Respond to renewal instructions', no, no, yes),
+      perm('Receive automated deadline alerts', yes, yes, yes),
+      perm('Invite users / assign roles', yes, no, no)
+    ];
+    const ep = (m, mC, path, desc) => ({ m, mC, path, desc });
+    const GET = '#2e7d32', POST = '#4f63e7', PATCH = '#b06514', DEL = '#c2372e';
+    const endpoints = [
+      ep('GET', GET, '/api/trademarks?jurisdiction&status&owner', 'List cases — scoped to company for client tokens'),
+      ep('POST', POST, '/api/trademarks', 'Create case; fires date-rule cascade for the jurisdiction'),
+      ep('PATCH', PATCH, '/api/trademarks/:id', 'Edit case; date field changes re-run cascade, write audit log'),
+      ep('DELETE', DEL, '/api/trademarks/:id', 'Soft-delete (attorney only)'),
+      ep('POST', POST, '/api/trademarks/:id/designations', 'Madrid: spawn designated-country cases linked to the IR'),
+      ep('GET', GET, '/api/case-dates?due_before=', 'Deadline sweep — powers reports & daily alert cron'),
+      ep('POST', POST, '/api/case-dates/:id/complete', 'Mark a deadline done'),
+      ep('GET', GET, '/api/portal/portfolio', 'Client portal: own marks, upcoming renewals, instructions'),
+      ep('POST', POST, '/api/portal/instructions', 'Client responds: renew / lapse / discuss — notifies attorney'),
+      ep('POST', POST, '/api/documents', 'Upload to object storage; visibility internal or client'),
+      ep('GET', GET, '/api/audit?entity=trademark&id=', 'Full change history for a case')
+    ];
+    const box = (name, desc, border = '#e7e6e2') => ({ name, desc, border });
+    const archCols = [
+      { title: 'Clients', arrowDisp: 'flex', items: [
+        box('Desktop app (this prototype)', 'Attorneys & paralegals. Full case management — the current Brandu IP UI, pointed at the API instead of browser storage.'),
+        box('Client portal', 'Browser login for clients. Own portfolio, renewal instructions, documents.', '#d6daf7')] },
+      { title: 'API layer', arrowDisp: 'flex', items: [
+        box('REST API', 'JWT auth, role-based access. Client tokens are hard-scoped to their company_id — no cross-client leakage possible.'),
+        box('Audit middleware', 'Every write logged: who, what, old → new value.')] },
+      { title: 'Services', arrowDisp: 'flex', items: [
+        box('Date rules engine', 'Your Preferences cascade, server-side: a filed date generates dependent deadlines per jurisdiction.'),
+        box('Notification scheduler', 'Daily cron sweeps case_dates, renders email templates, sends alerts to staff & clients.')] },
+      { title: 'Storage', arrowDisp: 'none', items: [
+        box('PostgreSQL', 'All case data — see Data schema tab.'),
+        box('Object storage', 'Mark graphics & documents (S3-compatible).'),
+        box('Email service', 'Transactional sends (e.g. SES / Postmark).')] }
+    ];
+    const c = (n, t, k) => ({ n, t, nC: k === 'pk' ? '#16233b' : k === 'fk' ? '#4f63e7' : '#3d444c', nW: k ? 700 : 400 });
+    const tables = [
+      { name: 'trademarks', accent: '#4f63e7', desc: 'One row per case — 3,679 today', cols: [
+        c('id', 'uuid PK', 'pk'), c('mark_name', 'text'), c('jurisdiction_code ↗', 'jurisdictions', 'fk'), c('application_no', 'text'), c('registration_no', 'text'), c('status', 'enum'), c('basis', 'text'), c('classes', 'int[]'), c('owner_company_id ↗', 'companies', 'fk'), c('madrid_ir_no', 'text · null'), c('parent_case_id ↗', 'self · Madrid link', 'fk'), c('mark_image_key', 'text · null'), c('notes', 'text'), c('created_by ↗ / updated_at', 'users · timestamptz', 'fk')] },
+      { name: 'case_dates', accent: '#b06514', desc: 'All 176 date columns, normalised', cols: [
+        c('id', 'uuid PK', 'pk'), c('trademark_id ↗', 'trademarks', 'fk'), c('event_name', 'text · e.g. Renewal Deadline'), c('due_date', 'date'), c('completed_at', 'date · null'), c('generated_by_rule_id ↗', 'date_rules · null', 'fk')] },
+      { name: 'date_rules', accent: '#b06514', desc: 'Your Preferences cascade', cols: [
+        c('id', 'uuid PK', 'pk'), c('jurisdiction_code ↗', 'jurisdictions', 'fk'), c('trigger_event', 'text · e.g. Application Filed'), c('generated_event', 'text'), c('offset_months', 'int'), c('email_template_id ↗', 'email_templates · null', 'fk')] },
+      { name: 'companies', accent: '#2e7d32', desc: 'Clients / owners', cols: [
+        c('id', 'uuid PK', 'pk'), c('name', 'text'), c('address / country', 'text'), c('primary_contact_id ↗', 'users · null', 'fk')] },
+      { name: 'users', accent: '#2e7d32', desc: 'Staff + client logins', cols: [
+        c('id', 'uuid PK', 'pk'), c('email', 'text unique'), c('name', 'text'), c('role', 'attorney | paralegal | client'), c('company_id ↗', 'companies · null for staff', 'fk'), c('last_login_at', 'timestamptz')] },
+      { name: 'actions', accent: '#8a8f98', desc: 'Trademark actions timeline', cols: [
+        c('id', 'uuid PK', 'pk'), c('trademark_id ↗', 'trademarks', 'fk'), c('date', 'date'), c('description', 'text'), c('done', 'bool'), c('created_by ↗', 'users', 'fk')] },
+      { name: 'documents', accent: '#8a8f98', desc: 'Files incl. mark graphics', cols: [
+        c('id', 'uuid PK', 'pk'), c('trademark_id ↗', 'trademarks', 'fk'), c('filename / storage_key', 'text'), c('visibility', 'internal | client'), c('uploaded_by ↗', 'users', 'fk')] },
+      { name: 'email_templates', accent: '#b06514', desc: 'Client alert templates', cols: [
+        c('id', 'uuid PK', 'pk'), c('name / subject', 'text'), c('body', 'text · {{mark}} {{due_date}} merge fields'), c('jurisdiction_code ↗', 'jurisdictions · null = global', 'fk')] },
+      { name: 'notifications', accent: '#b06514', desc: 'Scheduled & sent alerts', cols: [
+        c('id', 'uuid PK', 'pk'), c('case_date_id ↗', 'case_dates', 'fk'), c('recipient_user_id ↗', 'users', 'fk'), c('send_at / sent_at', 'timestamptz'), c('channel', 'email | in_app')] },
+      { name: 'instructions', accent: '#4f63e7', desc: 'Client renewal responses', cols: [
+        c('id', 'uuid PK', 'pk'), c('case_date_id ↗', 'case_dates', 'fk'), c('response', 'renew | lapse | discuss'), c('responded_by ↗', 'users (client)', 'fk'), c('responded_at', 'timestamptz')] },
+      { name: 'jurisdictions', accent: '#2e7d32', desc: '176 rows', cols: [
+        c('code', 'text PK · e.g. AU, IR-Madrid', 'pk'), c('name', 'text'), c('treaty_member', 'bool')] },
+      { name: 'audit_log', accent: '#8a8f98', desc: 'Immutable change history', cols: [
+        c('id', 'bigserial PK', 'pk'), c('user_id ↗', 'users', 'fk'), c('entity / entity_id', 'text · uuid'), c('field', 'text'), c('old_value / new_value', 'jsonb'), c('at', 'timestamptz')] }
+    ];
+    const clientName = this.props.clientName ?? 'Acme Foods Pty Ltd';
+    const src = (jur, source, method, cadence) => ({ jur, source, method, cadence });
+    const syncSources = [
+      src('Multi-jurisdiction', 'WIPO Global Brand Database — 60+ national + Madrid/6ter registers in one public search', 'Scheduled search + record export', 'Weekly + on-demand'),
+      src('Multi-jurisdiction', 'TMview (EUIPO) — 75+ participating offices incl. AU, NZ, US, UK, EU, JP, KR, CA', 'Public search scrape', 'Weekly + on-demand'),
+      src('Madrid (WIPO)', 'WIPO Madrid Monitor — international registrations & designations', 'Scheduled Madrid Monitor scrape', 'Weekly + on-demand'),
+      src('Australia', 'IP Australia — Australian Trade Mark Search + IP Gov Open Data (IPGOD, data.gov.au) & weekly Official Journal of Trade Marks', 'Bulk open-data files + search scrape', 'Weekly + on-demand'),
+      src('New Zealand', 'IPONZ — public trade mark search & Journal', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('USA', 'USPTO — Trademark Search (ex-TESS), TSDR status, bulkdata.uspto.gov daily XML, Official Gazette', 'Bulk XML + TSDR fetch', 'Weekly + on-demand'),
+      src('United Kingdom', 'UKIPO — trade marks online search & published journal data', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('European Union', 'EUIPO — eSearch plus public register & Open Data portal', 'Open-data files + eSearch scrape', 'Weekly + on-demand'),
+      src('Canada', 'CIPO — Canadian Trademarks Database', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('China', 'CNIPA — trademark search (sbj.cnipa.gov.cn)', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Japan', 'JPO — J-PlatPat public search', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('South Korea', 'KIPO — KIPRIS public search', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Singapore', 'IPOS — IPnew / IP2SG register search', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('India', 'IP India — public trade mark search (ipindiaonline.gov.in)', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Turkey', 'TÜRKPATENT — online trade mark search & Bulletin', 'Scheduled bulletin scrape', 'Weekly + on-demand'),
+      src('Hong Kong', 'IPD Hong Kong — online trade mark search', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Malaysia', 'MyIPO — trade mark search', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Indonesia', 'DGIP — PDKI (pdki-indonesia.dgip.go.id)', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Thailand', 'DIP Thailand — trademark search', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Vietnam', 'IP Vietnam — WIPO Publish / IPAS public search', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Philippines', 'IPOPHL — trademark database', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Brazil', 'INPI Brazil — Busca de marcas & RPI gazette', 'Gazette + search scrape', 'Weekly + on-demand'),
+      src('Mexico', 'IMPI — MARCANET / VISOR', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Germany', 'DPMA — DPMAregister', 'Scheduled register scrape', 'Weekly + on-demand'),
+      src('France', 'INPI France — data.inpi.fr open data & register', 'Open-data files + search', 'Weekly + on-demand'),
+      src('Spain', 'OEPM — trademark locator (localizador)', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Italy', 'UIBM — trademark database', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Switzerland', 'IPI — Swissreg', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Norway', 'Patentstyret — trademark search', 'Scheduled search scrape', 'Weekly + on-demand'),
+      src('Africa (regional)', 'OAPI & ARIPO — regional registers / gazettes', 'Gazette + search scrape', 'Weekly + on-demand')
+    ];
+    const step = (n, name, desc) => ({ n, name, desc });
+    const syncSteps = [
+      step('1', 'Fetch', 'Scheduled job downloads each office\'s public bulk file or scrapes its public search/Bulletin — no paid API, no login. Runs headless on the server.'),
+      step('2', 'Parse & normalise', 'Extract application/registration no., status, key dates, owner, classes into a common shape per jurisdiction.'),
+      step('3', 'Match', 'Join incoming records to our cases on application no. / registration no. + jurisdiction.'),
+      step('4', 'Diff', 'Compare every field to what we hold — status changes, new dates, ownership changes, new deadlines.'),
+      step('5', 'Reconcile queue', 'Differences become a review item — the register is treated as the source of truth, but nothing overwrites a case silently.'),
+      step('6', 'Confirm / auto-apply', 'Attorney confirms; low-risk changes (e.g. status advanced to Registered) can auto-apply with an audit entry. This is the human-error safety net.')
+    ];
+    const rr = (t, d) => ({ t, d });
+    const reconRules = [
+      rr('Register is source of truth', 'When the official register and our record disagree, the register wins — surfaced for confirmation, never discarded.'),
+      rr('Never silent-overwrite attorney entries', 'A manually entered date or note is flagged as a conflict, not replaced.'),
+      rr('Status → cascade', 'An accepted register status change re-runs the jurisdiction date-rule cascade, then routes the new deadlines to review.'),
+      rr('Missing-in-register alert', 'A case we hold that the register no longer shows (lapsed/removed) raises a high-priority alert.'),
+      rr('Every sync is audited', 'Source, timestamp, old→new value and who confirmed are written to audit_log.')
+    ];
+    const cmp = (cap, ours, oursOk, norm) => ({ cap, ours, oursColor: oursOk === 2 ? '#2e7d32' : oursOk === 1 ? '#b06514' : '#c2372e', norm });
+    const compareRows = [
+      cmp('Status-driven date engine', 'Yes — per-jurisdiction cascade', 2, 'Core of CPA / Alt Legal'),
+      cmp('Jurisdiction opposition timelines', 'Yes — AU/NZ/US/UK/EU/TR/JP', 2, 'Mid-tier feature'),
+      cmp('Madrid IR + designation linkage', 'Yes', 2, 'Anaqua / IPfolio tier'),
+      cmp('Client extranet w/ per-login access', 'Yes', 2, 'Usually a paid add-on'),
+      cmp('Email templates + merge + send', 'Yes', 2, 'Alt Legal / WebTMS have it'),
+      cmp('Live register sync (public data)', 'Specced — this build', 1, 'CPA/Alt Legal via paid feeds'),
+      cmp('Weekend / holiday date roll-forward', 'Specced — real-code item', 1, 'Built-in commercially'),
+      cmp('Audit trail & rule versioning', 'Specced (audit_log)', 1, 'Standard in enterprise tools'),
+      cmp('Docketing-grade dual verification', 'Not yet', 0, 'Malpractice-insurance expectation'),
+      cmp('Renewal fees / invoicing hooks', 'Not yet', 0, 'Present in full IPMS')
+    ];
+    const parityItems = [
+      'Live register sync from public databases (this spec) — the biggest error-reduction win.',
+      'Robust date math: month-end, leap-year, weekend + per-office holiday roll-forward, validated against the Date Rule Test Cases harness.',
+      'Immutable audit log + date-rule versioning so statutory changes can be recomputed and traced.',
+      'Dual-diary / docket verification workflow for critical deadlines.',
+      'Fee schedules, renewal cost estimates and invoicing hooks.',
+      'Multi-user concurrency, backups and access logging at scale.'
+    ];
+    const clientInitials = clientName.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    const green = { bg: '#e6f2e6', fg: '#2e7d32' }, amber = { bg: '#fdf1e3', fg: '#b06514' }, blue = { bg: '#eceefc', fg: '#4f63e7' };
+    const row = (jur, name, reg, status, s, renewal, soon) => ({ jur, name, reg, status, bg: s.bg, fg: s.fg, renewal, renC: soon ? '#b06514' : '#5b6472' });
+    const portfolioRows = [
+      row('Australia', 'ACME & Device', '1284755', 'Registered', green, '14 Oct 2026', true),
+      row('Australia', 'ACME', '1104233', 'Registered', green, '02 Mar 2028'),
+      row('New Zealand', 'ACME & Device', '990112', 'Registered', green, '14 Oct 2026', true),
+      row('IR (Madrid)', 'ACME & Device', 'IR 1550021', 'Registered', blue, '22 Jan 2027', true),
+      row('United States', 'ACME & Device', 'Ser. 97/440,182', 'Pending', amber, '—'),
+      row('United Kingdom', 'ACME & Device', 'UK00003844501', 'Registered', green, '22 Jan 2027', true),
+      row('Japan', 'ACME (Katakana)', '6522104', 'Registered', green, '11 Aug 2029')
+    ];
+    const instructed = this.state.instructed;
+    return {
+      navTabs,
+      isArch: tab === 'Architecture', isSchema: tab === 'Data schema', isRegSync: tab === 'Register sync', isCompare: tab === 'Vs. commercial', isPortal: tab === 'Client portal',
+      archCols, permRows, endpoints, tables, syncSources, syncSteps, reconRules, compareRows, parityItems,
+      clientName, clientInitials,
+      statCards: [
+        { value: '7', label: 'Marks in your portfolio', color: '#16233b' },
+        { value: '4', label: 'Renewals in the next 12 months', color: '#b06514' },
+        { value: instructed ? '0' : '1', label: 'Awaiting your instruction', color: '#4f63e7' }
+      ],
+      portfolioRows,
+      instrDisp: instructed ? 'none' : 'block',
+      instrDoneDisp: instructed ? 'block' : 'none',
+      instrResult: instructed || '',
+      instructRenew: () => this.setState({ instructed: 'proceed with renewal' }),
+      instructLapse: () => this.setState({ instructed: 'do not renew' }),
+      instructDiscuss: () => this.setState({ instructed: 'attorney will contact you to discuss' })
+    };
+  }
+}
+</script>
+</body>
+</html>

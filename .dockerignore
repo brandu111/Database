@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+**/dist
+deploy
+server/data
+server/uploads
+.git
+*.sqlite*
+docs/design-handoff/screenshots
