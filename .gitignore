@@ -1,6 +1,7 @@
 node_modules/
 dist/
 deploy/
+brandu-tm-deploy.zip
 *.tsbuildinfo
 server/data/*.sqlite*
 server/uploads/
