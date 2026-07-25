@@ -40,6 +40,7 @@ import {
   loadRules,
   type DB,
 } from './db.js';
+import { IpAuError, ipAuConfigured, lookupTradeMark } from './ipaustralia.js';
 import {
   checkPassword,
   clearSessionCookie,
@@ -335,6 +336,23 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     created.filter((x) => x.irId).forEach((x) => processMarkWrite(db, x, x));
     res.json({ ir: getMark(db, ir.id), created: created.map((x) => getMark(db, x.id)) });
   });
+
+  /**
+   * Look up an Australian trade mark on the IP Australia register and return
+   * the mapped fields for the client to pre-populate a case. Editors only; the
+   * API credentials never leave the server.
+   */
+  app.get('/api/lookup/ip-australia/:number', edit, async (req, res) => {
+    try {
+      const fields = await lookupTradeMark(req.params.number);
+      res.json(fields);
+    } catch (e) {
+      const err = e as IpAuError;
+      res.status(err.status && err.status >= 400 && err.status < 600 ? err.status : 502).json({ error: err.message || 'Lookup failed' });
+    }
+  });
+
+  app.get('/api/lookup/ip-australia', view, (_req, res) => res.json({ configured: ipAuConfigured() }));
 
   app.get('/api/marks/:id/correspondence', view, (req, res) => {
     res.json(db.prepare(`SELECT * FROM correspondence WHERE mark_id=? ORDER BY sent_at DESC`).all(req.params.id));

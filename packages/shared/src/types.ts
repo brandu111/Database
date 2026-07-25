@@ -80,6 +80,10 @@ export interface Mark {
   ownerFirst?: string;
   ownerMiddle?: string;
   ownerLast?: string;
+  /** Owner's Australian Business Number (from the IP Australia register). */
+  ownerAbn?: string;
+  /** Owner's ACN / ARBN (from the IP Australia register). */
+  ownerAcn?: string;
   filingBasis: string;
   type: MarkType | string;
   wordText?: string;

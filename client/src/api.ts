@@ -39,6 +39,8 @@ export const api = {
   saveMark: (m: Mark) => req<Mark>('PUT', `/api/marks/${m.id}`, m),
   deleteMark: (id: string) => req<{ ok: true }>('DELETE', `/api/marks/${id}`),
   fileMadrid: (id: string, country?: string) => req<{ ir: Mark; created: Mark[] }>('POST', `/api/marks/${id}/madrid`, country ? { country } : {}),
+  ipAuConfigured: () => req<{ configured: boolean }>('GET', '/api/lookup/ip-australia'),
+  lookupIpAustralia: (number: string) => req<Partial<Mark>>('GET', `/api/lookup/ip-australia/${encodeURIComponent(number.trim())}`),
   logCorrespondence: (id: string, entry: { to: string; subject: string; body: string }) => req<{ ok: true }>('POST', `/api/marks/${id}/correspondence`, entry),
 
   oppositions: () => req<Opposition[]>('GET', '/api/oppositions'),

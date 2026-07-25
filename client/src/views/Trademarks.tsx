@@ -256,6 +256,34 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
     [canEdit, doSave]
   );
 
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupMsg, setLookupMsg] = useState('');
+
+  /** Populate the case from the IP Australia register by its application/registration number. */
+  const lookupIpAustralia = async () => {
+    const number = (m.application || m.registration || '').trim();
+    if (!number) {
+      setLookupMsg('Enter an application or registration number first.');
+      return;
+    }
+    const hasContent = m.name || m.classes || m.goods || m.owner;
+    if (hasContent && !window.confirm('Fetch details from IP Australia and overwrite this case’s mark name, classes, goods/services, owner and key dates?')) return;
+    setLookupBusy(true);
+    setLookupMsg('');
+    try {
+      const fields = await api.lookupIpAustralia(number);
+      // Merge fetched dates with any manual rows the user already added.
+      const fetched = fields.dates || [];
+      const keep = (m.dates || []).filter((d) => !fetched.some((f) => f.name === d.name));
+      update({ ...fields, dates: [...fetched, ...keep] }, true);
+      setLookupMsg(`Loaded from IP Australia (${number}).`);
+    } catch (e) {
+      setLookupMsg(e instanceof Error ? e.message : 'Lookup failed.');
+    } finally {
+      setLookupBusy(false);
+    }
+  };
+
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
 
   const jurNames = useMemo(() => {
@@ -429,6 +457,17 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
               <Field label="Registration no."><input type="text" value={m.registration} onChange={(e) => update({ registration: e.target.value })} disabled={ro} /></Field>
               <Field label="Classes"><input type="text" value={m.classes} onChange={(e) => update({ classes: e.target.value })} disabled={ro} /></Field>
             </div>
+            {canEdit && m.jurisdiction === 'Australia' && (
+              <div className="row" style={{ marginTop: -2, marginBottom: 8 }}>
+                <button className="btn secondary small" disabled={lookupBusy} onClick={lookupIpAustralia} title="Fetch details from the IP Australia register using the application or registration number">
+                  {lookupBusy ? 'Looking up…' : '🔍 Look up from IP Australia'}
+                </button>
+                <a href="https://search.ipaustralia.gov.au/trademarks/search/quick" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)', fontSize: 12 }}>
+                  Open register ↗
+                </a>
+                {lookupMsg && <span className="hint" style={{ color: lookupMsg.startsWith('Loaded') ? 'var(--success)' : 'var(--danger)' }}>{lookupMsg}</span>}
+              </div>
+            )}
             <Field label="Goods / services">
               <textarea value={m.goods} onChange={(e) => update({ goods: e.target.value })} disabled={ro} />
             </Field>
@@ -463,6 +502,10 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
                   <option>Individual</option>
                 </select>
               </Field>
+            </div>
+            <div className="grid2">
+              <Field label="ACN / ARBN"><input type="text" value={m.ownerAcn || ''} onChange={(e) => update({ ownerAcn: e.target.value })} disabled={ro} /></Field>
+              <Field label="ABN"><input type="text" value={m.ownerAbn || ''} onChange={(e) => update({ ownerAbn: e.target.value })} disabled={ro} /></Field>
             </div>
             <div className="grid2">
               <Field label="Address"><input type="text" value={m.address1 || ''} onChange={(e) => update({ address1: e.target.value })} disabled={ro} /></Field>
