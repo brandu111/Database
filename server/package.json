@@ -11,17 +11,18 @@
     "seed": "tsx src/seed-cli.ts",
     "test": "vitest run"
   },
+  "engines": {
+    "node": ">=22.13"
+  },
   "dependencies": {
     "@brandu/shared": "1.0.0",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.3.0",
     "cookie-parser": "^1.4.6",
     "express": "^4.21.0",
     "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.11",
     "@types/cookie-parser": "^1.4.7",
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.12",

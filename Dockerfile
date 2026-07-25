@@ -3,7 +3,7 @@
 # only better-sqlite3 (the single native dependency).
 
 # ---- build stage -----------------------------------------------------------
-FROM node:20-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
@@ -14,12 +14,11 @@ COPY . .
 RUN npm run build:deploy
 
 # ---- runtime stage ---------------------------------------------------------
-FROM node:20-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
-# Runtime manifest first, so the native module layer caches independently.
-COPY --from=build /app/deploy/package.json ./package.json
-RUN npm install --omit=dev && npm cache clean --force
+# The deploy bundle has no runtime dependencies (Node's built-in SQLite is used),
+# so there is nothing to install — just copy it in.
 COPY --from=build /app/deploy/ ./
 # Persist the database and uploaded files on a mounted volume.
 VOLUME ["/app/data", "/app/uploads"]

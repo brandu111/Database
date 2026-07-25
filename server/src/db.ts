@@ -1,7 +1,7 @@
-import Database from 'better-sqlite3';
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Database } from './sqlite.js';
 import {
   defaultOppDatesMaster,
   defaultRules,
@@ -24,7 +24,7 @@ import {
  * relational and store bcrypt hashes only.
  */
 
-export type DB = Database.Database;
+export type DB = Database;
 
 export function openDb(file: string): DB {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });

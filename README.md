@@ -24,7 +24,7 @@ storage and a client extranet.
 
 ## Getting started
 
-Requires Node 20+.
+Requires Node 22.13+ (or 24) — the server uses Node's built-in `node:sqlite`.
 
 ```bash
 npm install
@@ -45,8 +45,9 @@ Production build: `npm run build`, then `npm start` — the API serves the built
 
 - **VentraIP / cPanel shared hosting** (Setup Node.js App): [`docs/DEPLOY-cpanel.md`](docs/DEPLOY-cpanel.md).
   `npm run build:deploy` produces a self-contained `deploy/` bundle (a single
-  `app.cjs` with the engine inlined, the built client, and the seed data) that
-  installs only one native dependency on the host.
+  `app.cjs` with the engine inlined, the built client, and the seed data) with
+  **no dependencies to install and nothing to compile** — it uses the SQLite
+  engine built into Node (needs Node 22.13+ or 24).
 - **Docker / VPS / managed host** (Render, Railway, Fly.io):
   [`docs/DEPLOY-docker.md`](docs/DEPLOY-docker.md), using the root `Dockerfile`,
   `docker-compose.yml`, and `render.yaml`.
@@ -116,10 +117,12 @@ before go-live):
 
 ## Upgrade paths (deliberate v1 simplifications)
 
-- **Database**: SQLite (zero-ops, WAL) with JSON document columns + indexed filter
-  columns. The same shape maps directly onto PostgreSQL `jsonb` — swap `server/src/db.ts`
-  for a `pg` implementation; queries are intentionally simple. Cross-matter date reporting
-  at larger scale would justify promoting `dates[]` into a relational `mark_dates` table.
+- **Database**: SQLite via Node's built-in `node:sqlite` (zero-ops, no native module),
+  with JSON document columns + indexed filter columns behind a thin adapter
+  (`server/src/sqlite.ts`). The same shape maps directly onto PostgreSQL `jsonb` — swap
+  `server/src/db.ts` for a `pg` implementation; queries are intentionally simple.
+  Cross-matter date reporting at larger scale would justify promoting `dates[]` into a
+  relational `mark_dates` table.
 - **Files**: stored on local disk under `server/uploads`. Move to S3-compatible object
   storage by replacing the two handlers in `server/src/app.ts` (`/api/files`, `/files`).
 - **Email**: "Send client email" opens the user's mail app pre-filled and records the
