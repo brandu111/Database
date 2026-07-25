@@ -344,7 +344,14 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
    */
   app.get('/api/lookup/ip-australia/:number', edit, async (req, res) => {
     try {
-      const fields = await lookupTradeMark(req.params.number);
+      const fields = await lookupTradeMark(req.params.number, {
+        saveImage: (buffer, contentType) => {
+          const ext = contentType.includes('png') ? '.png' : contentType.includes('gif') ? '.gif' : contentType.includes('svg') ? '.svg' : '.jpg';
+          const name = `${randomBytes(8).toString('hex')}${ext}`;
+          fs.writeFileSync(path.join(uploadsDir, name), buffer);
+          return `/files/${name}`;
+        },
+      });
       res.json(fields);
     } catch (e) {
       const err = e as IpAuError;

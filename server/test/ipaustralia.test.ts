@@ -82,11 +82,11 @@ describe('mapApiTrademark', () => {
       number: '5',
       words: [],
       markCategories: ['Fancy/Device'],
-      images: { image: [{ imageUrl: 'https://example/img.png' }] },
+      images: { description: ['device'], images: ['https://cdn.search.ipaustralia.gov.au/x/T1/1.0/T1.MEDIUM.png'] },
       owner: [{ name: 'Jane Smith' }],
     });
     expect(m.type).toBe('Logo');
     expect(m.ownerType).toBe('Individual');
-    expect(m.image).toBe('https://example/img.png');
+    expect(m.image).toBe('https://cdn.search.ipaustralia.gov.au/x/T1/1.0/T1.MEDIUM.png');
   });
 });

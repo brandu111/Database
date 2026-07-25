@@ -90,7 +90,7 @@ interface ApiTrademark {
   statusDetail?: string | null;
   statusGroup?: string | null;
   irNumber?: string | null;
-  images?: { image?: { imageUrl?: string | null }[] } | null;
+  images?: { description?: (string | null)[] | null; images?: (string | null)[] | null } | null;
 }
 
 interface ApiPartyType {
@@ -127,9 +127,15 @@ function mapStatus(tm: ApiTrademark): string {
 }
 
 /** Best-effort mark type from the register's kind / categories, and whether an image exists. */
+/** The register's logo/device image URL (largest available), if any. */
+function imageUrlOf(tm: ApiTrademark): string {
+  const imgs = (tm.images?.images || []).map(clean).filter(Boolean);
+  return imgs.find((u) => /HIGH|LARGE/i.test(u)) || imgs.find((u) => /MEDIUM/i.test(u)) || imgs[0] || '';
+}
+
 function mapType(tm: ApiTrademark): string {
   const tokens = [...(tm.kind || []), ...(tm.markCategories || [])].map((x) => clean(x).toLowerCase());
-  const hasImage = !!tm.images?.image?.some((i) => clean(i?.imageUrl));
+  const hasImage = !!imageUrlOf(tm);
   const hasWord = tokens.some((t) => t.includes('word'));
   const hasDevice = tokens.some((t) => t.includes('device') || t.includes('figurative') || t.includes('logo') || t.includes('fancy'));
   if (tokens.some((t) => t.includes('series'))) return 'Series';
@@ -167,7 +173,7 @@ export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
   addDate('Publication Date', isoDate(tm.acceptanceAdvertisedDate) || isoDate(tm.registrationAdvertisedDate));
   addDate('Registration Date', isoDate(tm.enteredOnRegisterDate) || isoDate(tm.registeredFromDate));
 
-  const image = tm.images?.image?.map((i) => clean(i?.imageUrl)).find(Boolean) || null;
+  const image = imageUrlOf(tm) || null;
 
   const out: Partial<Mark> = {
     name,
@@ -198,8 +204,16 @@ export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
   return out;
 }
 
-/** Look up a trade mark by its number and return the mapped Mark fields. */
-export async function lookupTradeMark(numberRaw: string): Promise<Partial<Mark>> {
+/** Saves image bytes somewhere durable and returns a URL the client can load. */
+export type SaveImage = (buffer: Buffer, contentType: string, sourceUrl: string) => Promise<string> | string;
+
+/**
+ * Look up a trade mark by its number and return the mapped Mark fields. When a
+ * `saveImage` sink is provided and the register has a logo/device image, the
+ * image is downloaded from IP Australia's public image CDN and stored locally,
+ * so the mark's `image` becomes a durable local URL rather than a hotlink.
+ */
+export async function lookupTradeMark(numberRaw: string, opts: { saveImage?: SaveImage } = {}): Promise<Partial<Mark>> {
   if (!ipAuConfigured()) {
     throw new IpAuError(503, 'IP Australia lookup is not configured on the server (set IPAU_CLIENT_ID and IPAU_CLIENT_SECRET).');
   }
@@ -220,5 +234,24 @@ export async function lookupTradeMark(numberRaw: string): Promise<Partial<Mark>>
     throw new IpAuError(502, `IP Australia lookup failed (${res.status}). ${text.slice(0, 200)}`);
   }
   const tm = (await res.json()) as ApiTrademark;
-  return mapApiTrademark(tm);
+  const fields = mapApiTrademark(tm);
+
+  // Download and store the logo. The image CDN is public, so we deliberately do
+  // NOT send the API token to it. Best-effort: on any failure keep the fields
+  // (minus the image) rather than failing the whole lookup.
+  if (fields.image && opts.saveImage) {
+    try {
+      const imgRes = await fetch(fields.image, { headers: { Accept: 'image/*' } });
+      if (imgRes.ok) {
+        const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+        const buffer = Buffer.from(await imgRes.arrayBuffer());
+        fields.image = await opts.saveImage(buffer, contentType, fields.image);
+      } else {
+        delete fields.image;
+      }
+    } catch {
+      delete fields.image;
+    }
+  }
+  return fields;
 }
