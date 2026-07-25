@@ -416,10 +416,11 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
                 </select>
               </Field>
               <Field label="Jurisdiction">
-                <input type="text" list="jur-list" value={m.jurisdiction} onChange={(e) => update({ jurisdiction: e.target.value })} disabled={ro} />
-                <datalist id="jur-list">
-                  {allJurisdictions().map((j) => <option key={j} value={j} />)}
-                </datalist>
+                <select value={m.jurisdiction} onChange={(e) => update({ jurisdiction: e.target.value }, true)} disabled={ro}>
+                  {[...new Set([m.jurisdiction, ...allJurisdictions()])].filter(Boolean).map((j) => (
+                    <option key={j} value={j}>{j}</option>
+                  ))}
+                </select>
               </Field>
             </div>
             <TypeFields m={m} update={update} ro={ro} />

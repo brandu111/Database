@@ -621,8 +621,20 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   // ---- static client (production build) -------------------------------------
 
   if (opts.clientDist && fs.existsSync(opts.clientDist)) {
-    app.use(express.static(opts.clientDist));
-    app.get(/^\/(?!api\/|files\/).*/, (_req, res) => res.sendFile(path.join(opts.clientDist!, 'index.html')));
+    // Hashed assets (/assets/*) are immutable and cache freely; index.html must
+    // revalidate so a front-end update is never stuck behind a stale shell that
+    // references a since-deleted bundle.
+    app.use(
+      express.static(opts.clientDist, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+        },
+      })
+    );
+    app.get(/^\/(?!api\/|files\/).*/, (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile(path.join(opts.clientDist!, 'index.html'));
+    });
   }
 
   return app;
