@@ -92,6 +92,30 @@ The server listens on the port Passenger provides (or \$PORT, default 3000) and
 serves the front end from ./public. Data lives in ./data/brandu.sqlite and
 uploads in ./uploads — back these up. See docs/DEPLOY-cpanel.md in the repo for
 the full walkthrough.
+
+## Staff alert emails (optional)
+
+To let the system email staff ("action required" notices and the daily digest),
+add your cPanel/VentraIP mailbox details as environment variables in the Node
+app panel — nothing leaves your hosting:
+
+    SMTP_HOST    mail server host, e.g. mail.brandu.legal
+    SMTP_PORT    465 (SSL) or 587 (STARTTLS); default 587
+    SMTP_USER    a full mailbox address, e.g. alerts@brandu.legal
+    SMTP_PASS    that mailbox's password
+    SMTP_FROM    From address (defaults to SMTP_USER)
+    PORTAL_URL   https://portal.brandu.legal   (link shown in the emails)
+
+Each staff member sets their own address under Preferences → Settings → "My
+email sign-off". Use "Send test" there to confirm it works.
+
+Daily digest: schedule a cPanel cron job to run once a day (8:00 AM AET is
+0 22 * * * in UTC). Command:
+
+    source ~/nodevenv/brandu-tm/24/bin/activate && cd ~/brandu-tm && RUN_TASK=daily-digest node app.cjs
+
+This sends each staff member one email listing all of their deadlines due that
+day (and any overdue), then exits — it does not start the web server.
 `
 );
 
