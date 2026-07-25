@@ -12,15 +12,16 @@ stays where it is; the app runs on its own subdomain, e.g.
 > where files could be served directly.
 
 Shared hosting can't reliably run the TypeScript/Vite build, so you build a
-**pre-made bundle on your own computer** and upload it. The bundle needs to
-install just one dependency on the server (`better-sqlite3`), from a prebuilt
-binary — no compiler required.
+**pre-made bundle on your own computer** and upload it. The bundle uses the
+SQLite engine **built into Node itself**, so there are **no dependencies to
+install and nothing to compile** on the server — it just needs Node 22.13+ or
+24 (24 is ideal).
 
 ---
 
 ## 1. Build the deploy bundle (on your computer)
 
-Requires Node 20+ locally (once — only to produce the bundle).
+Requires Node 22.13+ locally (once — only to produce the bundle).
 
 ```bash
 git clone https://github.com/brandu111/Database.git
@@ -37,7 +38,7 @@ deploy/
   app.cjs         ← the whole server in one file (the Passenger startup file)
   public/         ← the built web app
   seed/           ← initial data (existing marks, oppositions, templates)
-  package.json    ← lists only better-sqlite3
+  package.json    ← runtime manifest (no dependencies)
   README.md
 ```
 
@@ -74,7 +75,7 @@ cPanel → **Setup Node.js App** → **Create Application**:
 
 | Field | Value |
 | --- | --- |
-| Node.js version | the highest offered (20.x preferred; 18.x is fine) |
+| Node.js version | **24.x** (the "recommended" one); 22.13+ also works — *not* 20 or 18 |
 | Application mode | **Production** |
 | Application root | `brandu-tm` (from step 2) |
 | Application URL | `portal.brandulegal.com.au` |
@@ -93,12 +94,11 @@ instead of the default `brandu-change-me`.
 
 Click **Create**.
 
-## 5. Install the dependency and start
+## 5. Start it
 
-1. On the app's card, click **Run NPM Install**. This fetches `better-sqlite3`
-   (a prebuilt binary — it should finish in a few seconds without compiling).
-   - *If it fails to build:* switch the app to a different Node version that has
-     a prebuilt binary available (20.x is the safest) and run it again.
+1. On the app's card, click **Run NPM Install**. Because the app has **no
+   dependencies** (it uses Node's built-in SQLite), this finishes instantly and
+   installs nothing — that is expected and correct, not an error.
 2. Click **Restart**. The first boot **seeds the database** from `seed/`
    (this can take a few seconds — it's importing several thousand records).
 3. Open `https://portal.brandulegal.com.au` — you should see the sign-in page.
@@ -162,8 +162,11 @@ Database schema changes and rule updates migrate automatically on start
 - **"Database already contains N marks — refusing to re-seed"** in the log →
   harmless; it means seeding was attempted on an already-populated database.
   Remove `SEED_ON_START` and restart.
-- **NPM install fails compiling better-sqlite3** → change the Node.js version to
-  20.x (which has a matching prebuilt binary) and retry.
+- **App won't start, log mentions `sqlite` / `getBuiltinModule`** → the Node
+  version is too old. Built-in SQLite needs **Node 22.13+ or 24**; switch the
+  app's Node.js version to **24.x** and restart. (Node 20/18 won't work.)
+- **`ExperimentalWarning: SQLite is an experimental feature`** in the log →
+  harmless and expected; it's just a notice, not an error.
 
 If you'd rather not run on shared hosting, `docs/DEPLOY-docker.md` covers a small
 VPS / managed host (Render, Railway, Fly.io) using the included `Dockerfile` —
