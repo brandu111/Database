@@ -105,9 +105,10 @@ export function Reports() {
   }, [rules, dateCols]);
 
   const sorted = useMemo(() => {
+    const q = rCompany.trim().toLowerCase();
     const rows = marks.filter(
       (m) =>
-        (rCompany === 'All companies' || m.owner === rCompany) &&
+        (!q || q === 'all companies' || (m.owner || '').toLowerCase().includes(q)) &&
         (rJur === 'All jurisdictions' || m.jurisdiction === rJur) &&
         (rStatus === 'All statuses' || m.status === rStatus) &&
         !excluded.includes(m.id)
@@ -173,10 +174,14 @@ export function Reports() {
         </div>
         <div className="hint" style={{ marginBottom: 10 }}>Drag a column heading left or right to reorder. Click a heading to sort. Your layout is saved on this computer.</div>
         <div className="row">
-          <select value={rCompany} onChange={(e) => setRCompany(e.target.value)}>
-            <option>All companies</option>
-            {owners.map((o) => <option key={o}>{o}</option>)}
-          </select>
+          <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <input type="text" list="report-companies" placeholder="🔍 Search company…" value={rCompany === 'All companies' ? '' : rCompany}
+              onChange={(e) => setRCompany(e.target.value || 'All companies')} style={{ minWidth: 220 }} />
+            <datalist id="report-companies">{owners.map((o) => <option key={o} value={o} />)}</datalist>
+            {rCompany && rCompany !== 'All companies' && (
+              <button className="btn danger-link" title="Clear" onClick={() => setRCompany('All companies')} style={{ position: 'absolute', right: 4 }}>✕</button>
+            )}
+          </span>
           <select value={rJur} onChange={(e) => setRJur(e.target.value)}>
             <option>All jurisdictions</option>
             {jurs.map((j) => <option key={j}>{j}</option>)}
@@ -197,6 +202,14 @@ export function Reports() {
       </div>
 
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', borderBottom: '2px solid var(--accent, #d34b44)' }}>
+          {settings?.logo && <img src={settings.logo} alt="logo" style={{ maxHeight: 52, maxWidth: 180, objectFit: 'contain' }} />}
+          <div>
+            <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--heading)' }}>{settings?.lawFirmName || 'BrandU Legal'} — Trade Marks Report</div>
+            <div className="hint">{fmtDate(todayISO())} · {sorted.length} matters</div>
+          </div>
+          <span className="hint" style={{ marginLeft: 'auto', textAlign: 'right' }}>Change the logo &amp; firm name in<br />Preferences → Settings &amp; Users</span>
+        </div>
         <table className="list">
           <thead>
             <tr>

@@ -75,9 +75,11 @@ function migrate(db: DB): void {
       body TEXT NOT NULL DEFAULT '', user_name TEXT NOT NULL DEFAULT ''
     );
   `);
-  // Per-user HTML email signature (individual sign-offs). Added by migration so
-  // existing databases pick it up without losing data.
+  // Per-user HTML email signature (individual sign-offs) and email address (for
+  // staff alert notifications). Added by migration so existing databases pick
+  // them up without losing data.
   addColumn(db, 'staff_users', 'signature', "TEXT NOT NULL DEFAULT ''");
+  addColumn(db, 'staff_users', 'email', "TEXT NOT NULL DEFAULT ''");
   ensureRulesCurrent(db);
 }
 
