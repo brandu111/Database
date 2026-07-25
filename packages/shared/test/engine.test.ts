@@ -187,6 +187,66 @@ describe('Madrid designation renewal linkage', () => {
   });
 });
 
+describe('renewal roll-over — ticking a renewal off advances to the next cycle', () => {
+  it('AU: completing a renewal archives it and creates the next renewal + reminder chain', () => {
+    const m = blankMark();
+    m.dates.push({ name: 'Application Filed', date: '2020-08-15', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2021-02-10', done: true });
+    ensureRuleRows(m, rules);
+    expect(dateOf(m, 'Renewal Deadline')).toBe('2030-08-15');
+
+    // The user ticks the renewal off.
+    m.dates.find((x) => x.name === 'Renewal Deadline')!.done = true;
+    ensureRuleRows(m, rules);
+
+    // A new (not-done) renewal appears 10 years on, with a fresh reminder chain.
+    const live = m.dates.find((x) => x.name === 'Renewal Deadline')!;
+    expect(live.date).toBe('2040-08-15');
+    expect(live.done).toBe(false);
+    expect(dateOf(m, 'Renewal Reminder')).toBe('2040-02-15');
+    expect(dateOf(m, 'Renewal Reminder - Final')).toBe('2040-07-15');
+    expect(dateOf(m, 'Renewal Reminder - 1 Week')).toBe('2040-08-08');
+    expect(dateOf(m, '6 Month Renewal Grace Period')).toBe('2041-02-15');
+    // The completed renewal is kept as a static, ticked history record.
+    const archived = m.dates.find((x) => x.renewalArchived);
+    expect(archived?.date).toBe('2030-08-15');
+    expect(archived?.done).toBe(true);
+  });
+
+  it('advances again on a second completion (third 10-year cycle)', () => {
+    const m = blankMark();
+    m.dates.push({ name: 'Application Filed', date: '2020-08-15', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2021-02-10', done: true });
+    ensureRuleRows(m, rules);
+    m.dates.find((x) => x.name === 'Renewal Deadline')!.done = true;
+    ensureRuleRows(m, rules); // → 2040
+    m.dates.find((x) => x.name === 'Renewal Deadline')!.done = true;
+    ensureRuleRows(m, rules); // → 2050
+    expect(dateOf(m, 'Renewal Deadline')).toBe('2050-08-15');
+    expect(m.dates.filter((x) => x.renewalArchived).length).toBe(2);
+  });
+
+  it('Madrid: completing the IR renewal rolls it forward and re-propagates to designations', () => {
+    const ir = blankMark({ id: 'ir1', jurisdiction: 'Madrid Protocol (WIPO)' });
+    ir.dates.push({ name: 'Application Filed', date: '2014-04-04', done: true });
+    const des = blankMark({ id: 'des1', jurisdiction: 'Japan', irId: 'ir1' });
+    des.dates.push({ name: 'Application Filed', date: '2014-04-04', done: true });
+    const all = [ir, des];
+    ensureRuleRows(ir, rules, all);
+    expect(dateOf(ir, 'Renewal Deadline')).toBe('2024-04-04');
+    expect(dateOf(des, 'Renewal Deadline')).toBe('2024-04-04');
+
+    // Tick the IR renewal off.
+    ir.dates.find((x) => x.name === 'Renewal Deadline')!.done = true;
+    ensureRuleRows(ir, rules, all);
+    expect(dateOf(ir, 'Renewal Deadline')).toBe('2034-04-04');
+    // The linked designation follows the IR to the next cycle.
+    const dRen = des.dates.find((x) => x.name === 'Renewal Deadline')!;
+    expect(dRen.date).toBe('2034-04-04');
+    expect(dRen.done).toBe(false);
+  });
+});
+
 describe('rulesVersion migration', () => {
   it('replaces built-in rules but preserves custom rules', () => {
     const stored: RuleBook = {

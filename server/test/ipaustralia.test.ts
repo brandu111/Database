@@ -77,6 +77,25 @@ describe('mapApiTrademark', () => {
     expect(m.status).toBe('Pending');
   });
 
+  it('extracts classes from the classNumber / niceClass field variants', () => {
+    const m = mapApiTrademark({
+      number: '7',
+      words: ['ACME'],
+      goodsAndServices: [
+        { classNumber: 25, descriptionText: 'Clothing' },
+        { niceClass: '9', descriptionText: 'Software' },
+      ],
+    } as never);
+    expect(m.classes).toBe('9, 25');
+    expect(m.goods).toContain('Class 25: Clothing');
+    expect(m.goods).toContain('Class 9: Software');
+  });
+
+  it('falls back to a top-level class list and sorts numerically', () => {
+    const m = mapApiTrademark({ number: '8', words: ['ACME'], classes: [3, 30, 5] } as never);
+    expect(m.classes).toBe('3, 5, 30');
+  });
+
   it('classifies an individual owner (no ABN/ACN) and a logo mark', () => {
     const m = mapApiTrademark({
       number: '5',

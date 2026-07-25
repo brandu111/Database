@@ -38,6 +38,17 @@ export interface MarkDate {
   emailFor?: string;
   /** Madrid designation: renewal copied from the parent IR, not computed. */
   linkedToIR?: boolean;
+  /**
+   * Number of completed renewal cycles for a recurring renewal deadline. The
+   * live "Renewal Deadline" row advances one statutory period each time it is
+   * ticked off, so its computed date is anchor + off × (renewalCount + 1).
+   */
+  renewalCount?: number;
+  /**
+   * A static historical record of a renewal that was completed (ticked off).
+   * Kept for the audit trail and ignored by the date engine.
+   */
+  renewalArchived?: boolean;
   /** Staff member who added this date (for alert attribution / notification). */
   createdBy?: string;
   /** Notify the owner when this date is due (staff alert email opt-in). */

@@ -75,7 +75,11 @@ interface ApiTrademark {
   words?: (string | null)[] | null;
   kind?: (string | null)[] | null;
   markCategories?: (string | null)[] | null;
-  goodsAndServices?: ({ class?: string | null; descriptionText?: string | null } | null)[] | null;
+  goodsAndServices?: ({ class?: string | null; classNumber?: string | number | null; niceClass?: string | number | null; descriptionText?: string | null } | null)[] | null;
+  /** Some responses carry the Nice classes at the top level instead. */
+  classes?: (string | number | null)[] | null;
+  classNumbers?: (string | number | null)[] | null;
+  niceClasses?: (string | number | null)[] | null;
   owner?: (ApiPartyType | null)[] | null;
   filingDate?: string | null;
   priorityDate?: string | null;
@@ -154,10 +158,31 @@ function mapType(tm: ApiTrademark): string {
 export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
   const words = (tm.words || []).map(clean).filter(Boolean);
   const name = words.join('; ');
-  const gs = (tm.goodsAndServices || []).filter(Boolean) as { class?: string | null; descriptionText?: string | null }[];
-  const classes = [...new Set(gs.map((g) => clean(g.class)).filter(Boolean))].join(', ');
+  const gs = (tm.goodsAndServices || []).filter(Boolean) as {
+    class?: string | null;
+    classNumber?: string | number | null;
+    niceClass?: string | number | null;
+    descriptionText?: string | null;
+  }[];
+  // The Nice class can arrive under a few different keys depending on the API
+  // version — check each so the Classes box is always populated when present.
+  const classOf = (g: { class?: string | null; classNumber?: string | number | null; niceClass?: string | number | null }): string =>
+    clean(g.class) || clean(g.classNumber as string) || clean(g.niceClass as string);
+  const classSet = new Set<string>();
+  gs.forEach((g) => {
+    const c = classOf(g);
+    if (c) c.split(/[,;/]/).forEach((p) => { const v = clean(p); if (v) classSet.add(v); });
+  });
+  // Fall back to any top-level class list the response provides.
+  [...(tm.classes || []), ...(tm.classNumbers || []), ...(tm.niceClasses || [])].forEach((c) => {
+    const v = clean(c as string);
+    if (v) v.split(/[,;/]/).forEach((p) => { const q = clean(p); if (q) classSet.add(q); });
+  });
+  const classes = [...classSet]
+    .sort((a, b) => (Number(a) || 0) - (Number(b) || 0) || a.localeCompare(b))
+    .join(', ');
   const goods = gs
-    .map((g) => (clean(g.class) ? `Class ${clean(g.class)}: ${clean(g.descriptionText)}` : clean(g.descriptionText)))
+    .map((g) => (classOf(g) ? `Class ${classOf(g)}: ${clean(g.descriptionText)}` : clean(g.descriptionText)))
     .filter(Boolean)
     .join('\n');
 

@@ -24,6 +24,17 @@ const BASE_COLS: BaseCol[] = [
   { key: 'clientDocket', label: 'Client file ref.', get: (m) => m.clientDocket || '' },
 ];
 
+const IMG_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i;
+/**
+ * The logo/graphic to show for a mark in the Trade mark column: the mark's own
+ * image if it has one, otherwise the first image file attached as a document.
+ */
+function markLogo(m: Mark): string {
+  if (m.image) return m.image;
+  const doc = (m.docs || []).find((d) => d.fileUrl && (IMG_RE.test(d.fileUrl) || IMG_RE.test(d.fileName || '')));
+  return doc?.fileUrl || '';
+}
+
 const LS_KEY = 'brandu.reportLayout';
 function loadLayout(): { colsOn?: Record<string, boolean>; dateCols?: string[]; order?: string[] } {
   try {
@@ -123,7 +134,11 @@ export function Reports() {
     const cellStyle = 'border:1px solid #999;padding:5px 8px;font-family:Calibri,Arial,sans-serif;font-size:11pt';
     const th = activeCols.map((c) => `<th style="${cellStyle};background:#eee;text-align:left">${esc(c.label)}</th>`).join('');
     const cell = (c: { key: string; val: (m: Mark) => string }, m: Mark) => {
-      if (c.key === 'name' && images[m.id]) return `<img src="${images[m.id]}" style="max-height:44px;max-width:170px" />`;
+      // Show the logo and the mark name together, so the row is always
+      // identifiable and the graphic is never the only thing in the cell.
+      if (c.key === 'name' && images[m.id]) {
+        return `<img src="${images[m.id]}" style="max-height:44px;max-width:170px;vertical-align:middle" /> ${esc(c.val(m) || '')}`;
+      }
       return esc(c.val(m) || '');
     };
     const trs = sorted.map((m) => `<tr>${activeCols.map((c) => `<td style="${cellStyle}">${cell(c, m)}</td>`).join('')}</tr>`).join('');
@@ -140,9 +155,10 @@ export function Reports() {
     if (colsOn.name) {
       await Promise.all(
         sorted
-          .filter((m) => m.image)
-          .map(async (m) => {
-            const uri = await toDataUri(m.image!);
+          .map((m) => ({ m, logo: markLogo(m) }))
+          .filter((x) => x.logo)
+          .map(async ({ m, logo }) => {
+            const uri = await toDataUri(logo);
             if (uri) images[m.id] = uri;
           })
       );
@@ -245,13 +261,26 @@ export function Reports() {
             {sorted.length === 0 && <tr><td colSpan={activeCols.length + 1} className="hint" style={{ padding: 18 }}>No matters match the filters.</td></tr>}
             {sorted.slice(0, 500).map((m) => (
               <tr key={m.id}>
-                {activeCols.map((c) => (
-                  <td key={c.key} style={c.bold ? { fontWeight: 600, color: 'var(--heading)' } : undefined}>
-                    {c.key === 'name' && m.image
-                      ? <img src={m.image} alt={m.name || 'trade mark'} style={{ maxHeight: 40, maxWidth: 160, objectFit: 'contain', verticalAlign: 'middle' }} />
-                      : c.val(m) || '—'}
-                  </td>
-                ))}
+                {activeCols.map((c) => {
+                  const logo = c.key === 'name' ? markLogo(m) : '';
+                  return (
+                    <td key={c.key} style={c.bold ? { fontWeight: 600, color: 'var(--heading)' } : undefined}>
+                      {logo ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <img
+                            src={logo}
+                            alt=""
+                            style={{ maxHeight: 40, maxWidth: 120, objectFit: 'contain', verticalAlign: 'middle' }}
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                          />
+                          <span>{m.name || '—'}</span>
+                        </span>
+                      ) : (
+                        c.val(m) || '—'
+                      )}
+                    </td>
+                  );
+                })}
                 <td>
                   <button className="btn danger-link" title="Remove from report" onClick={() => setExcluded([...excluded, m.id])}>✕</button>
                 </td>

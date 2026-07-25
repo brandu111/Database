@@ -17,7 +17,7 @@ import type { Nav } from '../App';
 import { api, uploadFile } from '../api';
 import { buildDeadlineEmail, templateForDate, type ComposedEmail } from '../email';
 import { EmailComposeModal } from '../EmailComposeModal';
-import { Card, Field, SortArrow, StatusBadge, confirmDelete } from '../ui';
+import { Card, DateInput, Field, SortArrow, StatusBadge, confirmDelete } from '../ui';
 
 const MARK_TYPES = ['Word', 'Logo', 'Combined', '3D Shape', 'Series', 'Sound', 'Scent', 'Movement', 'Colour'];
 
@@ -84,7 +84,23 @@ export function Trademarks({ nav, go, canEdit }: Props) {
           reload();
           go({ markId: null });
         }}
-        onCreated={() => reload()}
+        onCreated={(created) => {
+          // Merge new/updated related cases (e.g. a Madrid family) into state so
+          // the just-opened case is present immediately — otherwise navigating to
+          // it before the list reloads would bounce back to the dashboard.
+          if (created && created.length) {
+            setMarks((cur) => {
+              const map = new Map((cur || []).map((x) => [x.id, x]));
+              created.forEach((x) => map.set(x.id, x));
+              return [...map.values()];
+            });
+          }
+          // Refresh from the server too, to pick up related-case changes that
+          // aren't in the response (e.g. the basic case gaining its Madrid family
+          // link). The merge above already seeded the opened case, so this reload
+          // never causes a bounce.
+          reload();
+        }}
       />
     );
   }
@@ -238,7 +254,7 @@ interface DetailProps {
   onOpen: (id: string) => void;
   onChanged: (m: Mark) => void;
   onDeleted: () => void;
-  onCreated: () => void;
+  onCreated: (created?: Mark[]) => void;
 }
 
 function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySignature, myName, canEdit, onBack, onOpen, onChanged, onDeleted, onCreated }: DetailProps) {
@@ -304,7 +320,11 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
       const anchorId = m.basicId || m.id;
       const resp = await api.fileMadrid(anchorId, { countries, filingDate: mpFilingDate || undefined, subsequent });
       setMpModal(null);
-      onCreated();
+      // Merge the whole family (IR + designations) into state before navigating,
+      // so the IR case is present when we open it and the view stays inside the
+      // Madrid case instead of flicking back to the dashboard.
+      const family = [resp.ir, ...(resp.created || [])].filter(Boolean) as Mark[];
+      onCreated(family.length ? family : undefined);
       if (resp.ir?.id) onOpen(resp.ir.id);
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Madrid filing failed.');
@@ -333,7 +353,18 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
       const fetched = fields.dates || [];
       const keep = (m.dates || []).filter((d) => !fetched.some((f) => f.name === d.name));
       update({ ...fields, dates: [...fetched, ...keep] }, true);
-      setLookupMsg(`Loaded from IP Australia (${number}).`);
+      // Copy the fetched classes (and goods) across to any related Madrid cases —
+      // the IR and its designations share this basic case's classification.
+      let copiedTo = 0;
+      if (fields.classes && m.madridId) {
+        const family = allMarks.filter((x) => x.madridId === m.madridId && x.id !== m.id);
+        const saved = await Promise.all(
+          family.map((x) => api.saveMark({ ...x, classes: fields.classes!, goods: fields.goods || x.goods }))
+        );
+        copiedTo = saved.length;
+        if (saved.length) onCreated(saved);
+      }
+      setLookupMsg(`Loaded from IP Australia (${number}).${copiedTo ? ` Classes copied to ${copiedTo} related Madrid case${copiedTo > 1 ? 's' : ''}.` : ''}`);
     } catch (e) {
       setLookupMsg(e instanceof Error ? e.message : 'Lookup failed.');
     } finally {
@@ -694,8 +725,8 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                         {d.linkedToIR && <span className="hint" title="Linked to IR renewal date"> ⟳ IR</span>}
                       </td>
                       <td>
-                        <input type="date" value={d.date || ''} disabled={ro || !!d.linkedToIR}
-                          onChange={(e) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)) }, true)} />
+                        <DateInput value={d.date || ''} disabled={ro || !!d.linkedToIR}
+                          onChange={(v) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, date: v } : x)) }, true)} />
                       </td>
                       <td>
                         <input type="text" value={d.note || ''} placeholder="" disabled={ro}
@@ -714,7 +745,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
               <div className="row" style={{ marginTop: 10 }}>
                 <input type="text" list="date-names" placeholder="Add date…" style={{ flex: 2 }} value={addDateName} onChange={(e) => setAddDateName(e.target.value)} />
                 <datalist id="date-names">{jurNames.map((n) => <option key={n} value={n} />)}</datalist>
-                <input type="date" style={{ width: 150 }} value={addDateDate} onChange={(e) => setAddDateDate(e.target.value)} />
+                <DateInput value={addDateDate} onChange={setAddDateDate} style={{ width: 160 }} />
                 <button className="btn small" disabled={!addDateName} onClick={() => {
                   update({ dates: [...m.dates, { name: addDateName, date: addDateDate || todayISO(), done: false, createdBy: myName, notify: true }] }, true);
                   setAddDateName('');
@@ -766,7 +797,8 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             {(m.actions || []).map((a, i) => (
               <div key={i} className="row" style={{ marginBottom: 6 }}>
                 <input type="checkbox" checked={!!a.done} disabled={ro} onChange={() => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) }, true)} />
-                <input type="date" style={{ width: 140 }} value={a.date} disabled={ro} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)) })} />
+                <DateInput value={a.date} disabled={ro} style={{ width: 150 }}
+                  onChange={(v) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, date: v } : x)) }, true)} />
                 <input type="text" style={{ flex: 1 }} className={a.done ? 'done' : ''} value={a.text} disabled={ro} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)) })} />
                 <button className="btn danger-link" title={a.alert ? 'Alert on — shows in Alerts tab' : 'Alert off'} disabled={ro}
                   style={{ color: a.alert ? 'var(--accent)' : '#c8c7c2' }}

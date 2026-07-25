@@ -77,7 +77,10 @@ export function auRecompute(m: Mark): void {
   computed.forEach((dr) => {
     const base = m.dates.find((x) => x.name === dr.auBase);
     const bd = base && base.date ? base.date : '';
-    dr.date = bd ? shift(bd, dr.auOff || 0, dr.auUnit || 'months') : '';
+    // A recurring renewal deadline advances one statutory period per completed
+    // cycle (renewalCount). Every other row uses its plain offset (mult = 1).
+    const mult = (dr.renewalCount || 0) + 1;
+    dr.date = bd ? shift(bd, (dr.auOff || 0) * mult, dr.auUnit || 'months') : '';
     const rem = Math.trunc(Number(dr.auRem)) || 0;
     for (let k = 1; k <= 6; k++) {
       const rn = `${dr.name} — Reminder ${k} of ${rem}`;
@@ -101,6 +104,40 @@ export function auRecompute(m: Mark): void {
 const POST_REGISTRATION = /renewal|non-use|declaration of use|dependency|\bdau\b|statement of use|grace/i;
 
 /**
+ * When the live "Renewal Deadline" row has been ticked complete, record the
+ * completed renewal as a static history row and roll the live deadline forward
+ * one statutory period (bumping `renewalCount`), clearing the tick and the
+ * associated reminder / grace rows so a fresh reminder chain regenerates.
+ *
+ * Madrid designations inherit their renewal from the IR (`linkedToIR`) and are
+ * skipped here — advancing the IR re-propagates to them.
+ */
+export function advanceCompletedRenewals(m: Mark): void {
+  const rows = m.dates || (m.dates = []);
+  const live = rows.find(
+    (d) => /^renewal deadline$/i.test(d.name) && d.done && !d.renewalArchived && !d.linkedToIR
+  );
+  if (!live) return;
+  // Keep a static, ticked record of the renewal just completed (audit trail).
+  rows.push({
+    name: 'Renewal Deadline (renewed)',
+    date: live.date,
+    done: true,
+    renewalArchived: true,
+    note: 'Renewal completed',
+  });
+  // Roll the live renewal forward one cycle and clear the tick.
+  live.done = false;
+  live.renewalCount = (live.renewalCount || 0) + 1;
+  // Reset the reminder / grace rows tied to this renewal so a fresh chain shows.
+  for (const d of rows) {
+    if (d !== live && !d.renewalArchived && (d.emailFor === 'Renewal Deadline' || d.auBase === 'Renewal Deadline')) {
+      d.done = false;
+    }
+  }
+}
+
+/**
  * Activate every rule whose trigger date is present on the mark.
  * Post-registration rules (renewal chain, non-use, declarations of use,
  * dependency, statement of use, grace) are gated behind a present
@@ -113,6 +150,10 @@ const POST_REGISTRATION = /renewal|non-use|declaration of use|dependency|\bdau\b
  */
 export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): void {
   if (!m) return;
+  // Roll any ticked-off renewal forward before (re)activating the rule rows, so
+  // the refreshed "Renewal Deadline" carries its bumped renewalCount into the
+  // recompute below and a new deadline + reminder chain appears.
+  advanceCompletedRenewals(m);
   const list = rulesFor(rules, m.jurisdiction);
   const val = (n: string) => {
     const row = (m.dates || []).find((x) => x.name === n);
@@ -158,10 +199,14 @@ export function linkDesignationRenewal(m: Mark, allMarks: Mark[]): void {
     row = { name: 'Renewal Deadline', date: '', done: false };
     m.dates.push(row);
   }
+  // When the IR renewal moves (e.g. the IR renewal was ticked off and rolled to
+  // the next cycle), clear the tick and refresh the reminder chain here too.
+  const changed = row.date !== irRen.date;
   row.date = irRen.date;
   row.auBase = '';
   row.linkedToIR = true;
   row.note = 'Linked to IR renewal date';
+  if (changed) row.done = false;
   (
     [
       ['Renewal Reminder', -6, 'months'],
@@ -177,6 +222,7 @@ export function linkDesignationRenewal(m: Mark, allMarks: Mark[]): void {
       m.dates.push(rr);
     }
     rr.date = dt;
+    if (changed) rr.done = false;
   });
 }
 

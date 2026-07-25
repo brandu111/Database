@@ -92,6 +92,54 @@ export function todayISO(now: Date = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/** Normalise a possibly 2-digit year to a 4-digit one (windowed around 2000). */
+function normYear(y: number): number {
+  if (y >= 100) return y;
+  return y <= 69 ? 2000 + y : 1900 + y;
+}
+
+function makeISO(y: number, m: number, d: number): string {
+  if (!y || m < 1 || m > 12 || d < 1) return '';
+  const yy = normYear(y);
+  if (d > daysInMonth(yy, m)) return '';
+  return fromParts(yy, m, d);
+}
+
+/**
+ * Parse a human-typed date into ISO `yyyy-mm-dd`, so dates can be edited by
+ * typing instead of using a date picker. Day-first (Australian) convention.
+ * Accepts, case-insensitively:
+ *   2026-07-25 · 2026/07/25 · 25/07/2026 · 25-07-2026 · 25.07.2026 · 25 07 2026
+ *   25 Jul 2026 · 25 July 2026 · Jul 25 2026 · Jul 25, 2026 · 25Jul2026
+ *   25/7/26 (2-digit year)
+ * Returns '' if the text cannot be understood.
+ */
+export function parseDateInput(input: string): string {
+  const s = (input || '').trim();
+  if (!s) return '';
+  // ISO / year-first: 2026-07-25 or 2026/07/25
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (m) return makeISO(+m[1], +m[2], +m[3]);
+  // Day-first numeric: 25/07/2026, 25-07-26, 25.7.2026, 25 07 2026
+  m = s.match(/^(\d{1,2})[-/.\s](\d{1,2})[-/.\s](\d{2,4})$/);
+  if (m) return makeISO(+m[3], +m[2], +m[1]);
+  // Day then month name: 25 Jul 2026 / 25July2026 / 25-Jul-2026
+  m = s.match(/^(\d{1,2})[-/.\s]*([A-Za-z]{3,})[-/.,\s]*(\d{2,4})$/);
+  if (m) {
+    const mon = MONTHS.indexOf(m[2].slice(0, 3).toLowerCase());
+    if (mon >= 0) return makeISO(+m[3], mon + 1, +m[1]);
+  }
+  // Month name then day: Jul 25 2026 / July 25, 2026
+  m = s.match(/^([A-Za-z]{3,})[-/.,\s]*(\d{1,2})[-/.,\s]+(\d{2,4})$/);
+  if (m) {
+    const mon = MONTHS.indexOf(m[1].slice(0, 3).toLowerCase());
+    if (mon >= 0) return makeISO(+m[3], mon + 1, +m[2]);
+  }
+  return '';
+}
+
 /** Whole days from `fromISO` to `toISO` (positive when toISO is later). */
 export function daysBetween(fromISO: string, toISO: string): number {
   const a = new Date(fromISO + 'T00:00:00Z').getTime();

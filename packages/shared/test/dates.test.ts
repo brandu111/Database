@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysBetween, fmtDate, rollForwardToBusinessDay, shift } from '../src/dates.js';
+import { daysBetween, fmtDate, parseDateInput, rollForwardToBusinessDay, shift } from '../src/dates.js';
 
 /**
  * Acceptance suite ported from `Date Rule Test Cases.dc.html` — the handoff's
@@ -86,5 +86,34 @@ describe('daysBetween', () => {
   it('measures forward and backward', () => {
     expect(daysBetween('2024-01-01', '2024-01-31')).toBe(30);
     expect(daysBetween('2024-01-31', '2024-01-01')).toBe(-30);
+  });
+});
+
+describe('parseDateInput — typing a date instead of using the picker', () => {
+  it('accepts ISO and year-first', () => {
+    expect(parseDateInput('2026-07-25')).toBe('2026-07-25');
+    expect(parseDateInput('2026/07/25')).toBe('2026-07-25');
+  });
+  it('accepts day-first numeric (Australian) with various separators', () => {
+    expect(parseDateInput('25/07/2026')).toBe('2026-07-25');
+    expect(parseDateInput('25-07-2026')).toBe('2026-07-25');
+    expect(parseDateInput('25.7.2026')).toBe('2026-07-25');
+    expect(parseDateInput('5/3/2026')).toBe('2026-03-05');
+  });
+  it('windows 2-digit years', () => {
+    expect(parseDateInput('25/07/26')).toBe('2026-07-25');
+    expect(parseDateInput('25/07/85')).toBe('1985-07-25');
+  });
+  it('accepts month names in either order', () => {
+    expect(parseDateInput('25 Jul 2026')).toBe('2026-07-25');
+    expect(parseDateInput('25 July 2026')).toBe('2026-07-25');
+    expect(parseDateInput('Jul 25, 2026')).toBe('2026-07-25');
+    expect(parseDateInput('25-Aug-2030')).toBe('2030-08-25');
+  });
+  it('rejects nonsense and impossible dates', () => {
+    expect(parseDateInput('')).toBe('');
+    expect(parseDateInput('not a date')).toBe('');
+    expect(parseDateInput('32/01/2026')).toBe('');
+    expect(parseDateInput('25/13/2026')).toBe('');
   });
 });
