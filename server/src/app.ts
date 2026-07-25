@@ -8,6 +8,7 @@ import {
   applyStage,
   daysBetween,
   ensureRuleRows,
+  fmtDate,
   oppSchedule,
   shift,
   todayISO,
@@ -42,6 +43,7 @@ import {
   type DB,
 } from './db.js';
 import { IpAuError, ipAuConfigured, lookupTradeMark } from './ipaustralia.js';
+import { mailerConfigured, sendMail } from './mailer.js';
 import {
   checkPassword,
   clearSessionCookie,
@@ -116,7 +118,121 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   const touched = all.filter((x) => x.id === m.id || x.irId === m.id);
   const tx = db.transaction(() => touched.forEach((x) => saveMark(db, x)));
   tx();
+  // Notify the staff member attributed to any newly added, alert-flagged date
+  // that action is required in the system. Only fires for genuinely new rows.
+  if (mailerConfigured()) {
+    const prevKeys = new Set((previous?.dates || []).map((d) => `${d.name}|${d.date}`));
+    for (const d of m.dates) {
+      if (d.notify && d.createdBy && !d.done && !prevKeys.has(`${d.name}|${d.date}`)) {
+        const to = staffEmailByName(db, d.createdBy);
+        if (to) {
+          const mail = actionRequiredEmail(m, d);
+          sendMail({ to, ...mail }).catch((e) => console.log('Alert email failed:', (e as Error).message));
+        }
+      }
+    }
+  }
   return m;
+}
+
+const escHtml = (s: unknown) => String(s ?? '').split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
+
+/** Look up a staff member's email address by their name (case-insensitive). */
+function staffEmailByName(db: DB, name: string): string | null {
+  if (!name) return null;
+  const row = db.prepare(`SELECT email FROM staff_users WHERE name=? COLLATE NOCASE`).get(name) as { email?: string } | undefined;
+  const email = row?.email?.trim();
+  return email || null;
+}
+
+const portalUrl = () => (process.env.PORTAL_URL || '').trim();
+
+/** "Action required" email for a single newly added deadline. */
+function actionRequiredEmail(m: Mark, d: MarkDate): { subject: string; html: string } {
+  const due = fmtDate(d.date);
+  const link = portalUrl();
+  const subject = `Action required: ${d.name} — ${m.name || 'trade mark'} (due ${due})`;
+  const html = `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#16233b">
+    <p>A deadline attributed to you has been added in the trade marks system:</p>
+    <table cellpadding="4" style="border-collapse:collapse">
+      <tr><td><b>Matter</b></td><td>${escHtml(m.name)}${m.jurisdiction ? ' · ' + escHtml(m.jurisdiction) : ''}</td></tr>
+      <tr><td><b>Deadline</b></td><td>${escHtml(d.name)}</td></tr>
+      <tr><td><b>Due</b></td><td>${due}</td></tr>
+      ${m.owner ? `<tr><td><b>Owner</b></td><td>${escHtml(m.owner)}</td></tr>` : ''}
+    </table>
+    <p>Please review this matter in the system.${link ? ` <a href="${escHtml(link)}">Open the trade marks system</a>.` : ''}</p>
+  </div>`;
+  return { subject, html };
+}
+
+interface DigestItem { date: string; name: string; mark: string; jur: string; overdue: boolean; }
+
+/**
+ * Send each staff member one email listing all of their outstanding alert items
+ * (deadlines they added that are due today or overdue). Intended to run once a
+ * day via a cPanel cron using `RUN_TASK=daily-digest node app.cjs`.
+ */
+export async function runDailyDigest(db: DB, opts: { today?: string } = {}): Promise<{ sent: number; recipients: string[] }> {
+  if (!mailerConfigured()) return { sent: 0, recipients: [] };
+  const today = opts.today || todayISO();
+  const users = db.prepare(`SELECT name, email FROM staff_users WHERE email <> ''`).all() as { name: string; email: string }[];
+  const emailByName = new Map(users.map((u) => [u.name.toLowerCase(), u.email.trim()]));
+  const byUser = new Map<string, { name: string; email: string; items: DigestItem[] }>();
+
+  const add = (owner: string | undefined, item: DigestItem) => {
+    if (!owner) return;
+    const email = emailByName.get(owner.toLowerCase());
+    if (!email) return;
+    const key = owner.toLowerCase();
+    if (!byUser.has(key)) byUser.set(key, { name: owner, email, items: [] });
+    byUser.get(key)!.items.push(item);
+  };
+
+  for (const m of listMarks(db)) {
+    for (const d of m.dates || []) {
+      if (d.done || !d.date || !d.notify || !d.createdBy) continue;
+      if (d.date > today) continue; // due today or overdue only
+      add(d.createdBy, { date: d.date, name: d.name, mark: m.name || '(untitled)', jur: m.jurisdiction || '', overdue: d.date < today });
+    }
+    for (const a of m.actions || []) {
+      if (a.done || !a.alert || !a.createdBy) continue;
+      const when = a.alertDate || a.date;
+      if (!when || when > today) continue;
+      add(a.createdBy, { date: when, name: a.text || 'Action', mark: m.name || '(untitled)', jur: m.jurisdiction || '', overdue: when < today });
+    }
+  }
+
+  const sends: Promise<unknown>[] = [];
+  const recipients: string[] = [];
+  for (const { name, email, items } of byUser.values()) {
+    items.sort((a, b) => (a.date < b.date ? -1 : 1));
+    const rows = items
+      .map(
+        (it) =>
+          `<tr><td style="padding:4px 8px;border:1px solid #ddd;color:${it.overdue ? '#d34b44' : '#16233b'}">${fmtDate(it.date)}${it.overdue ? ' · overdue' : ''}</td>` +
+          `<td style="padding:4px 8px;border:1px solid #ddd">${escHtml(it.mark)}</td>` +
+          `<td style="padding:4px 8px;border:1px solid #ddd">${escHtml(it.jur)}</td>` +
+          `<td style="padding:4px 8px;border:1px solid #ddd">${escHtml(it.name)}</td></tr>`
+      )
+      .join('');
+    const link = portalUrl();
+    const html = `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#16233b">
+      <p>Good morning ${escHtml(name.split(' ')[0] || name)},</p>
+      <p>You have <b>${items.length}</b> item${items.length === 1 ? '' : 's'} requiring attention today:</p>
+      <table style="border-collapse:collapse">
+        <tr><th style="padding:4px 8px;border:1px solid #ddd;background:#eee;text-align:left">Due</th>
+        <th style="padding:4px 8px;border:1px solid #ddd;background:#eee;text-align:left">Matter</th>
+        <th style="padding:4px 8px;border:1px solid #ddd;background:#eee;text-align:left">Jurisdiction</th>
+        <th style="padding:4px 8px;border:1px solid #ddd;background:#eee;text-align:left">Deadline</th></tr>
+        ${rows}
+      </table>
+      <p>${link ? `<a href="${escHtml(link)}">Open the trade marks system</a>` : 'Open the trade marks system'} to action these.</p>
+    </div>`;
+    recipients.push(email);
+    sends.push(sendMail({ to: email, subject: `Trade marks — ${items.length} action${items.length === 1 ? '' : 's'} due (${fmtDate(today)})`, html }).catch((e) => console.log(`Digest to ${email} failed:`, (e as Error).message)));
+  }
+  await Promise.allSettled(sends);
+  return { sent: recipients.length, recipients };
 }
 
 function computeAlerts(db: DB, alertDays: number, forCompany?: string): AlertRow[] {
@@ -220,8 +336,8 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const session = readSession(db, req);
     if (!session) return res.status(401).json({ error: 'Not signed in' });
     if (session.kind === 'staff') {
-      const row = db.prepare(`SELECT signature FROM staff_users WHERE id=?`).get(session.id) as { signature?: string } | undefined;
-      return res.json({ kind: 'staff', id: session.id, name: session.name, level: session.level, signature: row?.signature || '' });
+      const row = db.prepare(`SELECT signature, email FROM staff_users WHERE id=?`).get(session.id) as { signature?: string; email?: string } | undefined;
+      return res.json({ kind: 'staff', id: session.id, name: session.name, level: session.level, signature: row?.signature || '', email: row?.email || '' });
     }
     res.json({ kind: 'client', company: session.company });
   });
@@ -233,6 +349,42 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const signature = String((req.body || {}).signature || '');
     db.prepare(`UPDATE staff_users SET signature=? WHERE id=?`).run(signature, session.id);
     res.json({ ok: true });
+  });
+
+  // A staff member sets their own contact email (used for alert notifications).
+  app.put('/api/auth/me/email', edit, (req, res) => {
+    const session = readSession(db, req);
+    if (!session || session.kind !== 'staff') return res.status(401).json({ error: 'Not signed in' });
+    const email = String((req.body || {}).email || '').trim();
+    db.prepare(`UPDATE staff_users SET email=? WHERE id=?`).run(email, session.id);
+    res.json({ ok: true });
+  });
+
+  // Mail configuration status and a test send (Full permissions).
+  app.get('/api/mail/status', view, (_req, res) => res.json({ configured: mailerConfigured() }));
+
+  app.post('/api/mail/test', full, async (req, res) => {
+    if (!mailerConfigured()) return res.status(400).json({ error: 'Email is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS in the Node app environment.' });
+    const session = readSession(db, req);
+    const own = session?.kind === 'staff' ? staffEmailByName(db, session.name) : null;
+    const to = String((req.body || {}).to || own || '').trim();
+    if (!to) return res.status(400).json({ error: 'No address to send to — add your email in “My email sign-off” first.' });
+    try {
+      await sendMail({ to, subject: 'BrandU trade marks — test email', html: '<p>This is a test email from the trade marks system. Email is configured correctly.</p>' });
+      res.json({ ok: true, to });
+    } catch (e) {
+      res.status(502).json({ error: `Send failed: ${(e as Error).message}` });
+    }
+  });
+
+  // Manually trigger the daily digest (also runnable via RUN_TASK=daily-digest).
+  app.post('/api/tasks/daily-digest', full, async (_req, res) => {
+    try {
+      const r = await runDailyDigest(db);
+      res.json(r);
+    } catch (e) {
+      res.status(502).json({ error: (e as Error).message });
+    }
   });
 
   // ---- marks ---------------------------------------------------------------
@@ -646,7 +798,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   });
 
   app.get('/api/users', full, (_req, res) => {
-    res.json(db.prepare(`SELECT id, name, level, signature FROM staff_users ORDER BY name`).all());
+    res.json(db.prepare(`SELECT id, name, level, signature, email FROM staff_users ORDER BY name`).all());
   });
 
   app.post('/api/users', full, (req, res) => {
@@ -665,12 +817,13 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const { name, level, password } = req.body || {};
     const row = db.prepare(`SELECT id FROM staff_users WHERE id=?`).get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
-    const { signature } = req.body || {};
+    const { signature, email } = req.body || {};
     if (name) db.prepare(`UPDATE staff_users SET name=? WHERE id=?`).run(String(name), req.params.id);
     if (level) db.prepare(`UPDATE staff_users SET level=? WHERE id=?`).run(String(level), req.params.id);
     if (password) db.prepare(`UPDATE staff_users SET password_hash=? WHERE id=?`).run(hashPassword(String(password)), req.params.id);
     if (signature !== undefined) db.prepare(`UPDATE staff_users SET signature=? WHERE id=?`).run(String(signature || ''), req.params.id);
-    res.json(db.prepare(`SELECT id, name, level, signature FROM staff_users WHERE id=?`).get(req.params.id));
+    if (email !== undefined) db.prepare(`UPDATE staff_users SET email=? WHERE id=?`).run(String(email || '').trim(), req.params.id);
+    res.json(db.prepare(`SELECT id, name, level, signature, email FROM staff_users WHERE id=?`).get(req.params.id));
   });
 
   app.delete('/api/users/:id', full, (req, res) => {

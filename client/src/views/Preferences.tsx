@@ -337,7 +337,7 @@ function RuleRow({ r, i, isFull, expanded, onToggle, onChange, onDelete }: {
 
 function SettingsUsers({ isFull }: { isFull: boolean }) {
   const [fs, setFs] = useState<FirmSettings | null>(null);
-  const [users, setUsers] = useState<{ id: string; name: string; level: string }[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string; level: string; email?: string }[]>([]);
   const [access, setAccess] = useState<{ id: string; company: string; userId: string; active: number; createdAt: string }[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
   const [grantCompany, setGrantCompany] = useState('');
@@ -347,17 +347,37 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
   const [me, setMe] = useState<Me | null>(null);
   const [mySig, setMySig] = useState('');
   const [sigState, setSigState] = useState('');
+  const [myEmail, setMyEmail] = useState('');
+  const [emailState, setEmailState] = useState('');
+  const [mailConfigured, setMailConfigured] = useState(false);
+  const [testState, setTestState] = useState('');
   const sigTimer = useRef<number | null>(null);
+  const emailTimer = useRef<number | null>(null);
 
   useEffect(() => {
     api.settings().then(setFs);
-    api.me().then((m) => { setMe(m); if (m.kind === 'staff') setMySig(m.signature || ''); }, () => undefined);
+    api.me().then((m) => { setMe(m); if (m.kind === 'staff') { setMySig(m.signature || ''); setMyEmail(m.email || ''); } }, () => undefined);
+    api.mailStatus().then((s) => setMailConfigured(s.configured), () => undefined);
     api.companies().then((cs) => setCompanies(cs.map((c) => c.name).filter(Boolean).sort()), () => undefined);
     if (isFull) {
       api.users().then(setUsers, () => undefined);
       api.clientAccess().then(setAccess, () => undefined);
     }
   }, [isFull]);
+
+  const onMyEmail = (email: string) => {
+    setMyEmail(email);
+    setEmailState('Saving…');
+    if (emailTimer.current) window.clearTimeout(emailTimer.current);
+    emailTimer.current = window.setTimeout(() => {
+      api.saveMyEmail(email).then(() => setEmailState('Saved'), () => setEmailState('Save failed'));
+    }, 700);
+  };
+
+  const sendTest = () => {
+    setTestState('Sending…');
+    api.sendTestMail().then((r) => setTestState(`Sent to ${r.to}`), (e) => setTestState(e instanceof Error ? e.message : 'Failed'));
+  };
 
   // Save the current user's signature, debounced so typing doesn't hammer the API.
   const onMySig = (html: string) => {
@@ -422,6 +442,18 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
 
         {me?.kind === 'staff' && (
           <Card label="My email sign-off" right={<span className="save-state">{sigState}</span>}>
+            <Field label="My email address (for alert notifications)">
+              <input type="email" value={myEmail} onChange={(e) => onMyEmail(e.target.value)} placeholder="you@brandu.legal" />
+              <div className="hint" style={{ marginTop: 2 }}>
+                {emailState || 'Where “action required” alerts and your daily digest are sent.'}
+                {' · '}
+                {mailConfigured ? (
+                  <>Email is set up. <button className="btn secondary small" style={{ marginLeft: 4 }} onClick={sendTest}>Send test</button> {testState}</>
+                ) : (
+                  <span style={{ color: 'var(--danger)' }}>Automatic emails are off until the mail server is configured (see the deploy notes).</span>
+                )}
+              </div>
+            </Field>
             <div className="hint" style={{ marginBottom: 8 }}>
               Your personal sign-off, used by the <code>[Signature]</code> field when you send an email from a case. It sends as formatted HTML, so a logo or formatting comes across. This is yours alone — each staff member sets their own.
             </div>
@@ -430,13 +462,17 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
         )}
 
         {isFull && (
-          <Card label="Staff users">
+          <Card label="Staff users" right={mailConfigured ? <button className="btn secondary small" onClick={() => api.runDailyDigest().then((r) => window.alert(`Digest sent to ${r.sent} user(s).`), (e) => window.alert(e instanceof Error ? e.message : 'Failed'))}>Send digest now</button> : undefined}>
             <table className="list">
-              <thead><tr><th>Name</th><th>Permission level</th><th>Password</th><th /></tr></thead>
+              <thead><tr><th>Name</th><th>Email</th><th>Permission level</th><th>Password</th><th /></tr></thead>
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id}>
                     <td>{u.name}</td>
+                    <td>
+                      <input type="email" defaultValue={u.email || ''} placeholder="—" style={{ minWidth: 160 }}
+                        onBlur={(e) => { if (e.target.value !== (u.email || '')) api.updateUser(u.id, { email: e.target.value }).then(() => api.users().then(setUsers)); }} />
+                    </td>
                     <td>
                       <select value={u.level} onChange={(e) => api.updateUser(u.id, { level: e.target.value }).then(() => api.users().then(setUsers))}>
                         <option>Full Permissions</option>

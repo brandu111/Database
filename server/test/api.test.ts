@@ -134,6 +134,27 @@ describe('marks and the server-side date engine', () => {
   });
 });
 
+describe('staff email & alert mailing', () => {
+  it('stores the signed-in user’s own email and returns it from /me', async () => {
+    await admin.put('/api/auth/me/email').send({ email: 'admin@brandu.legal' }).expect(200);
+    const me = (await admin.get('/api/auth/me').expect(200)).body;
+    expect(me.email).toBe('admin@brandu.legal');
+  });
+
+  it('reports mail as unconfigured and the digest as a no-op without SMTP env', async () => {
+    expect((await admin.get('/api/mail/status').expect(200)).body.configured).toBe(false);
+    // A test send is refused with a helpful error when SMTP isn't configured.
+    await admin.post('/api/mail/test').send({}).expect(400);
+    const digest = (await admin.post('/api/tasks/daily-digest').expect(200)).body;
+    expect(digest).toEqual({ sent: 0, recipients: [] });
+  });
+
+  it('gates mail endpoints to Full permissions', async () => {
+    await viewer.post('/api/mail/test').send({}).expect(403);
+    await viewer.post('/api/tasks/daily-digest').expect(403);
+  });
+});
+
 describe('oppositions', () => {
   it('generates the AU opposition timeline from an anchor date, citations attached', async () => {
     const r = await admin.post('/api/oppositions').send({ name: 'Test opp', jurisdiction: 'Australia' }).expect(201);

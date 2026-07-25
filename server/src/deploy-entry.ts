@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { createApp } from './app.js';
+import { createApp, runDailyDigest } from './app.js';
 import { openDb } from './db.js';
 import { seed } from './seed.js';
 
@@ -27,6 +27,21 @@ const port = parseInt(process.env.PORT || '3000', 10);
 
 const db = openDb(dbFile);
 
+// One-shot task mode (for cPanel cron): send the daily digest, then exit without
+// starting the web server. Cron example (8:00 AM AET):
+//   source ~/nodevenv/brandu-tm/24/bin/activate && cd ~/brandu-tm && RUN_TASK=daily-digest node app.cjs
+if (process.env.RUN_TASK === 'daily-digest') {
+  runDailyDigest(db)
+    .then((r) => {
+      console.log(`Daily digest: sent ${r.sent} email(s)${r.recipients.length ? ' to ' + r.recipients.join(', ') : ''}.`);
+      process.exit(0);
+    })
+    .catch((e) => {
+      console.error('Daily digest failed:', (e as Error).message);
+      process.exit(1);
+    });
+} else {
+
 if (process.env.SEED_ON_START === '1') {
   try {
     const out = seed(db, { seedDir });
@@ -41,3 +56,5 @@ const app = createApp(db, { uploadsDir, clientDist });
 app.listen(port, () => {
   console.log(`BrandU TM database listening on port ${port} (db: ${dbFile}, client: ${clientDist})`);
 });
+
+}
