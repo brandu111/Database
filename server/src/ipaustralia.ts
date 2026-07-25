@@ -40,15 +40,18 @@ async function getAccessToken(): Promise<string> {
   const now = Date.now();
   if (cachedToken && cachedToken.expiresAt > now + 60_000) return cachedToken.value;
   const { token } = endpoints();
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: process.env.IPAU_CLIENT_ID!,
-    client_secret: process.env.IPAU_CLIENT_SECRET!,
-  });
+  // IP Australia's token endpoint authenticates the client with HTTP Basic
+  // (client id/secret in the Authorization header); the body carries only the
+  // grant type. Sending the secret in the body is rejected as invalid_request.
+  const basic = Buffer.from(`${process.env.IPAU_CLIENT_ID}:${process.env.IPAU_CLIENT_SECRET}`).toString('base64');
   const res = await fetch(token, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-    body,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+      Authorization: `Basic ${basic}`,
+    },
+    body: new URLSearchParams({ grant_type: 'client_credentials' }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
