@@ -38,6 +38,10 @@ export interface MarkDate {
   emailFor?: string;
   /** Madrid designation: renewal copied from the parent IR, not computed. */
   linkedToIR?: boolean;
+  /** Staff member who added this date (for alert attribution / notification). */
+  createdBy?: string;
+  /** Notify the owner when this date is due (staff alert email opt-in). */
+  notify?: boolean;
 }
 
 export interface MarkContact {
@@ -54,6 +58,8 @@ export interface MarkAction {
   done: boolean;
   alert?: boolean;
   alertDate?: string;
+  /** Staff member who added this action (for alert attribution / notification). */
+  createdBy?: string;
 }
 
 export interface MarkDoc {

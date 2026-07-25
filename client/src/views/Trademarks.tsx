@@ -4,8 +4,6 @@ import {
   allJurisdictions,
   fmtDate,
   madridMembers,
-  mergeTemplate,
-  mergeTemplateHtml,
   rulesFor,
   statusOptions,
   todayISO,
@@ -17,6 +15,8 @@ import {
 } from '@brandu/shared';
 import type { Nav } from '../App';
 import { api, uploadFile } from '../api';
+import { buildDeadlineEmail, templateForDate, type ComposedEmail } from '../email';
+import { EmailComposeModal } from '../EmailComposeModal';
 import { Card, Field, SortArrow, StatusBadge, confirmDelete } from '../ui';
 
 const MARK_TYPES = ['Word', 'Logo', 'Combined', '3D Shape', 'Series', 'Sound', 'Scent', 'Movement', 'Colour'];
@@ -34,6 +34,7 @@ export function Trademarks({ nav, go, canEdit }: Props) {
   const [rules, setRules] = useState<RuleBook>({});
   const [firm, setFirm] = useState<FirmSettings | null>(null);
   const [mySignature, setMySignature] = useState('');
+  const [myName, setMyName] = useState('');
   const [error, setError] = useState('');
 
   const reload = useCallback(() => {
@@ -46,7 +47,10 @@ export function Trademarks({ nav, go, canEdit }: Props) {
     api.templates().then(setTemplates, () => undefined);
     api.rules().then((r) => setRules(r.rules), () => undefined);
     api.settings().then(setFirm, () => undefined);
-    api.me().then((m) => setMySignature(m.kind === 'staff' ? m.signature || '' : ''), () => undefined);
+    api.me().then((m) => {
+      setMySignature(m.kind === 'staff' ? m.signature || '' : '');
+      setMyName(m.kind === 'staff' ? m.name : '');
+    }, () => undefined);
   }, [reload]);
 
   if (error) return <div className="err">{error}</div>;
@@ -68,6 +72,7 @@ export function Trademarks({ nav, go, canEdit }: Props) {
         rules={rules}
         firm={firm}
         mySignature={mySignature}
+        myName={myName}
         canEdit={canEdit}
         onBack={() => {
           reload();
@@ -227,6 +232,7 @@ interface DetailProps {
   rules: RuleBook;
   firm: FirmSettings | null;
   mySignature: string;
+  myName: string;
   canEdit: boolean;
   onBack: () => void;
   onOpen: (id: string) => void;
@@ -235,7 +241,7 @@ interface DetailProps {
   onCreated: () => void;
 }
 
-function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySignature, canEdit, onBack, onOpen, onChanged, onDeleted, onCreated }: DetailProps) {
+function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySignature, myName, canEdit, onBack, onOpen, onChanged, onDeleted, onCreated }: DetailProps) {
   const [m, setM] = useState<Mark>(initial);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [addDateName, setAddDateName] = useState('');
@@ -246,7 +252,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   const [mpFilingDate, setMpFilingDate] = useState('');
   const [mpBusy, setMpBusy] = useState(false);
   const [showRelated, setShowRelated] = useState(false);
-  const [email, setEmail] = useState<null | { to: string; subject: string; html: string; plain: string; copied: boolean }>(null);
+  const [email, setEmail] = useState<ComposedEmail | null>(null);
   const timer = useRef<number | null>(null);
   const latest = useRef(m);
   latest.current = m;
@@ -376,77 +382,13 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   }, [m.dates, m.jurisdiction, m.irId, m.status]);
 
   const emailForDate = (name: string, emailFor: string | undefined, date: string) => {
-    const dfName = emailFor || name;
-    const tpl =
-      templates.find((t) => t.dateField === dfName && t.jurisdiction === m.jurisdiction) ||
-      templates.find((t) => t.dateField === dfName);
-    const rule = rulesFor(rules, m.jurisdiction).find((r) => (r.name === name || (emailFor && r.name === emailFor)) && r.template);
-    if (!tpl && !rule) return null;
+    if (!templateForDate(m, name, emailFor, templates, rules)) return null;
     return async () => {
-      const client = (m.contacts || []).find((c) => (c.position || '').toLowerCase() === 'client');
-      const to = client?.email || '';
-      // Sign-off: the sender's own HTML signature, falling back to the firm
-      // default (plain text). Keep matching plain and HTML versions.
-      const hasMine = !!(mySignature && mySignature.replace(/<[^>]*>/g, '').trim());
-      const signatureHtml = hasMine ? mySignature : textToHtml(firm?.emailSignature || '');
-      const signature = hasMine ? htmlToText(mySignature) : firm?.emailSignature || '';
-      const ctx = { dueDate: date, firmName: firm?.lawFirmName, signature, signatureHtml };
-      const bodyTpl = tpl ? tpl.body : rule!.template;
-      const subject = tpl ? mergeTemplate(tpl.subject, m, ctx) : `Re: ${m.name} - ${name}`;
-      const plain = mergeTemplate(bodyTpl, m, ctx);
-      // Inline the case's graphic as a data URI so it travels when the email is
-      // copied into a mail client (the /files URL is behind login).
-      const markImage = m.image ? await toDataUri(m.image) : undefined;
-      const html = `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#16233b;line-height:1.5">${mergeTemplateHtml(bodyTpl, m, { ...ctx, markImage })}</div>`;
-      setEmail({ to, subject, html, plain, copied: false });
-      api.logCorrespondence(m.id, { to, subject, body: plain }).catch(() => undefined);
+      const built = await buildDeadlineEmail({ mark: m, dateName: name, emailFor, date, templates, rules, firm, mySignature });
+      if (!built) return;
+      setEmail(built);
+      api.logCorrespondence(m.id, { to: built.to, subject: built.subject, body: built.plain }).catch(() => undefined);
     };
-  };
-
-  // Convert between the stored HTML signature and a plain-text fallback.
-  const htmlToText = (html: string): string => {
-    const d = document.createElement('div');
-    d.innerHTML = html;
-    return (d.innerText || d.textContent || '').trim();
-  };
-  const textToHtml = (t: string): string =>
-    t.split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('\n').join('<br>');
-
-  // Fetch an image behind the app's auth and turn it into a data: URI.
-  const toDataUri = async (url: string): Promise<string | undefined> => {
-    try {
-      const res = await fetch(url, { credentials: 'same-origin' });
-      if (!res.ok) return undefined;
-      const blob = await res.blob();
-      return await new Promise((resolve) => {
-        const r = new FileReader();
-        r.onload = () => resolve(typeof r.result === 'string' ? r.result : undefined);
-        r.onerror = () => resolve(undefined);
-        r.readAsDataURL(blob);
-      });
-    } catch {
-      return undefined;
-    }
-  };
-
-  const copyEmail = async () => {
-    if (!email) return;
-    try {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          'text/html': new Blob([email.html], { type: 'text/html' }),
-          'text/plain': new Blob([email.plain], { type: 'text/plain' }),
-        }),
-      ]);
-      setEmail({ ...email, copied: true });
-    } catch {
-      try {
-        await navigator.clipboard.writeText(email.plain);
-        setEmail({ ...email, copied: true });
-      } catch {
-        window.alert('Could not copy automatically — select the preview and copy manually.');
-      }
-    }
   };
 
   const importOwnerContacts = () => {
@@ -774,7 +716,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 <datalist id="date-names">{jurNames.map((n) => <option key={n} value={n} />)}</datalist>
                 <input type="date" style={{ width: 150 }} value={addDateDate} onChange={(e) => setAddDateDate(e.target.value)} />
                 <button className="btn small" disabled={!addDateName} onClick={() => {
-                  update({ dates: [...m.dates, { name: addDateName, date: addDateDate || todayISO(), done: false }] }, true);
+                  update({ dates: [...m.dates, { name: addDateName, date: addDateDate || todayISO(), done: false, createdBy: myName, notify: true }] }, true);
                   setAddDateName('');
                   setAddDateDate('');
                 }}>
@@ -819,7 +761,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             <datalist id="case-contact-names">{contactNames.map((n) => <option key={n} value={n} />)}</datalist>
           </Card>
 
-          <Card label="Trade mark actions" right={canEdit ? <button className="btn small" onClick={() => update({ actions: [...(m.actions || []), { date: todayISO(), text: '', done: false }] }, true)}>+ Add action</button> : undefined}>
+          <Card label="Trade mark actions" right={canEdit ? <button className="btn small" onClick={() => update({ actions: [...(m.actions || []), { date: todayISO(), text: '', done: false, createdBy: myName }] }, true)}>+ Add action</button> : undefined}>
             {(m.actions || []).length === 0 && <div className="hint">No actions.</div>}
             {(m.actions || []).map((a, i) => (
               <div key={i} className="row" style={{ marginBottom: 6 }}>
@@ -943,39 +885,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
         </div>
       )}
 
-      {email && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(22,35,59,0.4)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 50, padding: '40px 16px', overflowY: 'auto' }}
-          onClick={() => setEmail(null)}
-        >
-          <div className="card" style={{ maxWidth: 680, width: '100%', margin: 0 }} onClick={(e) => e.stopPropagation()}>
-            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
-              <div className="section-label" style={{ marginBottom: 0 }}>✉ Email — {m.name || 'this case'}</div>
-              <button className="btn danger-link" onClick={() => setEmail(null)}>✕</button>
-            </div>
-            <div className="hint" style={{ marginBottom: 10 }}>
-              This is a formatted HTML email with your sign-off{m.image ? ' and the case logo' : ''}. Copy it and paste into Outlook — the formatting{m.image ? ', logo' : ''} and signature come across. “Open in email app” sends a plain-text version instead.
-            </div>
-            <Field label="To"><input type="text" value={email.to} readOnly /></Field>
-            <Field label="Subject"><input type="text" value={email.subject} readOnly /></Field>
-            <div className="section-label" style={{ marginTop: 8 }}>Preview</div>
-            <div
-              style={{ background: '#fff', color: '#16233b', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', maxHeight: 340, overflowY: 'auto', fontSize: 13, lineHeight: 1.5 }}
-              dangerouslySetInnerHTML={{ __html: email.html }}
-            />
-            <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
-              <button
-                className="btn secondary"
-                onClick={() => window.open(`mailto:${encodeURIComponent(email.to)}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.plain)}`)}
-                title="Opens your mail app with the text version (no logo)"
-              >
-                Open in email app
-              </button>
-              <button className="btn" onClick={copyEmail}>{email.copied ? '✓ Copied — paste into your email' : 'Copy HTML email'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {email && <EmailComposeModal email={email} title={m.name || 'this case'} hasLogo={!!m.image} onClose={() => setEmail(null)} />}
     </>
   );
 
