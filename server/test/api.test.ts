@@ -77,19 +77,32 @@ describe('marks and the server-side date engine', () => {
     expect(r.body.dates.some((d: { name: string }) => d.name === 'Registration Date')).toBe(true);
   });
 
-  it('files a Madrid IR and links a designation renewal to it', async () => {
-    const r = await admin.post(`/api/marks/${id}/madrid`).send({ country: 'Japan' }).expect(200);
+  it('files a Madrid IR with initial designations; renewal comes from the IR filing date', async () => {
+    const r = await admin.post(`/api/marks/${id}/madrid`).send({ countries: ['Japan', 'China'], filingDate: '2014-04-04' }).expect(200);
     const ir = r.body.ir;
     expect(ir.jurisdiction).toBe('Madrid Protocol (WIPO)');
     expect(ir.basicId).toBe(id);
-    // Register the IR so its renewal exists, then check propagation.
-    ir.dates.push({ name: 'Registration Date', date: '2014-04-04', done: true });
-    await admin.put(`/api/marks/${ir.id}`).send(ir).expect(200);
+    // IR renews 10 years from its filing date — no separate registration needed.
+    expect(ir.dates.find((d: { name: string }) => d.name === 'Renewal Deadline').date).toBe('2024-04-04');
+    expect(ir.dates.find((d: { name: string }) => d.name === 'Dependency Period Ends').date).toBe('2019-04-04');
+
     const marks = (await admin.get('/api/marks')).body;
-    const des = marks.find((m: { irId?: string }) => m.irId === ir.id);
-    expect(des.jurisdiction).toBe('Japan');
-    const ren = des.dates.find((d: { name: string }) => d.name === 'Renewal Deadline');
+    const desigs = marks.filter((m: { irId?: string }) => m.irId === ir.id);
+    expect(desigs.map((d: { jurisdiction: string }) => d.jurisdiction).sort()).toEqual(['China', 'Japan']);
+    const japan = desigs.find((d: { jurisdiction: string }) => d.jurisdiction === 'Japan');
+    // Initial designations share the IR filing date and inherit its renewal.
+    expect(japan.dates.find((d: { name: string }) => d.name === 'Application Filed').date).toBe('2014-04-04');
+    const ren = japan.dates.find((d: { name: string }) => d.name === 'Renewal Deadline');
     expect(ren.date).toBe('2024-04-04');
+    expect(ren.linkedToIR).toBe(true);
+  });
+
+  it('adds a subsequent designation dated when filed, sharing the IR renewal', async () => {
+    const r = await admin.post(`/api/marks/${id}/madrid`).send({ countries: ['Singapore'], filingDate: '2020-06-15', subsequent: true }).expect(200);
+    const sg = r.body.created.find((m: { jurisdiction: string }) => m.jurisdiction === 'Singapore');
+    expect(sg.dates.find((d: { name: string }) => d.name === 'Application Filed').date).toBe('2020-06-15');
+    const ren = sg.dates.find((d: { name: string }) => d.name === 'Renewal Deadline');
+    expect(ren.date).toBe('2024-04-04'); // still the IR renewal date
     expect(ren.linkedToIR).toBe(true);
   });
 

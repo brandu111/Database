@@ -8,7 +8,7 @@ import type { OppDateMaster, OppSchedule, Rule, RuleBook } from './types.js';
  * If any built-in rule changes, bump RULES_VERSION and let migrateRules()
  * refresh stored rulebooks (user rules flagged `custom: true` survive).
  */
-export const RULES_VERSION = 7;
+export const RULES_VERSION = 8;
 
 const T_REN =
   'Dear {{client}},\n\nRe: Trade mark {{mark}} ({{jurisdiction}})\n\nThis is a reminder that the renewal deadline for the above trade mark is {{deadline}}. Please confirm whether you would like us to attend to the renewal, and we will provide a cost estimate.\n\nKind regards\nBrandU Legal';
@@ -107,11 +107,14 @@ export function defaultRules(): RuleBook {
       ...renewalChain('Application Filed', 10),
     ],
     'Madrid Protocol (WIPO)': [
-      // Dependency / central-attack window: 5 years from the IR date.
-      r('Dependency Period Ends', 'Registration Date', 5, 'years', true),
+      // The IR renews 10 years from the international registration (filing)
+      // date, and the dependency / central-attack window runs 5 years from the
+      // same date — both anchored on the IR's Application Filed, not a later
+      // registration date. Designations inherit the IR renewal date.
+      r('Dependency Period Ends', 'Application Filed', 5, 'years', true),
       r('Irregularities notice response due', 'Irregularities Notice Issued', 3, 'months', true),
       r('Philippines DAU deadline (3 years from IR/designation date)', 'Application Filed', 3, 'years', true, '', 3),
-      ...renewalChain('Registration Date', 10),
+      ...renewalChain('Application Filed', 10),
     ],
     Canada: [
       r('OA Response Due', 'OA Issued', 6, 'months', true, T_OA),

@@ -187,7 +187,11 @@ function MarkList({ marks, canEdit, onOpen, onCreated }: { marks: Mark[]; canEdi
                 <td><StatusBadge status={m.status} /></td>
                 <td>{m.owner || '—'}</td>
                 <td className="mono">{fmtDate(dateOf(m, 'Application Filed')) || '—'}</td>
-                <td className="mono">{fmtDate(dateOf(m, 'Renewal Deadline')) || '—'}</td>
+                <td className="mono">
+                  {(m.jurisdiction === 'Madrid Protocol (WIPO)' || m.irId) && m.status !== 'Registered'
+                    ? '—'
+                    : fmtDate(dateOf(m, 'Renewal Deadline')) || '—'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -226,6 +230,11 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
   const [addDateName, setAddDateName] = useState('');
   const [addDateDate, setAddDateDate] = useState('');
   const [mpCountry, setMpCountry] = useState('');
+  const [mpModal, setMpModal] = useState<null | 'file' | 'subsequent'>(null);
+  const [mpPicked, setMpPicked] = useState<Set<string>>(new Set());
+  const [mpFilingDate, setMpFilingDate] = useState('');
+  const [mpBusy, setMpBusy] = useState(false);
+  const [showRelated, setShowRelated] = useState(false);
   const timer = useRef<number | null>(null);
   const latest = useRef(m);
   latest.current = m;
@@ -255,6 +264,36 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
     },
     [canEdit, doSave]
   );
+
+  const openMadridModal = (kind: 'file' | 'subsequent') => {
+    setMpPicked(new Set());
+    setMpCountry('');
+    setMpFilingDate(kind === 'file' ? todayISO() : todayISO());
+    setMpModal(kind);
+  };
+
+  /** File the IR (and initial designations) or add subsequent designations. */
+  const submitMadrid = async () => {
+    const subsequent = mpModal === 'subsequent';
+    const countries = [...mpPicked];
+    if (subsequent && countries.length === 0) {
+      window.alert('Tick at least one jurisdiction to add.');
+      return;
+    }
+    setMpBusy(true);
+    try {
+      // For a subsequent designation the basic case id is where the IR hangs off.
+      const anchorId = m.basicId || m.id;
+      const resp = await api.fileMadrid(anchorId, { countries, filingDate: mpFilingDate || undefined, subsequent });
+      setMpModal(null);
+      onCreated();
+      if (resp.ir?.id) onOpen(resp.ir.id);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Madrid filing failed.');
+    } finally {
+      setMpBusy(false);
+    }
+  };
 
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupMsg, setLookupMsg] = useState('');
@@ -312,8 +351,17 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
         .find((i) => !m.dates[i].done);
       if (next !== undefined) show.add(next);
     }
-    return m.dates.map((d, i) => ({ d, i })).filter(({ d, i }) => !d.reminder || show.has(i));
-  }, [m.dates]);
+    // On Madrid cases (the IR and each designation) the renewal date is fixed by
+    // the IR but not shown until the case itself is registered.
+    const hideRenewal = (m.jurisdiction === 'Madrid Protocol (WIPO)' || !!m.irId) && m.status !== 'Registered';
+    return m.dates
+      .map((d, i) => ({ d, i }))
+      .filter(({ d, i }) => {
+        if (d.reminder && !show.has(i)) return false;
+        if (hideRenewal && /renewal/i.test(d.name)) return false;
+        return true;
+      });
+  }, [m.dates, m.jurisdiction, m.irId, m.status]);
 
   const fillMerge = (s: string): string => {
     const client = (m.contacts || []).find((c) => (c.position || '').toLowerCase() === 'client');
@@ -412,11 +460,16 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
 
   const ro = !canEdit;
   const now = Date.now();
+  const relatedList = m.madridId ? allMarks.filter((x) => x.madridId === m.madridId) : [m];
+  const inFamily = relatedList.length > 1;
+  const filedOf = (r: Mark) => (r.dates || []).find((x) => x.name === 'Application Filed')?.date || '';
+  const familyLabel = (r: Mark) =>
+    r.irId ? `Designation — ${r.jurisdiction}` : r.jurisdiction === 'Madrid Protocol (WIPO)' ? 'International Registration' : `Basic case — ${r.jurisdiction}`;
 
   return (
     <>
       <button className="back" onClick={onBack}>← All trade marks</button>
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
         <h2 style={{ margin: 0 }}>{m.name || '(untitled trade mark)'}</h2>
         <div className="row">
           <span className="save-state">
@@ -433,6 +486,52 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
           )}
         </div>
       </div>
+
+      {/* Madrid Protocol actions — kept at the top of the case. */}
+      <div className="row" style={{ marginBottom: 12, gap: 8 }}>
+        {canEdit && !isIR && !isDesignation && !irCase && (
+          <button
+            className="btn"
+            disabled={!mpEligible}
+            title={mpEligible ? 'File a Madrid Protocol international registration based on this case' : 'Madrid filing requires an Australian or New Zealand basic case'}
+            onClick={() => openMadridModal('file')}
+          >
+            🌐 File a Madrid case
+          </button>
+        )}
+        {canEdit && (isIR || (mpEligible && irCase)) && (
+          <button className="btn" onClick={() => openMadridModal('subsequent')}>+ Add subsequent designation(s)</button>
+        )}
+        {inFamily && (
+          <button className="btn secondary" onClick={() => setShowRelated((v) => !v)}>
+            {showRelated ? 'Hide related cases' : `Related cases (${relatedList.length})`}
+          </button>
+        )}
+      </div>
+
+      {showRelated && inFamily && (
+        <Card label="Related cases — Madrid family">
+          <table className="list">
+            <thead><tr><th>Case</th><th>Jurisdiction</th><th>Filed</th><th>Status</th></tr></thead>
+            <tbody>
+              {relatedList
+                .slice()
+                .sort((a, b) => {
+                  const rank = (r: Mark) => (r.basicId && r.jurisdiction === 'Madrid Protocol (WIPO)' ? 0 : r.irId ? 2 : 1);
+                  return rank(a) - rank(b) || (a.jurisdiction || '').localeCompare(b.jurisdiction || '');
+                })
+                .map((r) => (
+                  <tr key={r.id} className={r.id === m.id ? '' : 'click'} style={r.id === m.id ? { background: 'var(--accent-bg)' } : undefined} onClick={() => r.id !== m.id && onOpen(r.id)}>
+                    <td style={{ fontWeight: 600, color: 'var(--heading)' }}>{familyLabel(r)}{r.id === m.id ? ' · this case' : ''}</td>
+                    <td>{r.jurisdiction}</td>
+                    <td className="mono">{fmtDate(filedOf(r)) || '—'}</td>
+                    <td><StatusBadge status={r.status} /></td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
 
       <div className="detail-cols">
         <div>
@@ -664,67 +763,112 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
             ))}
           </Card>
 
-          <Card label="Madrid Protocol filing">
+          <Card label="Madrid Protocol">
             {isDesignation && irCase && (
-              <div className="hint">
-                Designation under <button className="back" style={{ margin: 0 }} onClick={() => onOpen(irCase.id)}>{irCase.application || 'the International Registration'}</button>.
-                The renewal date is linked to the IR and updates automatically.
+              <div className="hint" style={{ marginBottom: 8 }}>
+                Designation under the{' '}
+                <button className="back" style={{ margin: 0 }} onClick={() => onOpen(irCase.id)}>International Registration{irCase.irNumber ? ` (${irCase.irNumber})` : ''}</button>.
+                The renewal date is inherited from the IR and appears once this designation is registered.
               </div>
             )}
-            {family.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                {family.map((f) => (
-                  <div key={f.id} className="row" style={{ justifyContent: 'space-between', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 10px', marginBottom: 6, cursor: 'pointer' }} onClick={() => onOpen(f.id)}>
-                    <span>{f.irId ? `Designation — ${f.jurisdiction}` : f.basicId ? 'International Registration (Madrid Protocol)' : `Basic case — ${f.jurisdiction}`}</span>
-                    <span className="hint">{f.application || f.registration || 'no number'} · {f.status}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {mpEligible && canEdit && !irCase && (
-              <button className="btn" onClick={() => api.fileMadrid(m.id).then(() => { onCreated(); })}>File a Madrid case</button>
-            )}
-            {(isIR || (mpEligible && irCase)) && canEdit && (
-              <div style={{ marginTop: 8 }}>
-                <div className="section-label">Add designation</div>
-                <div className="row">
-                  <input type="text" placeholder="Search Madrid member…" style={{ maxWidth: 240 }} value={mpCountry} onChange={(e) => setMpCountry(e.target.value)} />
-                </div>
-                {mpCountry && (
-                  <div className="row" style={{ marginTop: 6 }}>
-                    {mpChoices.slice(0, 8).map((c) => (
-                      <button key={c} className="chip" onClick={() => {
-                        const basicId = isIR ? (m.basicId || m.id) : m.id;
-                        api.fileMadrid(basicId, c).then(() => { setMpCountry(''); onCreated(); });
-                      }}>
-                        + {c}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {isIR && (
+              <div className="hint" style={{ marginBottom: 8 }}>
+                International Registration. Renewal is 10 years from the IR filing date and covers every designation; it appears once registered.
+                Use <strong>+ Add subsequent designation(s)</strong> above to designate more jurisdictions later.
               </div>
             )}
             {designations.length > 0 && (
-              <table className="list" style={{ marginTop: 8 }}>
-                <thead><tr><th>Designation</th><th>Filed</th><th>Application</th><th>Status</th></tr></thead>
-                <tbody>
-                  {designations.map((d) => (
-                    <tr key={d.id} className="click" onClick={() => onOpen(d.id)}>
-                      <td>{d.jurisdiction}</td>
-                      <td className="mono">{fmtDate((d.dates || []).find((x) => x.name === 'Application Filed')?.date || '') || '—'}</td>
-                      <td className="mono">{d.application || '—'}</td>
-                      <td><StatusBadge status={d.status} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <>
+                <div className="section-label">Designations ({designations.length})</div>
+                <table className="list">
+                  <thead><tr><th>Jurisdiction</th><th>Filed</th><th>Application</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {designations.map((d) => (
+                      <tr key={d.id} className="click" onClick={() => onOpen(d.id)}>
+                        <td>{d.jurisdiction}</td>
+                        <td className="mono">{fmtDate((d.dates || []).find((x) => x.name === 'Application Filed')?.date || '') || '—'}</td>
+                        <td className="mono">{d.application || '—'}</td>
+                        <td><StatusBadge status={d.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
             )}
-            {!mpEligible && !isIR && !isDesignation && !family.length && (
-              <div className="hint">Madrid filings are made from an Australian or New Zealand basic case.</div>
+            {!isIR && !isDesignation && !irCase && (
+              <div className="hint">
+                {mpEligible
+                  ? 'Use “🌐 File a Madrid case” at the top to file an international registration based on this case and designate Madrid member countries.'
+                  : 'Madrid Protocol filings are made from an Australian or New Zealand basic case.'}
+              </div>
             )}
           </Card>
         </div>
       </div>
+
+      {mpModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(22,35,59,0.4)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 50, padding: '40px 16px', overflowY: 'auto' }}
+          onClick={() => !mpBusy && setMpModal(null)}
+        >
+          <div className="card" style={{ maxWidth: 640, width: '100%', margin: 0 }} onClick={(e) => e.stopPropagation()}>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+              <div className="section-label" style={{ marginBottom: 0 }}>
+                {mpModal === 'file' ? '🌐 File a Madrid Protocol international registration' : '+ Add subsequent designation(s)'}
+              </div>
+              <button className="btn danger-link" onClick={() => !mpBusy && setMpModal(null)}>✕</button>
+            </div>
+            <div className="hint" style={{ marginBottom: 10 }}>
+              {mpModal === 'file'
+                ? `Based on your ${m.jurisdiction} case “${m.name || 'this case'}”. The mark, owner and any priority date are copied to the International Registration and each designated country — all editable afterwards, and opened as separate, linked cases.`
+                : 'A subsequent designation is dated the day it is filed; its renewal still aligns to the International Registration’s renewal date.'}
+            </div>
+            <div className="grid2">
+              <Field label={mpModal === 'file' ? 'International registration (filing) date' : 'Designation filing date'}>
+                <input type="date" value={mpFilingDate} onChange={(e) => setMpFilingDate(e.target.value)} />
+              </Field>
+              <Field label="Find a member">
+                <input type="text" placeholder="Search Madrid members…" value={mpCountry} onChange={(e) => setMpCountry(e.target.value)} />
+              </Field>
+            </div>
+            <div className="section-label" style={{ marginTop: 4 }}>Designate jurisdictions</div>
+            <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8 }}>
+              {mpChoices.length === 0 && <div className="hint">No matching members.</div>}
+              <div className="grid2" style={{ gap: '2px 14px' }}>
+                {mpChoices.map((c) => {
+                  const on = mpPicked.has(c);
+                  return (
+                    <label key={c} className="row" style={{ padding: '3px 4px', cursor: 'pointer', gap: 6 }}>
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() =>
+                          setMpPicked((prev) => {
+                            const n = new Set(prev);
+                            if (on) n.delete(c);
+                            else n.add(c);
+                            return n;
+                          })
+                        }
+                      />
+                      <span>{c}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+              <span className="hint">{mpPicked.size} selected · member list current as at Jul 2026 — verify against WIPO</span>
+              <div className="row">
+                <button className="btn secondary" disabled={mpBusy} onClick={() => setMpModal(null)}>Cancel</button>
+                <button className="btn" disabled={mpBusy} onClick={submitMadrid}>
+                  {mpBusy ? 'Filing…' : mpModal === 'file' ? 'File international registration' : 'Add designation(s)'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 

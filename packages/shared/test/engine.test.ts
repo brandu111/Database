@@ -144,6 +144,24 @@ describe('applyStage — status engine', () => {
   });
 });
 
+describe('Madrid International Registration renewal', () => {
+  it('computes the IR renewal from its filing date, without a registration date', () => {
+    const ir = blankMark({ id: 'ir1', jurisdiction: 'Madrid Protocol (WIPO)' });
+    ir.dates.push({ name: 'Application Filed', date: '2014-04-04', done: true });
+    ensureRuleRows(ir, rules);
+    // Renewal = IR filing date + 10 years; dependency = filing + 5 years.
+    expect(dateOf(ir, 'Renewal Deadline')).toBe('2024-04-04');
+    expect(dateOf(ir, 'Dependency Period Ends')).toBe('2019-04-04');
+  });
+
+  it('a non-Madrid jurisdiction still gates renewal behind a registration date', () => {
+    const us = blankMark({ jurisdiction: 'USA' });
+    us.dates.push({ name: 'Application Filed', date: '2014-04-04', done: true });
+    ensureRuleRows(us, rules);
+    expect(dateOf(us, 'Renewal Deadline')).toBeUndefined();
+  });
+});
+
 describe('Madrid designation renewal linkage', () => {
   it('designation copies the IR renewal instead of computing its own, and re-propagates', () => {
     const ir = blankMark({ id: 'ir1', jurisdiction: 'Madrid Protocol (WIPO)' });

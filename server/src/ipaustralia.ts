@@ -169,6 +169,7 @@ export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
     if (iso) dates.push({ name: label, date: iso, done: true });
   };
   addDate('Application Filed', isoDate(tm.filingDate));
+  addDate('Priority Date', isoDate(tm.priorityDate));
   addDate('OA Issued', isoDate(tm.firstReportDate));
   addDate('Publication Date', isoDate(tm.acceptanceAdvertisedDate) || isoDate(tm.registrationAdvertisedDate));
   addDate('Registration Date', isoDate(tm.enteredOnRegisterDate) || isoDate(tm.registeredFromDate));

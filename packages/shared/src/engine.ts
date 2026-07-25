@@ -119,10 +119,15 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
     return row && row.date;
   };
   const regPresent = val('Registration Date');
+  // A Madrid International Registration renews from its own filing (international
+  // registration) date, so its post-registration rules fire as soon as their
+  // trigger date exists rather than waiting for a separate registration date.
+  // (The UI hides the renewal rows on Madrid cases until they are registered.)
+  const isMadridIr = m.jurisdiction === 'Madrid Protocol (WIPO)';
   list.forEach((r) => {
     if (!r.name || !r.trigger) return;
     const post = POST_REGISTRATION.test(r.name);
-    const gateOk = post ? regPresent : val(r.trigger);
+    const gateOk = post ? (isMadridIr ? !!val(r.trigger) : regPresent) : val(r.trigger);
     if (!gateOk) return;
     ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0 });
   });

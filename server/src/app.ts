@@ -14,6 +14,7 @@ import {
   type AlertRow,
   type Company,
   type Mark,
+  type MarkDate,
   type Opposition,
   type OppositionDate,
   type StaffLevel,
@@ -246,21 +247,41 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
    * From an AU/NZ basic case, spawn the linked Madrid International
    * Registration; with {country} also add a designation case under the IR.
    */
+  /**
+   * File a Madrid Protocol international registration from an AU/NZ basic case,
+   * and/or add designations to it. Body:
+   *   { countries?: string[], country?: string, filingDate?: string,
+   *     subsequent?: boolean }
+   * The IR and each designated jurisdiction are created as separate, related
+   * cases (shared madridId). Initial designations share the IR filing date;
+   * subsequent designations are dated the day they are filed. Convention
+   * priority recorded on the basic case is carried forward. Basic-case details
+   * are copied (and remain editable on the new cases).
+   */
   app.post('/api/marks/:id/madrid', edit, (req, res) => {
     const basic = getMark(db, req.params.id);
     if (!basic) return res.status(404).json({ error: 'Not found' });
-    const country = req.body?.country ? String(req.body.country) : null;
-    const td = todayISO();
+    const body = req.body || {};
+    const countries: string[] = Array.isArray(body.countries)
+      ? body.countries.map(String)
+      : body.country
+        ? [String(body.country)]
+        : [];
+    const subsequent = !!body.subsequent;
+
     const fam = basic.madridId || `fam-${basic.id}`;
     basic.madridId = fam;
     const all = listMarks(db);
     let ir = all.find((x) => x.madridId === fam && x.jurisdiction === 'Madrid Protocol (WIPO)');
+
     const ownerBits: Partial<Mark> = {
       owner: basic.owner,
       ownerType: basic.ownerType,
       ownerFirst: basic.ownerFirst,
       ownerMiddle: basic.ownerMiddle,
       ownerLast: basic.ownerLast,
+      ownerAbn: basic.ownerAbn,
+      ownerAcn: basic.ownerAcn,
       address1: basic.address1,
       address2: basic.address2,
       city: basic.city,
@@ -269,11 +290,22 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
       country: basic.country,
       phone: basic.phone,
     };
+
+    // Convention priority carried forward from the basic case (if recorded there).
+    const priorityRows = (basic.dates || []).filter((d) => d.date && /^priority date$/i.test(d.name || ''));
+    const withPriority = (dates: MarkDate[]): MarkDate[] => {
+      priorityRows.forEach((p) => {
+        if (!dates.some((d) => d.name === p.name)) dates.push({ name: p.name, date: p.date, done: true });
+      });
+      return dates;
+    };
+
     const created: Mark[] = [];
     if (!ir) {
       if (!['Australia', 'New Zealand'].includes(basic.jurisdiction)) {
-        return res.status(400).json({ error: 'A Madrid case can only be filed from an Australian or New Zealand basic application' });
+        return res.status(400).json({ error: 'A Madrid case can only be filed from an Australian or New Zealand basic application.' });
       }
+      const irFilingDate = body.filingDate ? String(body.filingDate) : todayISO();
       ir = blankMark({
         id: newId('ir'),
         name: basic.name,
@@ -290,50 +322,65 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
         comments: `Based on ${basic.jurisdiction} case ${basic.registration || basic.application || ''}`,
         madridId: fam,
         basicId: basic.id,
-        treaty: { basis: 'Madrid Protocol', date: td, desigs: [] },
-        dates: [{ name: 'Application Filed', date: td, done: false, auInput: true }],
+        treaty: { basis: 'Madrid Protocol', date: irFilingDate, desigs: [] },
+        dates: withPriority([{ name: 'Application Filed', date: irFilingDate, done: true, auInput: true }]),
         contacts: clone(basic.contacts || []),
         image: basic.image || null,
         ...ownerBits,
       });
       created.push(ir);
     }
-    if (country) {
-      const cp = { classes: true, goods: true, disclaimers: true, contacts: true, ...(basic.madridCopy || {}) };
-      const exists = all.some((x) => x.irId === ir!.id && x.jurisdiction === country);
-      if (!exists) {
-        created.push(
-          blankMark({
-            id: newId('des'),
-            name: basic.name,
-            jurisdiction: country,
-            status: 'Pending',
-            filingBasis: 'Madrid Protocol',
-            type: basic.type,
-            wordText: basic.wordText || '',
-            classes: cp.classes ? basic.classes : '',
-            goods: cp.goods ? basic.goods : '',
-            disclaimers: cp.disclaimers ? basic.disclaimers : '',
-            matter: basic.matter,
-            clientDocket: basic.clientDocket,
-            comments: `Designation under Madrid IR (basic: ${basic.name})`,
-            madridId: fam,
-            irId: ir.id,
-            treaty: { basis: 'Madrid Protocol', date: td, desigs: [] },
-            dates: [{ name: 'Application Filed', date: td, done: false, auInput: true }],
-            contacts: cp.contacts ? clone(basic.contacts || []) : [],
-            ...ownerBits,
-          })
-        );
-      }
+
+    const irFilingDate = (ir.dates || []).find((d) => d.name === 'Application Filed')?.date || todayISO();
+    // Initial designations share the IR filing date; subsequent designations
+    // are dated when they are filed (the supplied date, or today).
+    const desigFilingDate = subsequent ? (body.filingDate ? String(body.filingDate) : todayISO()) : irFilingDate;
+    const cp = { classes: true, goods: true, disclaimers: true, contacts: true, ...(basic.madridCopy || {}) };
+
+    for (const country of countries) {
+      if (!country || country === 'Madrid Protocol (WIPO)') continue;
+      if (all.some((x) => x.irId === ir!.id && x.jurisdiction === country)) continue;
+      if (created.some((x) => x.irId === ir!.id && x.jurisdiction === country)) continue;
+      created.push(
+        blankMark({
+          id: newId('des'),
+          name: basic.name,
+          jurisdiction: country,
+          status: 'Pending',
+          filingBasis: 'Madrid Protocol',
+          type: basic.type,
+          wordText: basic.wordText || '',
+          classes: cp.classes ? basic.classes : '',
+          goods: cp.goods ? basic.goods : '',
+          disclaimers: cp.disclaimers ? basic.disclaimers : '',
+          matter: basic.matter,
+          clientDocket: basic.clientDocket,
+          comments: `${subsequent ? 'Subsequent designation' : 'Designation'} under Madrid IR (basic: ${basic.name})`,
+          madridId: fam,
+          irId: ir.id,
+          treaty: { basis: 'Madrid Protocol', date: desigFilingDate, desigs: [] },
+          dates: withPriority([{ name: 'Application Filed', date: desigFilingDate, done: true, auInput: true }]),
+          contacts: cp.contacts ? clone(basic.contacts || []) : [],
+          ...ownerBits,
+        })
+      );
     }
+
     const tx = db.transaction(() => {
       saveMark(db, basic);
       created.forEach((x) => saveMark(db, x));
     });
     tx();
-    // Propagate any existing IR renewal to a newly created designation.
-    created.filter((x) => x.irId).forEach((x) => processMarkWrite(db, x, x));
+    // Compute the IR renewal (from its filing date) first, then propagate it to
+    // every designation.
+    const irNow = getMark(db, ir.id)!;
+    processMarkWrite(db, irNow, irNow);
+    created
+      .filter((x) => x.irId)
+      .forEach((x) => {
+        const m = getMark(db, x.id)!;
+        processMarkWrite(db, m, m);
+      });
     res.json({ ir: getMark(db, ir.id), created: created.map((x) => getMark(db, x.id)) });
   });
 
