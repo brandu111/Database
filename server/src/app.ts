@@ -154,6 +154,20 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.use(express.json({ limit: '25mb' }));
   app.use(cookieParser());
 
+  // Never let a proxy/CDN (e.g. LiteSpeed LSCache) cache API or file responses:
+  // caching an authenticated response would both break sessions and leak one
+  // user's data to another. Mark everything under /api and /files no-store.
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/files')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      // LiteSpeed-specific opt-out, honoured even if the server default caches.
+      res.setHeader('X-LiteSpeed-Cache-Control', 'no-cache');
+    }
+    next();
+  });
+
   const view = requireStaff(db, 'view');
   const edit = requireStaff(db, 'edit');
   const full = requireStaff(db, 'full');
