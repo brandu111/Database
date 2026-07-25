@@ -168,44 +168,74 @@ function actionRequiredEmail(m: Mark, d: MarkDate): { subject: string; html: str
 interface DigestItem { date: string; name: string; mark: string; jur: string; overdue: boolean; }
 
 /**
- * Send each staff member one email listing all of their outstanding alert items
- * (deadlines they added that are due today or overdue). Intended to run once a
- * day via a cPanel cron using `RUN_TASK=daily-digest node app.cjs`.
+ * Send each staff member one email listing all of their outstanding items that
+ * are due today or overdue. Items attributed to a staff member go to them; any
+ * unattributed item (a system/seeded deadline, a reminder, or an opposition
+ * date) goes to the fallback recipients (DIGEST_FALLBACK, default alexMJ,admin)
+ * so nothing falls through the cracks. Intended to run once a day via a cPanel
+ * cron using `RUN_TASK=daily-digest node app.cjs`.
  */
-export async function runDailyDigest(db: DB, opts: { today?: string } = {}): Promise<{ sent: number; recipients: string[] }> {
-  if (!mailerConfigured()) return { sent: 0, recipients: [] };
-  const today = opts.today || todayISO();
+export interface DigestBucket { name: string; email: string; items: DigestItem[] }
+
+/**
+ * Group every outstanding item (due today or overdue) into one bucket per
+ * recipient. Attributed items go to that staff member; unattributed ones go to
+ * the fallback recipients (DIGEST_FALLBACK, default alexMJ,admin). Pure over the
+ * database so it can be unit-tested without a mail server.
+ */
+export function buildDigests(db: DB, today: string): DigestBucket[] {
   const users = db.prepare(`SELECT name, email FROM staff_users WHERE email <> ''`).all() as { name: string; email: string }[];
   const emailByName = new Map(users.map((u) => [u.name.toLowerCase(), u.email.trim()]));
-  const byUser = new Map<string, { name: string; email: string; items: DigestItem[] }>();
+  const byUser = new Map<string, DigestBucket>();
+  const fallbackNames = (process.env.DIGEST_FALLBACK || 'alexMJ,admin').split(',').map((s) => s.trim()).filter(Boolean);
 
-  const add = (owner: string | undefined, item: DigestItem) => {
-    if (!owner) return;
-    const email = emailByName.get(owner.toLowerCase());
+  const addFor = (name: string, item: DigestItem) => {
+    const email = emailByName.get(name.toLowerCase());
     if (!email) return;
-    const key = owner.toLowerCase();
-    if (!byUser.has(key)) byUser.set(key, { name: owner, email, items: [] });
+    const key = name.toLowerCase();
+    if (!byUser.has(key)) byUser.set(key, { name, email, items: [] });
     byUser.get(key)!.items.push(item);
   };
+  // Attributed → the staff member; unattributed (or owner with no email set) →
+  // the fallback recipients (alexMJ and admin by default).
+  const add = (owner: string | undefined, item: DigestItem) => {
+    if (owner && emailByName.has(owner.toLowerCase())) addFor(owner, item);
+    else fallbackNames.forEach((n) => addFor(n, item));
+  };
+
+  const due = (iso: string | undefined) => !!iso && iso <= today; // today or overdue
 
   for (const m of listMarks(db)) {
     for (const d of m.dates || []) {
-      if (d.done || !d.date || !d.notify || !d.createdBy) continue;
-      if (d.date > today) continue; // due today or overdue only
+      if (d.done || !due(d.date)) continue;
       add(d.createdBy, { date: d.date, name: d.name, mark: m.name || '(untitled)', jur: m.jurisdiction || '', overdue: d.date < today });
     }
     for (const a of m.actions || []) {
-      if (a.done || !a.alert || !a.createdBy) continue;
+      if (a.done || !a.alert) continue;
       const when = a.alertDate || a.date;
-      if (!when || when > today) continue;
+      if (!due(when)) continue;
       add(a.createdBy, { date: when, name: a.text || 'Action', mark: m.name || '(untitled)', jur: m.jurisdiction || '', overdue: when < today });
     }
   }
+  // Opposition deadlines have no individual owner — route them to the fallback.
+  for (const o of listOppositions(db)) {
+    for (const d of o.dates || []) {
+      if (d.done || d.suspend || !due(d.date)) continue;
+      add(undefined, { date: d.date, name: d.name || 'Opposition deadline', mark: o.name || '(opposition)', jur: o.jurisdiction || '', overdue: d.date < today });
+    }
+  }
+  for (const b of byUser.values()) b.items.sort((a, c) => (a.date < c.date ? -1 : 1));
+  return [...byUser.values()];
+}
+
+export async function runDailyDigest(db: DB, opts: { today?: string } = {}): Promise<{ sent: number; recipients: string[] }> {
+  if (!mailerConfigured()) return { sent: 0, recipients: [] };
+  const today = opts.today || todayISO();
+  const buckets = buildDigests(db, today);
 
   const sends: Promise<unknown>[] = [];
   const recipients: string[] = [];
-  for (const { name, email, items } of byUser.values()) {
-    items.sort((a, b) => (a.date < b.date ? -1 : 1));
+  for (const { name, email, items } of buckets) {
     const rows = items
       .map(
         (it) =>
@@ -243,7 +273,7 @@ function computeAlerts(db: DB, alertDays: number, forCompany?: string): AlertRow
     if (forCompany && m.owner !== forCompany) continue;
     (m.actions || []).forEach((a) => {
       if (a.alert && !a.done && a.alertDate)
-        rows.push({ date: a.alertDate, kind: 'Action', refType: 'mark', refId: m.id, mark: m.name || '(untitled)', jur: m.jurisdiction || '', text: a.text || 'Action alert' });
+        rows.push({ date: a.alertDate, kind: 'Action', refType: 'mark', refId: m.id, mark: m.name || '(untitled)', jur: m.jurisdiction || '', text: a.text || 'Action alert', owner: a.createdBy });
     });
     (m.dates || []).forEach((d) => {
       if (d.done || !d.date) return;
@@ -256,6 +286,7 @@ function computeAlerts(db: DB, alertDays: number, forCompany?: string): AlertRow
           mark: m.name || '(untitled)',
           jur: m.jurisdiction || '',
           text: (d.name || '').replace(/ — Reminder.*$/, ''),
+          owner: d.createdBy,
         });
     });
   }

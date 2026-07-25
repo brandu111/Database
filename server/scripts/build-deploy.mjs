@@ -105,6 +105,8 @@ app panel — nothing leaves your hosting:
     SMTP_PASS    that mailbox's password
     SMTP_FROM    From address (defaults to SMTP_USER)
     PORTAL_URL   https://portal.brandu.legal   (link shown in the emails)
+    DIGEST_FALLBACK  staff names that receive unattributed deadlines in the
+                     digest (comma-separated; default: alexMJ,admin)
 
 Each staff member sets their own address under Preferences → Settings → "My
 email sign-off". Use "Send test" there to confirm it works.

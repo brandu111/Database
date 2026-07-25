@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Express } from 'express';
-import { createApp } from '../src/app.js';
+import { buildDigests, createApp } from '../src/app.js';
 import { newId, openDb } from '../src/db.js';
 import { hashPassword } from '../src/auth.js';
 
@@ -12,11 +12,12 @@ import { hashPassword } from '../src/auth.js';
  */
 
 let app: Express;
+let db: ReturnType<typeof openDb>;
 let admin: request.Agent;
 let viewer: request.Agent;
 
 beforeAll(() => {
-  const db = openDb(':memory:');
+  db = openDb(':memory:');
   db.prepare(`INSERT INTO staff_users(id,name,level,password_hash) VALUES(?,?,?,?)`).run(newId('u'), 'Admin', 'Full Permissions', hashPassword('pw'));
   db.prepare(`INSERT INTO staff_users(id,name,level,password_hash) VALUES(?,?,?,?)`).run(newId('u'), 'Fiona', 'View and Print Only', hashPassword('pw'));
   app = createApp(db, { uploadsDir: `${process.env.TMPDIR || '/tmp'}/brandu-test-uploads` });
@@ -152,6 +153,32 @@ describe('staff email & alert mailing', () => {
   it('gates mail endpoints to Full permissions', async () => {
     await viewer.post('/api/mail/test').send({}).expect(403);
     await viewer.post('/api/tasks/daily-digest').expect(403);
+  });
+
+  it('routes attributed deadlines to the owner and unattributed ones to the fallback (alexMJ, admin)', async () => {
+    // Staff who can receive mail: Bob (an owner), plus the two fallbacks.
+    db.prepare(`INSERT INTO staff_users(id,name,level,password_hash,email) VALUES(?,?,?,?,?)`).run(newId('u'), 'Bob', 'Edit Only', hashPassword('pw'), 'bob@brandu.legal');
+    db.prepare(`INSERT INTO staff_users(id,name,level,password_hash,email) VALUES(?,?,?,?,?)`).run(newId('u'), 'alexMJ', 'Edit Only', hashPassword('pw'), 'alex@brandu.legal');
+    db.prepare(`UPDATE staff_users SET email='admin@brandu.legal' WHERE name='Admin'`).run();
+
+    const past = '2000-01-01';
+    const m = (await admin.post('/api/marks').send({ name: 'DIGEST MARK', jurisdiction: 'Australia' }).expect(201)).body;
+    m.dates = [
+      { name: 'Owned overdue', date: past, done: false, createdBy: 'Bob', notify: true },
+      { name: 'Unowned overdue', date: past, done: false },
+    ];
+    await admin.put(`/api/marks/${m.id}`).send(m).expect(200);
+
+    const buckets = buildDigests(db, '2020-01-01');
+    const byName = Object.fromEntries(buckets.map((b) => [b.name.toLowerCase(), b]));
+    const names = (n: string) => (byName[n]?.items || []).map((i) => i.name);
+
+    expect(names('bob')).toContain('Owned overdue');
+    expect(names('bob')).not.toContain('Unowned overdue');
+    expect(names('alexmj')).toContain('Unowned overdue');
+    expect(names('admin')).toContain('Unowned overdue');
+    // Every collected item is due today or overdue.
+    for (const b of buckets) for (const it of b.items) expect(it.date <= '2020-01-01').toBe(true);
   });
 });
 

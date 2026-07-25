@@ -282,6 +282,8 @@ export interface AlertRow {
   jur: string;
   text: string;
   overdue?: boolean;
+  /** Staff member the underlying date/action is attributed to, if any. */
+  owner?: string;
 }
 
 export interface OppScheduleStep {
