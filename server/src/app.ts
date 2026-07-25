@@ -43,6 +43,7 @@ import {
   type DB,
 } from './db.js';
 import { IpAuError, ipAuConfigured, lookupTradeMark } from './ipaustralia.js';
+import { csvRowToMark } from './import-marks.js';
 import { mailerConfigured, sendMail } from './mailer.js';
 import {
   checkPassword,
@@ -444,6 +445,35 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.delete('/api/marks/:id', edit, (req, res) => {
     deleteMark(db, req.params.id);
     res.json({ ok: true });
+  });
+
+  // Bulk import cases from parsed CSV rows. Each row becomes a case, run through
+  // the deadline engine so renewals/reminders compute from the imported dates.
+  app.post('/api/marks/import', full, (req, res) => {
+    const rows: Record<string, string>[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) return res.status(400).json({ error: 'No rows to import.' });
+    const errors: { line: number; error: string }[] = [];
+    let imported = 0;
+    rows.forEach((row, i) => {
+      try {
+        const partial = csvRowToMark(row);
+        const m = blankMark(partial);
+        processMarkWrite(db, m, null);
+        imported++;
+      } catch (e) {
+        errors.push({ line: i + 2, error: (e as Error).message }); // +2: header row + 1-indexed
+      }
+    });
+    res.json({ imported, errors, total: rows.length });
+  });
+
+  // Delete EVERY case (and, implicitly, their Madrid links). Full permissions,
+  // guarded by an explicit confirm token so it can't fire by accident.
+  app.delete('/api/marks', full, (req, res) => {
+    if (String(req.query.confirm) !== 'DELETE-ALL') return res.status(400).json({ error: 'Missing confirmation.' });
+    const before = listMarks(db).length;
+    db.prepare('DELETE FROM marks').run();
+    res.json({ deleted: before });
   });
 
   /**

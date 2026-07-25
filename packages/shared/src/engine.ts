@@ -80,7 +80,8 @@ export function auRecompute(m: Mark): void {
     // Renewal rows carry a completed-cycle count so a ticked-off renewal rolls
     // to the next period; every other row has auCycle 0 (multiplier 1, no change).
     const cyc = Math.trunc(Number(dr.auCycle)) || 0;
-    dr.date = bd ? shift(bd, (dr.auOff || 0) * (cyc + 1), dr.auUnit || 'months') : '';
+    // A pinned row keeps its manually-set date; only its reminders recompute.
+    if (!(dr.pinned && dr.date)) dr.date = bd ? shift(bd, (dr.auOff || 0) * (cyc + 1), dr.auUnit || 'months') : '';
     const rem = Math.trunc(Number(dr.auRem)) || 0;
     for (let k = 1; k <= 6; k++) {
       const rn = `${dr.name} — Reminder ${k} of ${rem}`;
@@ -158,6 +159,8 @@ function rollCompletedRenewals(m: Mark): void {
     ren.auCycle = (Math.trunc(Number(ren.auCycle)) || 0) + 1;
     ren.done = false;
     ren.note = 'Renewed — next renewal deadline';
+    // A pinned renewal won't be recomputed by auRecompute, so advance it here.
+    if (ren.pinned) ren.date = shift(ren.date, ren.auOff || 10, ren.auUnit || 'years');
     // Reset the reminder and grace rows tied to this renewal for the new cycle.
     (m.dates || []).forEach((r) => {
       if (r === ren) return;

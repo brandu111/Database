@@ -43,6 +43,8 @@ export const api = {
   createMark: (partial: Partial<Mark>) => req<Mark>('POST', '/api/marks', partial),
   saveMark: (m: Mark) => req<Mark>('PUT', `/api/marks/${m.id}`, m),
   deleteMark: (id: string) => req<{ ok: true }>('DELETE', `/api/marks/${id}`),
+  importMarks: (rows: Record<string, string>[]) => req<{ imported: number; total: number; errors: { line: number; error: string }[] }>('POST', '/api/marks/import', { rows }),
+  deleteAllMarks: () => req<{ deleted: number }>('DELETE', '/api/marks?confirm=DELETE-ALL'),
   fileMadrid: (id: string, opts: { countries?: string[]; filingDate?: string; subsequent?: boolean } = {}) =>
     req<{ ir: Mark; created: Mark[] }>('POST', `/api/marks/${id}/madrid`, opts),
   ipAuConfigured: () => req<{ configured: boolean }>('GET', '/api/lookup/ip-australia'),

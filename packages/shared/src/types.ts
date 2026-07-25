@@ -35,6 +35,12 @@ export interface MarkDate {
    * period (e.g. +10 years) with fresh reminders. 0/undefined for every other row.
    */
   auCycle?: number;
+  /**
+   * A manually-set date (e.g. an imported renewal) that the engine must not
+   * recompute from its base. Reminders still generate from it, and a completed
+   * renewal still rolls forward.
+   */
+  pinned?: boolean;
   /** Row was auto-generated (reminders) — safe to delete/recompute. */
   auGen?: boolean;
   /** Row is a manual input date seeded by a status stage. */

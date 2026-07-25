@@ -1,21 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fmtDate, jurList, MERGE_FIELDS, mergeTemplate, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
+import { fmtDate, IMPORT_COLUMN_NOTES, IMPORT_COLUMNS, IMPORT_EXAMPLE_ROW, jurList, MERGE_FIELDS, mergeTemplate, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
 import { api, type Me } from '../api';
+import { parseCsv, toCsv } from '../csv';
 import { SignatureEditor } from '../SignatureEditor';
 import { Card, Field, confirmDelete } from '../ui';
 
 export function Preferences({ isFull }: { isFull: boolean }) {
-  const [tab, setTab] = useState<'rules' | 'templates' | 'settings'>('rules');
+  const [tab, setTab] = useState<'rules' | 'templates' | 'settings' | 'data'>('rules');
   return (
     <>
       <div className="row" style={{ marginBottom: 14 }}>
         <button className={`chip${tab === 'rules' ? ' on' : ''}`} onClick={() => setTab('rules')}>Date Rules</button>
         <button className={`chip${tab === 'templates' ? ' on' : ''}`} onClick={() => setTab('templates')}>Email Templates</button>
         <button className={`chip${tab === 'settings' ? ' on' : ''}`} onClick={() => setTab('settings')}>Settings &amp; Users</button>
+        {isFull && <button className={`chip${tab === 'data' ? ' on' : ''}`} onClick={() => setTab('data')}>Import / Data</button>}
       </div>
       {tab === 'rules' && <DateRules isFull={isFull} />}
       {tab === 'templates' && <EmailTemplates isFull={isFull} />}
       {tab === 'settings' && <SettingsUsers isFull={isFull} />}
+      {tab === 'data' && isFull && <DataImport />}
     </>
   );
 }
@@ -558,6 +561,156 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
           </Card>
         )}
         {!isFull && <Card label="Settings & users"><div className="hint">Full Permissions are required to manage users, client access and firm settings.</div></Card>}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------- import / data
+
+function DataImport() {
+  const [rows, setRows] = useState<Record<string, string>[] | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ imported: number; total: number; errors: { line: number; error: string }[] } | null>(null);
+  const [delText, setDelText] = useState('');
+  const [delMsg, setDelMsg] = useState('');
+
+  const onFile = async (f: File | undefined) => {
+    if (!f) return;
+    setResult(null);
+    setFileName(f.name);
+    try {
+      const text = await f.text();
+      setRows(parseCsv(text));
+    } catch {
+      setRows([]);
+    }
+  };
+
+  const doImport = async () => {
+    if (!rows?.length) return;
+    setBusy(true);
+    try {
+      setResult(await api.importMarks(rows));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Import failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const csv = toCsv(IMPORT_COLUMNS, [IMPORT_EXAMPLE_ROW]);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'brandu-cases-template.csv';
+    a.click();
+  };
+
+  const deleteAll = async () => {
+    if (delText !== 'DELETE') return;
+    if (!window.confirm('This permanently deletes EVERY case in the portal. This cannot be undone. Continue?')) return;
+    setBusy(true);
+    setDelMsg('');
+    try {
+      const r = await api.deleteAllMarks();
+      setDelMsg(`Deleted ${r.deleted} case(s). You can now import your data.`);
+      setDelText('');
+    } catch (e) {
+      setDelMsg(e instanceof Error ? e.message : 'Delete failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const preview = (rows || []).slice(0, 5);
+
+  return (
+    <div className="detail-cols">
+      <div>
+        <Card label="Import cases from CSV">
+          <div className="hint" style={{ marginBottom: 10 }}>
+            One row per case. Download the template, fill it in (or map your export to the same column names), then upload it here. Dates can be <code>dd/mm/yyyy</code>. Renewal dates and reminders are calculated automatically from the filing/registration dates — you only need <code>RenewalDate</code> if a case renews on a non-standard date.
+          </div>
+          <div className="row" style={{ marginBottom: 10 }}>
+            <button className="btn secondary" onClick={downloadTemplate}>⬇ Download CSV template</button>
+            <label className="btn" style={{ cursor: 'pointer' }}>
+              ⬆ Choose CSV file
+              <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { onFile(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+            </label>
+          </div>
+
+          {rows && (
+            <>
+              <div className="hint" style={{ marginBottom: 6 }}>
+                <strong>{fileName}</strong> — {rows.length} case{rows.length === 1 ? '' : 's'} found.
+              </div>
+              {rows.length > 0 && (
+                <>
+                  <table className="list" style={{ marginBottom: 10 }}>
+                    <thead><tr><th>Mark</th><th>Jurisdiction</th><th>Status</th><th>App / Reg</th></tr></thead>
+                    <tbody>
+                      {preview.map((r, i) => (
+                        <tr key={i}>
+                          <td>{r.MarkName || r.markname || r.Mark || <span className="hint">— (missing name)</span>}</td>
+                          <td>{r.Jurisdiction || r.jurisdiction || '—'}</td>
+                          <td>{r.Status || r.status || '—'}</td>
+                          <td>{r.ApplicationNo || r.RegistrationNo || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {rows.length > preview.length && <div className="hint" style={{ marginBottom: 8 }}>…and {rows.length - preview.length} more.</div>}
+                  <button className="btn" disabled={busy} onClick={doImport}>{busy ? 'Importing…' : `Import ${rows.length} case${rows.length === 1 ? '' : 's'}`}</button>
+                </>
+              )}
+              {rows.length === 0 && <div className="hint" style={{ color: 'var(--danger)' }}>No rows found — check the file has a header row and at least one case.</div>}
+            </>
+          )}
+
+          {result && (
+            <div style={{ marginTop: 12, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+              <div><strong>Imported {result.imported} of {result.total}.</strong></div>
+              {result.errors.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <div className="hint" style={{ color: 'var(--danger)' }}>{result.errors.length} row(s) skipped:</div>
+                  <ul style={{ margin: '4px 0 0 18px' }}>
+                    {result.errors.slice(0, 20).map((e, i) => <li key={i} className="hint">Row {e.line}: {e.error}</li>)}
+                  </ul>
+                </div>
+              )}
+              {result.imported > 0 && <div className="hint" style={{ marginTop: 6 }}>Open the Trade Marks tab to see them. Renewal deadlines and reminders have been calculated.</div>}
+            </div>
+          )}
+        </Card>
+
+        <Card label="⚠ Danger zone — delete all cases">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Removes <strong>every</strong> case from the portal so you can start fresh before importing. This cannot be undone — take a backup of <code>data/brandu.sqlite</code> on the server first. Oppositions, contacts and templates are not affected.
+          </div>
+          <div className="row">
+            <input type="text" placeholder="Type DELETE to confirm" value={delText} onChange={(e) => setDelText(e.target.value)} style={{ maxWidth: 220 }} />
+            <button className="btn danger-link" disabled={busy || delText !== 'DELETE'} onClick={deleteAll} style={{ border: '1px solid var(--danger)', borderRadius: 8, padding: '6px 12px' }}>
+              Delete all cases
+            </button>
+          </div>
+          {delMsg && <div className="hint" style={{ marginTop: 8 }}>{delMsg}</div>}
+        </Card>
+      </div>
+
+      <div>
+        <Card label="Column reference">
+          <div className="hint" style={{ marginBottom: 8 }}>Column headers are matched loosely (case and spacing don’t matter). Only <strong>MarkName</strong> is required.</div>
+          <table className="list">
+            <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+            <tbody>
+              {IMPORT_COLUMNS.map((c) => (
+                <tr key={c}><td style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{c}</td><td className="hint">{IMPORT_COLUMN_NOTES[c] || ''}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       </div>
     </div>
   );

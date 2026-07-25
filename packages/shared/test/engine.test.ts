@@ -74,6 +74,17 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     expect(m.dates.find((d) => d.name === 'Renewal Reminder')!.done).toBe(false);
   });
 
+  it('honours a pinned (imported) renewal date instead of recomputing it, and still makes reminders', () => {
+    const m = blankMark();
+    m.dates.push({ name: 'Application Filed', date: '2020-08-15', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2021-02-10', done: true });
+    // An imported, non-standard renewal date, pinned.
+    m.dates.push({ name: 'Renewal Deadline', date: '2031-06-30', done: false, pinned: true });
+    ensureRuleRows(m, rules);
+    expect(dateOf(m, 'Renewal Deadline')).toBe('2031-06-30'); // kept, not the computed 2030-08-15
+    expect(dateOf(m, 'Renewal Reminder')).toBe('2030-12-30'); // reminders relative to the pinned date
+  });
+
   it('does not create renewal rows before a Registration Date exists', () => {
     const m = blankMark();
     m.dates.push({ name: 'Application Filed', date: '2020-08-15', done: true });

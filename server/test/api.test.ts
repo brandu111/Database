@@ -182,6 +182,35 @@ describe('staff email & alert mailing', () => {
   });
 });
 
+describe('bulk import & clear', () => {
+  it('imports CSV rows as cases with the engine computing renewals, then can clear all', async () => {
+    const rows = [
+      { MarkName: 'IMPORT ONE', Jurisdiction: 'Australia', Status: 'Registered', ApplicationNo: '3000001', FiledDate: '15/08/2020', RegistrationDate: '10/02/2021', Classes: '9, 42' },
+      { MarkName: '', Jurisdiction: 'Australia' }, // invalid — no name
+    ];
+    const r = (await admin.post('/api/marks/import').send({ rows }).expect(200)).body;
+    expect(r.imported).toBe(1);
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].line).toBe(3);
+
+    const marks = (await admin.get('/api/marks')).body as { name: string; dates: { name: string; date: string }[] }[];
+    const one = marks.find((m) => m.name === 'IMPORT ONE')!;
+    expect(one).toBeTruthy();
+    // AU renewal computed from the filing date + 10 years.
+    expect(one.dates.find((d) => d.name === 'Renewal Deadline')?.date).toBe('2030-08-15');
+
+    // Non-full users may not import or clear.
+    await viewer.post('/api/marks/import').send({ rows }).expect(403);
+    await viewer.delete('/api/marks?confirm=DELETE-ALL').expect(403);
+
+    // Clearing requires the confirm token.
+    await admin.delete('/api/marks').expect(400);
+    const del = (await admin.delete('/api/marks?confirm=DELETE-ALL').expect(200)).body;
+    expect(del.deleted).toBeGreaterThan(0);
+    expect((await admin.get('/api/marks')).body).toHaveLength(0);
+  });
+});
+
 describe('oppositions', () => {
   it('generates the AU opposition timeline from an anchor date, citations attached', async () => {
     const r = await admin.post('/api/oppositions').send({ name: 'Test opp', jurisdiction: 'Australia' }).expect(201);
