@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fmtDate, todayISO, type FirmSettings, type Mark, type RuleBook } from '@brandu/shared';
 import { api } from '../api';
+import { toDataUri } from '../email';
 import { SortArrow } from '../ui';
 
 interface BaseCol {
@@ -116,19 +117,36 @@ export function Reports() {
     return rows;
   }, [marks, rCompany, rJur, rStatus, excluded, activeCols, sort]);
 
-  const buildTableHtml = () => {
+  const buildTableHtml = (images: Record<string, string>) => {
     const esc = (s: unknown) => String(s ?? '').split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
     const cellStyle = 'border:1px solid #999;padding:5px 8px;font-family:Calibri,Arial,sans-serif;font-size:11pt';
     const th = activeCols.map((c) => `<th style="${cellStyle};background:#eee;text-align:left">${esc(c.label)}</th>`).join('');
-    const trs = sorted.map((m) => `<tr>${activeCols.map((c) => `<td style="${cellStyle}">${esc(c.val(m) || '')}</td>`).join('')}</tr>`).join('');
+    const cell = (c: { key: string; val: (m: Mark) => string }, m: Mark) => {
+      if (c.key === 'name' && images[m.id]) return `<img src="${images[m.id]}" style="max-height:44px;max-width:170px" />`;
+      return esc(c.val(m) || '');
+    };
+    const trs = sorted.map((m) => `<tr>${activeCols.map((c) => `<td style="${cellStyle}">${cell(c, m)}</td>`).join('')}</tr>`).join('');
     const logo = settings?.logo ? `<img src="${settings.logo}" style="max-height:60px;margin-bottom:8px"><br>` : '';
     const title = `<div style="font-family:Calibri,Arial,sans-serif;font-size:16pt;font-weight:bold;margin-bottom:2px">${esc(settings?.lawFirmName || 'BrandU Legal')} — Trade Marks Report</div>`;
     const sub = `<div style="font-family:Calibri,Arial,sans-serif;font-size:10pt;color:#555;margin-bottom:10px">${esc(fmtDate(todayISO()))} · ${sorted.length} matters</div>`;
     return `${logo}${title}${sub}<table style="border-collapse:collapse"><tr>${th}</tr>${trs}</table>`;
   };
 
-  const download = (mime: string, ext: string) => {
-    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body>${buildTableHtml()}</body></html>`;
+  const download = async (mime: string, ext: string) => {
+    // Inline each logo mark's image as a data URI so it appears in the exported
+    // Word/Excel file (the /files URL is behind login and wouldn't load there).
+    const images: Record<string, string> = {};
+    if (colsOn.name) {
+      await Promise.all(
+        sorted
+          .filter((m) => m.image)
+          .map(async (m) => {
+            const uri = await toDataUri(m.image!);
+            if (uri) images[m.id] = uri;
+          })
+      );
+    }
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body>${buildTableHtml(images)}</body></html>`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([html], { type: mime }));
     a.download = `trade-marks-report.${ext}`;
@@ -215,7 +233,11 @@ export function Reports() {
             {sorted.slice(0, 500).map((m) => (
               <tr key={m.id}>
                 {activeCols.map((c) => (
-                  <td key={c.key} style={c.bold ? { fontWeight: 600, color: 'var(--heading)' } : undefined}>{c.val(m) || '—'}</td>
+                  <td key={c.key} style={c.bold ? { fontWeight: 600, color: 'var(--heading)' } : undefined}>
+                    {c.key === 'name' && m.image
+                      ? <img src={m.image} alt={m.name || 'trade mark'} style={{ maxHeight: 40, maxWidth: 160, objectFit: 'contain', verticalAlign: 'middle' }} />
+                      : c.val(m) || '—'}
+                  </td>
                 ))}
                 <td>
                   <button className="btn danger-link" title="Remove from report" onClick={() => setExcluded([...excluded, m.id])}>✕</button>
