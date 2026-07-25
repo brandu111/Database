@@ -105,6 +105,14 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   if (previous && previous.status !== m.status) applyStage(m, rules, m.status);
   ensureRuleRows(m, rules, all);
   m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+  // Keep the International Registration number in sync across the Madrid family:
+  // it is entered once on the IR case and copied down to every designation
+  // (initial and subsequent). Designations are saved below via `touched`.
+  if (m.jurisdiction === 'Madrid Protocol (WIPO)') {
+    for (const x of all) {
+      if (x.irId === m.id) x.irNumber = m.irNumber || '';
+    }
+  }
   const touched = all.filter((x) => x.id === m.id || x.irId === m.id);
   const tx = db.transaction(() => touched.forEach((x) => saveMark(db, x)));
   tx();
@@ -358,6 +366,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
           comments: `${subsequent ? 'Subsequent designation' : 'Designation'} under Madrid IR (basic: ${basic.name})`,
           madridId: fam,
           irId: ir.id,
+          irNumber: ir.irNumber || '',
           treaty: { basis: 'Madrid Protocol', date: desigFilingDate, desigs: [] },
           dates: withPriority([{ name: 'Application Filed', date: desigFilingDate, done: true, auInput: true }]),
           contacts: cp.contacts ? clone(basic.contacts || []) : [],

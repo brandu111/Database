@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeTemplate } from '../src/merge.js';
+import { mergeTemplate, mergeTemplateHtml } from '../src/merge.js';
 import type { Mark } from '../src/types.js';
 
 /**
@@ -58,5 +58,34 @@ describe('mergeTemplate', () => {
 
   it('supports ACN / ABN and client first name', () => {
     expect(mergeTemplate('Dear [FirstName], ACN [ACN] ABN [ABN]', mark)).toBe('Dear Natalie, ACN 600 123 456 ABN 12 600 123 456');
+  });
+});
+
+describe('mergeTemplateHtml', () => {
+  it('renders the mark as text when the case has no graphic', () => {
+    const out = mergeTemplateHtml('Re: [TrademarkName]', { ...mark, image: null });
+    expect(out).toBe('Re: BRANDU');
+  });
+
+  it('renders the mark as an inline image when the case has a graphic', () => {
+    const out = mergeTemplateHtml('Re: [TrademarkName]', { ...mark, image: '/files/logo.png' });
+    expect(out).toContain('<img src="/files/logo.png"');
+    expect(out).toContain('alt="BRANDU"');
+    expect(out).not.toContain('BRANDU<');
+  });
+
+  it('prefers the provided data-URI image (for pasting into email)', () => {
+    const out = mergeTemplateHtml('[Logo]', mark, { markImage: 'data:image/png;base64,AAAA' });
+    expect(out).toContain('src="data:image/png;base64,AAAA"');
+  });
+
+  it('escapes literal text and converts newlines to <br>', () => {
+    const out = mergeTemplateHtml('A < B\nnext', { ...mark, image: null });
+    expect(out).toBe('A &lt; B<br>next');
+  });
+
+  it('leaves unknown tokens and resolves dates in HTML', () => {
+    const out = mergeTemplateHtml('Due [RenewalDeadline]; fee [FEES]', { ...mark, image: null });
+    expect(out).toBe('Due 15 Aug 2030; fee [FEES]');
   });
 });

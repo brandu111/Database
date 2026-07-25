@@ -136,7 +136,7 @@ function EmailTemplates({ isFull }: { isFull: boolean }) {
         >
           {showFields && (
             <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
-              <div className="hint" style={{ marginBottom: 6 }}>Use these in the subject or body — either <code>[FieldName]</code> or <code>{'{{FieldName}}'}</code>. You can also use the name of <em>any</em> deadline on the case as a field (e.g. <code>[Renewal Deadline]</code>, <code>[OA Response Due]</code>) and it will merge that date. Tokens the system doesn't recognise (e.g. <code>[FEES]</code>) are left in place for you to complete.</div>
+              <div className="hint" style={{ marginBottom: 6 }}>Use these in the subject or body — either <code>[FieldName]</code> or <code>{'{{FieldName}}'}</code>. You can also use the name of <em>any</em> deadline on the case as a field (e.g. <code>[Renewal Deadline]</code>, <code>[OA Response Due]</code>) and it will merge that date. Tokens the system doesn't recognise (e.g. <code>[FEES]</code>) are left in place for you to complete. When a case has a logo/device graphic, the mark shows as the <em>image</em> in the email instead of the words.</div>
               <div className="grid3">
                 {MERGE_FIELDS.map((g) => (
                   <div key={g.group}>

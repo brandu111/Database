@@ -106,6 +106,24 @@ describe('marks and the server-side date engine', () => {
     expect(ren.linkedToIR).toBe(true);
   });
 
+  it('copies the IR number entered on the IR case down to every designation, including subsequent ones', async () => {
+    const marks = (await admin.get('/api/marks')).body;
+    const ir = marks.find((m: { jurisdiction: string; basicId?: string }) => m.jurisdiction === 'Madrid Protocol (WIPO)' && m.basicId === id);
+    expect(ir).toBeTruthy();
+    // Enter the IR number once, on the IR case.
+    ir.irNumber = '1650123';
+    await admin.put(`/api/marks/${ir.id}`).send(ir).expect(200);
+
+    const after = (await admin.get('/api/marks')).body.filter((m: { irId?: string }) => m.irId === ir.id);
+    expect(after.length).toBeGreaterThan(0);
+    for (const d of after) expect(d.irNumber).toBe('1650123');
+
+    // A subsequent designation filed afterwards inherits the same IR number.
+    const r = await admin.post(`/api/marks/${id}/madrid`).send({ countries: ['Vietnam'], filingDate: '2021-02-02', subsequent: true }).expect(200);
+    const vn = r.body.created.find((m: { jurisdiction: string }) => m.jurisdiction === 'Vietnam');
+    expect(vn.irNumber).toBe('1650123');
+  });
+
   it('surfaces upcoming deadlines in alerts', async () => {
     const m = (await admin.get(`/api/marks/${id}`)).body;
     const soon = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);

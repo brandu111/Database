@@ -15,6 +15,12 @@ export interface MergeContext {
   signature?: string;
   /** Today's date (defaults to the current date). */
   today?: string;
+  /**
+   * The mark's graphic for HTML emails. When set (usually a `data:` URI so it
+   * survives being pasted into an email), the mark placeholders render this
+   * image instead of the mark's name. Falls back to `Mark.image` when omitted.
+   */
+  markImage?: string;
 }
 
 /** The merge fields offered to users, grouped for the reference panel. */
@@ -194,4 +200,57 @@ export function applyMerge(text: string, map: Record<string, string>, normDates:
 /** Merge a template body/subject against a case. */
 export function mergeTemplate(text: string, m: Partial<Mark>, ctx: MergeContext = {}): string {
   return applyMerge(text, mergeFieldMap(m, ctx), dateIndex(m));
+}
+
+function escapeHtml(s: string): string {
+  return s.split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;');
+}
+
+/**
+ * Placeholders that stand for "the mark itself". When the case has a graphic
+ * (a logo / device / composite mark), these render the image instead of the
+ * mark name — so device marks show the actual logo in the email, word marks
+ * show the words. Covers both the explicit image tokens and the plain name
+ * tokens the existing templates already use.
+ */
+const MARK_TOKENS = new Set(['trademarkname', 'mark', 'trademark', 'trademarkimage', 'markimage', 'marklogo', 'markgraphic', 'trademarklogo', 'logo']);
+
+/**
+ * Merge a template into an HTML fragment. Same field resolution as
+ * {@link mergeTemplate}, but the result is HTML: literal text is escaped,
+ * newlines become `<br>`, and when the case has a graphic the mark placeholders
+ * render it as an inline `<img>`. Pass `ctx.markImage` (ideally a `data:` URI)
+ * so the image travels when the email is copied into a mail client.
+ */
+export function mergeTemplateHtml(text: string, m: Partial<Mark>, ctx: MergeContext = {}): string {
+  const map = mergeFieldMap(m, ctx);
+  const normDates = dateIndex(m);
+  const imgSrc = ctx.markImage || m.image || '';
+  const name = map.TrademarkName || 'trade mark';
+  const imgTag = imgSrc
+    ? `<img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(name)}" style="max-height:96px;max-width:320px;vertical-align:middle" />`
+    : '';
+
+  const resolveHtml = (token: string): string | undefined => {
+    // The mark, shown as its graphic when the case has one.
+    if (imgTag && MARK_TOKENS.has(norm(token))) return imgTag;
+    const v = resolveToken(token, map, normDates);
+    return v === undefined ? undefined : escapeHtml(v);
+  };
+
+  const src = String(text || '');
+  const re = /\[([^\][\n]{1,60})\]|\{\{\s*([^}\n]{1,60}?)\s*\}\}/g;
+  const lit = (s: string) => escapeHtml(s).split('\n').join('<br>');
+  let out = '';
+  let last = 0;
+  let mm: RegExpExecArray | null;
+  while ((mm = re.exec(src))) {
+    out += lit(src.slice(last, mm.index));
+    const token = (mm[1] ?? mm[2] ?? '').trim();
+    const resolved = resolveHtml(token);
+    out += resolved === undefined ? lit(mm[0]) : resolved;
+    last = re.lastIndex;
+  }
+  out += lit(src.slice(last));
+  return out;
 }

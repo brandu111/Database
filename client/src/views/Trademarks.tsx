@@ -5,6 +5,7 @@ import {
   fmtDate,
   madridMembers,
   mergeTemplate,
+  mergeTemplateHtml,
   rulesFor,
   statusOptions,
   todayISO,
@@ -241,6 +242,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
   const [mpFilingDate, setMpFilingDate] = useState('');
   const [mpBusy, setMpBusy] = useState(false);
   const [showRelated, setShowRelated] = useState(false);
+  const [email, setEmail] = useState<null | { to: string; subject: string; html: string; plain: string; copied: boolean }>(null);
   const timer = useRef<number | null>(null);
   const latest = useRef(m);
   latest.current = m;
@@ -376,22 +378,57 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
       templates.find((t) => t.dateField === dfName);
     const rule = rulesFor(rules, m.jurisdiction).find((r) => (r.name === name || (emailFor && r.name === emailFor)) && r.template);
     if (!tpl && !rule) return null;
-    return () => {
+    return async () => {
       const client = (m.contacts || []).find((c) => (c.position || '').toLowerCase() === 'client');
       const to = client?.email || '';
       const ctx = { dueDate: date, firmName: firm?.lawFirmName, signature: firm?.emailSignature };
-      let subject: string;
-      let body: string;
-      if (tpl) {
-        subject = mergeTemplate(tpl.subject, m, ctx);
-        body = mergeTemplate(tpl.body, m, ctx);
-      } else {
-        subject = `Re: ${m.name} - ${name}`;
-        body = mergeTemplate(rule!.template, m, ctx);
-      }
-      window.open(`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-      api.logCorrespondence(m.id, { to, subject, body }).catch(() => undefined);
+      const bodyTpl = tpl ? tpl.body : rule!.template;
+      const subject = tpl ? mergeTemplate(tpl.subject, m, ctx) : `Re: ${m.name} - ${name}`;
+      const plain = mergeTemplate(bodyTpl, m, ctx);
+      // Inline the case's graphic as a data URI so it travels when the email is
+      // copied into a mail client (the /files URL is behind login).
+      const markImage = m.image ? await toDataUri(m.image) : undefined;
+      const html = mergeTemplateHtml(bodyTpl, m, { ...ctx, markImage });
+      setEmail({ to, subject, html, plain, copied: false });
+      api.logCorrespondence(m.id, { to, subject, body: plain }).catch(() => undefined);
     };
+  };
+
+  // Fetch an image behind the app's auth and turn it into a data: URI.
+  const toDataUri = async (url: string): Promise<string | undefined> => {
+    try {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) return undefined;
+      const blob = await res.blob();
+      return await new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(typeof r.result === 'string' ? r.result : undefined);
+        r.onerror = () => resolve(undefined);
+        r.readAsDataURL(blob);
+      });
+    } catch {
+      return undefined;
+    }
+  };
+
+  const copyEmail = async () => {
+    if (!email) return;
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([email.html], { type: 'text/html' }),
+          'text/plain': new Blob([email.plain], { type: 'text/plain' }),
+        }),
+      ]);
+      setEmail({ ...email, copied: true });
+    } catch {
+      try {
+        await navigator.clipboard.writeText(email.plain);
+        setEmail({ ...email, copied: true });
+      } catch {
+        window.alert('Could not copy automatically — select the preview and copy manually.');
+      }
+    }
   };
 
   const importOwnerContacts = () => {
@@ -542,8 +579,9 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
               <Field label="Classes"><input type="text" value={m.classes} onChange={(e) => update({ classes: e.target.value })} disabled={ro} /></Field>
             </div>
             <Field label="International registration no. (Madrid Protocol)">
-              <input type="text" value={m.irNumber || ''} onChange={(e) => update({ irNumber: e.target.value })} disabled={ro}
+              <input type="text" value={m.irNumber || ''} onChange={(e) => update({ irNumber: e.target.value })} disabled={ro || !!m.irId}
                 placeholder="If this case is a designation under an overseas Madrid registration, e.g. IR No. 1234567" />
+              {!!m.irId && <div className="hint" style={{ marginTop: 2 }}>Copied automatically from the International Registration. Enter it on the IR case to update every designation.</div>}
             </Field>
             {canEdit && m.jurisdiction === 'Australia' && (
               <div className="row" style={{ marginTop: -2, marginBottom: 8 }}>
@@ -661,7 +699,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
                 {visibleDates.map(({ d, i }) => {
                   const days = d.date ? (new Date(d.date + 'T00:00:00').getTime() - now) / 86400000 : NaN;
                   const urgent = !d.done && days >= -1 && days <= 30;
-                  const email = emailForDate(d.name, d.emailFor, d.date);
+                  const sendEmail = emailForDate(d.name, d.emailFor, d.date);
                   return (
                     <tr key={`${d.name}-${i}`}>
                       <td><input type="checkbox" checked={!!d.done} disabled={ro} onChange={() => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) }, true)} /></td>
@@ -678,7 +716,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
                           onChange={(e) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)) })} />
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        {email && <button className="btn danger-link" title="Send client email" onClick={email}>✉</button>}
+                        {sendEmail && <button className="btn danger-link" title="Send client email" onClick={sendEmail}>✉</button>}
                         {canEdit && <button className="btn danger-link" onClick={() => update({ dates: m.dates.filter((_, j) => j !== i) }, true)}>✕</button>}
                       </td>
                     </tr>
@@ -850,6 +888,42 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
                   {mpBusy ? 'Filing…' : mpModal === 'file' ? 'File international registration' : 'Add designation(s)'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {email && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(22,35,59,0.4)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 50, padding: '40px 16px', overflowY: 'auto' }}
+          onClick={() => setEmail(null)}
+        >
+          <div className="card" style={{ maxWidth: 680, width: '100%', margin: 0 }} onClick={(e) => e.stopPropagation()}>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+              <div className="section-label" style={{ marginBottom: 0 }}>✉ Email — {m.name || 'this case'}</div>
+              <button className="btn danger-link" onClick={() => setEmail(null)}>✕</button>
+            </div>
+            <div className="hint" style={{ marginBottom: 10 }}>
+              {m.image
+                ? 'This case has a graphic, so the mark appears as its logo in the email. Copy the email below and paste it into Outlook — the logo comes across with it.'
+                : 'Copy the email below and paste it into your email client, or open it in your default mail app.'}
+            </div>
+            <Field label="To"><input type="text" value={email.to} readOnly /></Field>
+            <Field label="Subject"><input type="text" value={email.subject} readOnly /></Field>
+            <div className="section-label" style={{ marginTop: 8 }}>Preview</div>
+            <div
+              style={{ background: '#fff', color: '#16233b', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', maxHeight: 340, overflowY: 'auto', fontSize: 13, lineHeight: 1.5 }}
+              dangerouslySetInnerHTML={{ __html: email.html }}
+            />
+            <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+              <button
+                className="btn secondary"
+                onClick={() => window.open(`mailto:${encodeURIComponent(email.to)}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.plain)}`)}
+                title="Opens your mail app with the text version (no logo)"
+              >
+                Open in email app
+              </button>
+              <button className="btn" onClick={copyEmail}>{email.copied ? '✓ Copied — paste into your email' : m.image ? 'Copy email (with logo)' : 'Copy email'}</button>
             </div>
           </div>
         </div>
