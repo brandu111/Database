@@ -263,6 +263,8 @@ export interface FirmSettings {
   documentsFolder: string;
   /** Logo shown on report headers (data URL or uploaded file URL). */
   logo: string;
+  /** Signature block appended to client emails via the [Signature] merge field. */
+  emailSignature?: string;
 }
 
 export interface AlertRow {

@@ -570,10 +570,50 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json((db.prepare(`SELECT doc FROM email_templates`).all() as { doc: string }[]).map((r) => JSON.parse(r.doc)));
   });
 
+  const upsertTemplate = db.prepare(`INSERT INTO email_templates(id,doc) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET doc=excluded.doc`);
+  const normaliseTemplate = (raw: Record<string, unknown>, id: string) => ({
+    id,
+    ref: String(raw.ref || ''),
+    jurisdiction: String(raw.jurisdiction || 'Australia'),
+    category: String(raw.category || 'General'),
+    stage: String(raw.stage || ''),
+    dateField: String(raw.dateField || ''),
+    subject: String(raw.subject || ''),
+    body: String(raw.body || ''),
+  });
+
+  app.post('/api/templates', full, (req, res) => {
+    const t = normaliseTemplate(req.body || {}, newId('tpl'));
+    upsertTemplate.run(t.id, JSON.stringify(t));
+    res.status(201).json(t);
+  });
+
   app.put('/api/templates/:id', full, (req, res) => {
-    const t = { ...req.body, id: req.params.id };
-    db.prepare(`INSERT INTO email_templates(id,doc) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET doc=excluded.doc`).run(t.id, JSON.stringify(t));
+    const t = normaliseTemplate(req.body || {}, req.params.id);
+    upsertTemplate.run(t.id, JSON.stringify(t));
     res.json(t);
+  });
+
+  app.delete('/api/templates/:id', full, (req, res) => {
+    db.prepare(`DELETE FROM email_templates WHERE id=?`).run(req.params.id);
+    res.json({ ok: true });
+  });
+
+  /** Bulk import — accepts an array of templates or { templates: [...] }. */
+  app.post('/api/templates/import', full, (req, res) => {
+    const list: Record<string, unknown>[] = Array.isArray(req.body) ? req.body : Array.isArray(req.body?.templates) ? req.body.templates : [];
+    if (!list.length) return res.status(400).json({ error: 'Provide a JSON array of templates, or { "templates": [ ... ] }.' });
+    let count = 0;
+    const tx = db.transaction(() => {
+      for (const raw of list) {
+        const id = raw.id ? String(raw.id) : newId('tpl');
+        const t = normaliseTemplate(raw, id);
+        upsertTemplate.run(t.id, JSON.stringify(t));
+        count++;
+      }
+    });
+    tx();
+    res.status(201).json({ imported: count });
   });
 
   // ---- settings & users ------------------------------------------------------

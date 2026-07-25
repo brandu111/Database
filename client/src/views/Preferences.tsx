@@ -1,18 +1,193 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fmtDate, jurList, type FirmSettings, type Rule, type RuleBook } from '@brandu/shared';
+import { fmtDate, jurList, MERGE_FIELDS, mergeTemplate, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
 import { api } from '../api';
 import { Card, Field, confirmDelete } from '../ui';
 
 export function Preferences({ isFull }: { isFull: boolean }) {
-  const [tab, setTab] = useState<'rules' | 'settings'>('rules');
+  const [tab, setTab] = useState<'rules' | 'templates' | 'settings'>('rules');
   return (
     <>
       <div className="row" style={{ marginBottom: 14 }}>
         <button className={`chip${tab === 'rules' ? ' on' : ''}`} onClick={() => setTab('rules')}>Date Rules</button>
+        <button className={`chip${tab === 'templates' ? ' on' : ''}`} onClick={() => setTab('templates')}>Email Templates</button>
         <button className={`chip${tab === 'settings' ? ' on' : ''}`} onClick={() => setTab('settings')}>Settings &amp; Users</button>
       </div>
-      {tab === 'rules' ? <DateRules isFull={isFull} /> : <SettingsUsers isFull={isFull} />}
+      {tab === 'rules' && <DateRules isFull={isFull} />}
+      {tab === 'templates' && <EmailTemplates isFull={isFull} />}
+      {tab === 'settings' && <SettingsUsers isFull={isFull} />}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------- email templates
+
+function EmailTemplates({ isFull }: { isFull: boolean }) {
+  const [templates, setTemplates] = useState<EmailTemplate[] | null>(null);
+  const [selId, setSelId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [fJur, setFJur] = useState('All');
+  const [saveState, setSaveState] = useState('');
+  const [showFields, setShowFields] = useState(false);
+
+  const reload = () => api.templates().then((t) => setTemplates(t.sort((a, b) => (a.jurisdiction + a.stage).localeCompare(b.jurisdiction + b.stage))));
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const jurs = useMemo(() => [...new Set((templates || []).map((t) => t.jurisdiction).filter(Boolean))].sort(), [templates]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (templates || []).filter(
+      (t) =>
+        (fJur === 'All' || t.jurisdiction === fJur) &&
+        (!q || [t.ref, t.category, t.stage, t.subject, t.dateField].join(' ').toLowerCase().includes(q))
+    );
+  }, [templates, search, fJur]);
+
+  const sel = (templates || []).find((t) => t.id === selId) || null;
+
+  const patch = (p: Partial<EmailTemplate>) => {
+    if (!sel) return;
+    setTemplates((cur) => (cur ? cur.map((t) => (t.id === sel.id ? { ...t, ...p } : t)) : cur));
+  };
+  const save = async () => {
+    if (!sel) return;
+    setSaveState('Saving…');
+    try {
+      await api.saveTemplate(sel);
+      setSaveState('Saved');
+    } catch {
+      setSaveState('Save failed — Full Permissions required');
+    }
+  };
+  const addNew = async () => {
+    const t = await api.createTemplate({ ref: '', jurisdiction: 'Australia', category: 'General', stage: 'New template', dateField: '', subject: '', body: '' });
+    await reload();
+    setSelId(t.id);
+  };
+  const importJson = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      const r = await api.importTemplates(parsed);
+      await reload();
+      setSaveState(`Imported ${r.imported} template(s)`);
+    } catch (e) {
+      setSaveState(e instanceof Error ? `Import failed: ${e.message}` : 'Import failed');
+    }
+  };
+
+  if (!templates) return <div className="hint">Loading…</div>;
+
+  const sampleMark: Partial<Mark> = {
+    name: 'EXAMPLE MARK',
+    owner: 'Example Co Pty Ltd',
+    jurisdiction: 'Australia',
+    application: '2650000',
+    registration: '2650000',
+    classes: '9, 42',
+    goods: 'Downloadable software; legal services',
+    status: 'Registered',
+    matter: '1234',
+    ownerAcn: '600 123 456',
+    ownerAbn: '12 600 123 456',
+    dates: [
+      { name: 'Application Filed', date: '2025-01-15', done: true },
+      { name: 'Renewal Deadline', date: '2035-01-15', done: false },
+      { name: 'OA Response Due', date: '2026-09-01', done: false },
+    ],
+    contacts: [{ name: 'Jane Client', company: '', position: 'Client', phone: '', email: '' }],
+  };
+
+  return (
+    <div className="pref-layout">
+      <div className="card" style={{ padding: 10 }}>
+        <input type="text" placeholder="Search templates…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 8 }} />
+        <select value={fJur} onChange={(e) => setFJur(e.target.value)} style={{ marginBottom: 8 }}>
+          <option value="All">All jurisdictions</option>
+          {jurs.map((j) => <option key={j}>{j}</option>)}
+        </select>
+        <div className="hint" style={{ marginBottom: 6 }}>{filtered.length} of {templates.length}</div>
+        <div style={{ maxHeight: 460, overflowY: 'auto' }}>
+          {filtered.map((t) => (
+            <div key={t.id} className={`jur-item${selId === t.id ? ' on' : ''}`} style={{ display: 'block' }} onClick={() => setSelId(t.id)}>
+              <div style={{ fontWeight: selId === t.id ? 600 : 500 }}>{t.stage || t.subject || '(untitled)'}</div>
+              <div className="hint">{[t.jurisdiction, t.category, t.ref && `Ref ${t.ref}`].filter(Boolean).join(' · ')}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <Card
+          label={sel ? 'Edit template' : 'Email templates'}
+          right={
+            isFull && (
+              <div className="row">
+                <button className="btn secondary small" onClick={() => setShowFields((v) => !v)}>{showFields ? 'Hide' : 'Merge'} fields</button>
+                <label className="btn secondary small" style={{ cursor: 'pointer' }}>
+                  Import JSON
+                  <input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importJson(f); }} />
+                </label>
+                <button className="btn small" onClick={addNew}>+ New template</button>
+                <span className="save-state">{saveState}</span>
+              </div>
+            )
+          }
+        >
+          {showFields && (
+            <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+              <div className="hint" style={{ marginBottom: 6 }}>Use these in the subject or body — either <code>[FieldName]</code> or <code>{'{{FieldName}}'}</code>. You can also use the name of <em>any</em> deadline on the case as a field (e.g. <code>[Renewal Deadline]</code>, <code>[OA Response Due]</code>) and it will merge that date. Tokens the system doesn't recognise (e.g. <code>[FEES]</code>) are left in place for you to complete.</div>
+              <div className="grid3">
+                {MERGE_FIELDS.map((g) => (
+                  <div key={g.group}>
+                    <div className="section-label" style={{ marginBottom: 4 }}>{g.group}</div>
+                    {g.fields.map((f) => (
+                      <div key={f.key} style={{ fontSize: 12, marginBottom: 2 }}><code>[{f.key}]</code> <span className="hint">{f.desc}</span></div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!sel && <div className="hint">Select a template on the left to edit it, add a new one, or import your templates from a JSON file. There are {templates.length} templates.</div>}
+
+          {sel && (
+            <>
+              <div className="grid3">
+                <Field label="Jurisdiction">
+                  <input type="text" list="tpl-jur" value={sel.jurisdiction} disabled={!isFull} onChange={(e) => patch({ jurisdiction: e.target.value })} />
+                  <datalist id="tpl-jur">{jurList().map((j) => <option key={j} value={j} />)}</datalist>
+                </Field>
+                <Field label="Category"><input type="text" value={sel.category} disabled={!isFull} onChange={(e) => patch({ category: e.target.value })} /></Field>
+                <Field label="Reference"><input type="text" value={sel.ref} disabled={!isFull} onChange={(e) => patch({ ref: e.target.value })} /></Field>
+              </div>
+              <div className="grid2">
+                <Field label="Name / stage"><input type="text" value={sel.stage} disabled={!isFull} onChange={(e) => patch({ stage: e.target.value })} /></Field>
+                <Field label="Attach to date (optional)">
+                  <input type="text" value={sel.dateField} disabled={!isFull} onChange={(e) => patch({ dateField: e.target.value })} placeholder="e.g. Renewal Deadline" />
+                </Field>
+              </div>
+              <Field label="Subject"><input type="text" value={sel.subject} disabled={!isFull} onChange={(e) => patch({ subject: e.target.value })} /></Field>
+              <Field label="Body"><textarea rows={12} value={sel.body} disabled={!isFull} onChange={(e) => patch({ body: e.target.value })} /></Field>
+              {isFull && (
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <button className="btn danger-link" onClick={() => { if (confirmDelete('this template')) api.deleteTemplate(sel.id).then(() => { setSelId(null); reload(); }); }}>Delete template</button>
+                  <button className="btn" onClick={save}>Save template</button>
+                </div>
+              )}
+              <div style={{ marginTop: 14 }}>
+                <div className="section-label">Preview (sample data)</div>
+                <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 6 }}>{mergeTemplate(sel.subject, sampleMark) || '(no subject)'}</div>
+                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{mergeTemplate(sel.body, sampleMark) || '(no body)'}</div>
+                </div>
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }
 
@@ -201,6 +376,10 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
             <Field label="Firm contact email"><input type="text" value={fs.firmContactEmail} disabled={ro} onChange={(e) => saveSettings({ ...fs, firmContactEmail: e.target.value })} /></Field>
           </div>
           <Field label="Documents folder"><input type="text" value={fs.documentsFolder} disabled={ro} onChange={(e) => saveSettings({ ...fs, documentsFolder: e.target.value })} /></Field>
+          <Field label="Email signature (used by the [Signature] merge field)">
+            <textarea rows={5} value={fs.emailSignature || ''} disabled={ro} onChange={(e) => saveSettings({ ...fs, emailSignature: e.target.value })}
+              placeholder={'Kind regards,\n\nBrandU Legal\nTrade Mark Attorneys'} />
+          </Field>
           <Field label="Logo (used on report headers)">
             {fs.logo ? (
               <div className="row">

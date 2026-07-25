@@ -4,11 +4,13 @@ import {
   allJurisdictions,
   fmtDate,
   madridMembers,
+  mergeTemplate,
   rulesFor,
   statusOptions,
   todayISO,
   type Company,
   type EmailTemplate,
+  type FirmSettings,
   type Mark,
   type RuleBook,
 } from '@brandu/shared';
@@ -29,6 +31,7 @@ export function Trademarks({ nav, go, canEdit }: Props) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [rules, setRules] = useState<RuleBook>({});
+  const [firm, setFirm] = useState<FirmSettings | null>(null);
   const [error, setError] = useState('');
 
   const reload = useCallback(() => {
@@ -40,6 +43,7 @@ export function Trademarks({ nav, go, canEdit }: Props) {
     api.companies().then(setCompanies, () => undefined);
     api.templates().then(setTemplates, () => undefined);
     api.rules().then((r) => setRules(r.rules), () => undefined);
+    api.settings().then(setFirm, () => undefined);
   }, [reload]);
 
   if (error) return <div className="err">{error}</div>;
@@ -59,6 +63,7 @@ export function Trademarks({ nav, go, canEdit }: Props) {
         companies={companies}
         templates={templates}
         rules={rules}
+        firm={firm}
         canEdit={canEdit}
         onBack={() => {
           reload();
@@ -216,6 +221,7 @@ interface DetailProps {
   companies: Company[];
   templates: EmailTemplate[];
   rules: RuleBook;
+  firm: FirmSettings | null;
   canEdit: boolean;
   onBack: () => void;
   onOpen: (id: string) => void;
@@ -224,7 +230,7 @@ interface DetailProps {
   onCreated: () => void;
 }
 
-function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, onBack, onOpen, onChanged, onDeleted, onCreated }: DetailProps) {
+function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canEdit, onBack, onOpen, onChanged, onDeleted, onCreated }: DetailProps) {
   const [m, setM] = useState<Mark>(initial);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [addDateName, setAddDateName] = useState('');
@@ -363,22 +369,6 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
       });
   }, [m.dates, m.jurisdiction, m.irId, m.status]);
 
-  const fillMerge = (s: string): string => {
-    const client = (m.contacts || []).find((c) => (c.position || '').toLowerCase() === 'client');
-    const first = (client?.name || m.owner || '').split(' ')[0];
-    const filed = (m.dates || []).find((x) => x.name === 'Application Filed')?.date || '';
-    return String(s || '')
-      .split('[TrademarkName]').join(m.name || '')
-      .split('[CompanyName]').join(m.owner || '')
-      .split('[FirstName]').join(first)
-      .split('[Jurisdiction]').join(m.jurisdiction || '')
-      .split('[ApplicationNumber]').join(m.application || '')
-      .split('[RegistrationNumber]').join(m.registration || '')
-      .split('[RegistrationClasses]').join(m.classes || '')
-      .split('[GoodsServices]').join(m.goods || '')
-      .split('[ApplicationFiled]').join(fmtDate(filed));
-  };
-
   const emailForDate = (name: string, emailFor: string | undefined, date: string) => {
     const dfName = emailFor || name;
     const tpl =
@@ -389,20 +379,15 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
     return () => {
       const client = (m.contacts || []).find((c) => (c.position || '').toLowerCase() === 'client');
       const to = client?.email || '';
+      const ctx = { dueDate: date, firmName: firm?.lawFirmName, signature: firm?.emailSignature };
       let subject: string;
       let body: string;
       if (tpl) {
-        subject = fillMerge(tpl.subject);
-        body = fillMerge(tpl.body);
+        subject = mergeTemplate(tpl.subject, m, ctx);
+        body = mergeTemplate(tpl.body, m, ctx);
       } else {
-        const rep = (s: string, k: string, v: string) => s.split(`{{${k}}}`).join(v || '');
-        let t = rule!.template;
-        t = rep(t, 'mark', m.name);
-        t = rep(t, 'client', client?.name || m.owner || 'client');
-        t = rep(t, 'jurisdiction', m.jurisdiction);
-        t = rep(t, 'deadline', fmtDate(date));
         subject = `Re: ${m.name} - ${name}`;
-        body = t;
+        body = mergeTemplate(rule!.template, m, ctx);
       }
       window.open(`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
       api.logCorrespondence(m.id, { to, subject, body }).catch(() => undefined);

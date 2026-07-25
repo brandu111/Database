@@ -23,17 +23,39 @@ const BASE_COLS: BaseCol[] = [
   { key: 'clientDocket', label: 'Client file ref.', get: (m) => m.clientDocket || '' },
 ];
 
+const LS_KEY = 'brandu.reportLayout';
+function loadLayout(): { colsOn?: Record<string, boolean>; dateCols?: string[]; order?: string[] } {
+  try {
+    return JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
 export function Reports() {
   const [marks, setMarks] = useState<Mark[]>([]);
   const [settings, setSettings] = useState<FirmSettings | null>(null);
   const [rules, setRules] = useState<RuleBook>({});
-  const [colsOn, setColsOn] = useState<Record<string, boolean>>(Object.fromEntries(BASE_COLS.map((c) => [c.key, !!c.defaultOn])));
-  const [dateCols, setDateCols] = useState<string[]>([]);
+  const saved = useMemo(loadLayout, []);
+  const [colsOn, setColsOn] = useState<Record<string, boolean>>(saved.colsOn || Object.fromEntries(BASE_COLS.map((c) => [c.key, !!c.defaultOn])));
+  const [dateCols, setDateCols] = useState<string[]>(saved.dateCols || []);
+  const [order, setOrder] = useState<string[]>(saved.order || []);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const [overKey, setOverKey] = useState<string | null>(null);
   const [rCompany, setRCompany] = useState('All companies');
   const [rJur, setRJur] = useState('All jurisdictions');
   const [rStatus, setRStatus] = useState('All statuses');
   const [sort, setSort] = useState<{ key: string; dir: number }>({ key: 'name', dir: 1 });
   const [excluded, setExcluded] = useState<string[]>([]);
+
+  // Persist the chosen layout (which columns, and their order) between visits.
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ colsOn, dateCols, order }));
+    } catch {
+      /* storage unavailable — layout just won't persist */
+    }
+  }, [colsOn, dateCols, order]);
 
   useEffect(() => {
     api.marks().then(setMarks);
@@ -47,13 +69,33 @@ export function Reports() {
 
   const dateVal = (m: Mark, dn: string) => (m.dates || []).find((d) => (d.name || '') === dn && d.date)?.date || '';
 
-  const activeCols = useMemo(
-    () =>
-      BASE_COLS.filter((c) => colsOn[c.key]).map((c) => ({ key: c.key, label: c.label, bold: !!c.bold, removable: false, val: c.get })).concat(
-        dateCols.map((dn) => ({ key: `date:${dn}`, label: dn, bold: false, removable: true, val: (m: Mark) => fmtDate(dateVal(m, dn)) }))
-      ),
-    [colsOn, dateCols]
-  );
+  const activeCols = useMemo(() => {
+    const all = BASE_COLS.filter((c) => colsOn[c.key])
+      .map((c) => ({ key: c.key, label: c.label, bold: !!c.bold, removable: false, val: c.get }))
+      .concat(dateCols.map((dn) => ({ key: `date:${dn}`, label: dn, bold: false, removable: true, val: (m: Mark) => fmtDate(dateVal(m, dn)) })));
+    // Apply the user's saved column order; columns without a saved position
+    // keep their natural order at the end (stable sort).
+    const pos = (k: string) => {
+      const i = order.indexOf(k);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    return all
+      .map((c, i) => ({ c, i }))
+      .sort((a, b) => pos(a.c.key) - pos(b.c.key) || a.i - b.i)
+      .map((x) => x.c);
+  }, [colsOn, dateCols, order]);
+
+  // Move a column so it lands at the target column's position.
+  const moveColumn = (fromKey: string, toKey: string) => {
+    if (fromKey === toKey) return;
+    const keys = activeCols.map((c) => c.key);
+    const from = keys.indexOf(fromKey);
+    const to = keys.indexOf(toKey);
+    if (from === -1 || to === -1) return;
+    keys.splice(from, 1);
+    keys.splice(to, 0, fromKey);
+    setOrder(keys);
+  };
 
   const dateColOptions = useMemo(() => {
     const names = new Set<string>(['Application Filed', 'OA Issued', 'Publication Date', 'Registration Date', 'Renewal Deadline', 'Notice of Allowance']);
@@ -107,7 +149,11 @@ export function Reports() {
             <option value="">+ Add date column…</option>
             {dateColOptions.map((n) => <option key={n}>{n}</option>)}
           </select>
+          {order.length > 0 && (
+            <button className="btn secondary small" title="Restore the default column order" onClick={() => setOrder([])}>Reset order</button>
+          )}
         </div>
+        <div className="hint" style={{ marginBottom: 10 }}>Drag a column heading left or right to reorder. Click a heading to sort. Your layout is saved on this computer.</div>
         <div className="row">
           <select value={rCompany} onChange={(e) => setRCompany(e.target.value)}>
             <option>All companies</option>
@@ -137,7 +183,23 @@ export function Reports() {
           <thead>
             <tr>
               {activeCols.map((c) => (
-                <th key={c.key} onClick={() => setSort({ key: c.key, dir: sort.key === c.key ? -sort.dir : 1 })}>
+                <th
+                  key={c.key}
+                  draggable
+                  onDragStart={(e) => { setDragKey(c.key); e.dataTransfer.effectAllowed = 'move'; }}
+                  onDragOver={(e) => { e.preventDefault(); if (overKey !== c.key) setOverKey(c.key); }}
+                  onDragLeave={() => setOverKey((k) => (k === c.key ? null : k))}
+                  onDrop={(e) => { e.preventDefault(); if (dragKey) moveColumn(dragKey, c.key); setDragKey(null); setOverKey(null); }}
+                  onDragEnd={() => { setDragKey(null); setOverKey(null); }}
+                  onClick={() => setSort({ key: c.key, dir: sort.key === c.key ? -sort.dir : 1 })}
+                  title="Click to sort · drag to reorder"
+                  style={{
+                    cursor: 'move',
+                    opacity: dragKey === c.key ? 0.4 : 1,
+                    borderLeft: overKey === c.key && dragKey && dragKey !== c.key ? '3px solid var(--accent, #2563eb)' : undefined,
+                  }}
+                >
+                  <span style={{ opacity: 0.4, marginRight: 4, cursor: 'grab' }} aria-hidden>⠿</span>
                   {c.label}
                   <SortArrow active={sort.key === c.key} dir={sort.dir} />
                   {c.removable && (

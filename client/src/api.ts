@@ -63,6 +63,10 @@ export const api = {
   saveOppDatesMaster: (v: OppDateMaster[]) => req<{ ok: true }>('PUT', '/api/opp-dates-master', v),
 
   templates: () => req<EmailTemplate[]>('GET', '/api/templates'),
+  createTemplate: (t: Partial<EmailTemplate>) => req<EmailTemplate>('POST', '/api/templates', t),
+  saveTemplate: (t: EmailTemplate) => req<EmailTemplate>('PUT', `/api/templates/${t.id}`, t),
+  deleteTemplate: (id: string) => req<{ ok: true }>('DELETE', `/api/templates/${id}`),
+  importTemplates: (templates: unknown) => req<{ imported: number }>('POST', '/api/templates/import', templates),
 
   settings: () => req<FirmSettings>('GET', '/api/settings'),
   saveSettings: (s: FirmSettings) => req<FirmSettings>('PUT', '/api/settings', s),
