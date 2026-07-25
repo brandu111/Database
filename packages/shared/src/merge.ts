@@ -12,7 +12,14 @@ export interface MergeContext {
   dueDate?: string;
   /** Firm name and signature block (from settings). */
   firmName?: string;
+  /** Plain-text signature (used by the text version / `mergeTemplate`). */
   signature?: string;
+  /**
+   * HTML signature for `mergeTemplateHtml`. When set, `[Signature]` is inserted
+   * as real HTML (not escaped) so an uploaded sign-off with formatting/images
+   * renders in the email.
+   */
+  signatureHtml?: string;
   /** Today's date (defaults to the current date). */
   today?: string;
   /**
@@ -232,8 +239,11 @@ export function mergeTemplateHtml(text: string, m: Partial<Mark>, ctx: MergeCont
     : '';
 
   const resolveHtml = (token: string): string | undefined => {
+    const key = norm(token);
     // The mark, shown as its graphic when the case has one.
-    if (imgTag && MARK_TOKENS.has(norm(token))) return imgTag;
+    if (imgTag && MARK_TOKENS.has(key)) return imgTag;
+    // The signature is HTML (an uploaded sign-off) — insert it unescaped.
+    if (key === 'signature' && ctx.signatureHtml != null) return ctx.signatureHtml;
     const v = resolveToken(token, map, normDates);
     return v === undefined ? undefined : escapeHtml(v);
   };

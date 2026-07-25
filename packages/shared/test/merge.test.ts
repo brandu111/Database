@@ -88,4 +88,11 @@ describe('mergeTemplateHtml', () => {
     const out = mergeTemplateHtml('Due [RenewalDeadline]; fee [FEES]', { ...mark, image: null });
     expect(out).toBe('Due 15 Aug 2030; fee [FEES]');
   });
+
+  it('inserts an HTML signature unescaped, but escapes a plain-text one', () => {
+    const withHtml = mergeTemplateHtml('[Signature]', { ...mark, image: null }, { signatureHtml: '<b>Nat</b><img src="data:x">' });
+    expect(withHtml).toBe('<b>Nat</b><img src="data:x">');
+    const plain = mergeTemplateHtml('[Signature]', { ...mark, image: null }, { signature: 'Nat & Co' });
+    expect(plain).toBe('Nat &amp; Co');
+  });
 });

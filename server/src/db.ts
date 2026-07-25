@@ -75,7 +75,16 @@ function migrate(db: DB): void {
       body TEXT NOT NULL DEFAULT '', user_name TEXT NOT NULL DEFAULT ''
     );
   `);
+  // Per-user HTML email signature (individual sign-offs). Added by migration so
+  // existing databases pick it up without losing data.
+  addColumn(db, 'staff_users', 'signature', "TEXT NOT NULL DEFAULT ''");
   ensureRulesCurrent(db);
+}
+
+/** Add a column to an existing table if it isn't already present. */
+function addColumn(db: DB, table: string, col: string, decl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${decl}`);
 }
 
 /** Apply the built-in rulebook / rulesVersion migration, keeping custom rules. */

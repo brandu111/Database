@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { fmtDate, jurList, MERGE_FIELDS, mergeTemplate, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
-import { api } from '../api';
+import { api, type Me } from '../api';
+import { SignatureEditor } from '../SignatureEditor';
 import { Card, Field, confirmDelete } from '../ui';
 
 export function Preferences({ isFull }: { isFull: boolean }) {
@@ -343,15 +344,30 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
   const [freshCreds, setFreshCreds] = useState<Record<string, string>>({});
   const [newUser, setNewUser] = useState({ name: '', level: 'Edit Only', password: '' });
   const [saveState, setSaveState] = useState('');
+  const [me, setMe] = useState<Me | null>(null);
+  const [mySig, setMySig] = useState('');
+  const [sigState, setSigState] = useState('');
+  const sigTimer = useRef<number | null>(null);
 
   useEffect(() => {
     api.settings().then(setFs);
+    api.me().then((m) => { setMe(m); if (m.kind === 'staff') setMySig(m.signature || ''); }, () => undefined);
     api.companies().then((cs) => setCompanies(cs.map((c) => c.name).filter(Boolean).sort()), () => undefined);
     if (isFull) {
       api.users().then(setUsers, () => undefined);
       api.clientAccess().then(setAccess, () => undefined);
     }
   }, [isFull]);
+
+  // Save the current user's signature, debounced so typing doesn't hammer the API.
+  const onMySig = (html: string) => {
+    setMySig(html);
+    setSigState('Saving…');
+    if (sigTimer.current) window.clearTimeout(sigTimer.current);
+    sigTimer.current = window.setTimeout(() => {
+      api.saveMySignature(html).then(() => setSigState('Saved'), () => setSigState('Save failed'));
+    }, 700);
+  };
 
   const saveSettings = async (next: FirmSettings) => {
     setFs(next);
@@ -376,8 +392,8 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
             <Field label="Firm contact email"><input type="text" value={fs.firmContactEmail} disabled={ro} onChange={(e) => saveSettings({ ...fs, firmContactEmail: e.target.value })} /></Field>
           </div>
           <Field label="Documents folder"><input type="text" value={fs.documentsFolder} disabled={ro} onChange={(e) => saveSettings({ ...fs, documentsFolder: e.target.value })} /></Field>
-          <Field label="Email signature (used by the [Signature] merge field)">
-            <textarea rows={5} value={fs.emailSignature || ''} disabled={ro} onChange={(e) => saveSettings({ ...fs, emailSignature: e.target.value })}
+          <Field label="Default firm sign-off (fallback for staff without their own)">
+            <textarea rows={4} value={fs.emailSignature || ''} disabled={ro} onChange={(e) => saveSettings({ ...fs, emailSignature: e.target.value })}
               placeholder={'Kind regards,\n\nBrandU Legal\nTrade Mark Attorneys'} />
           </Field>
           <Field label="Logo (used on report headers)">
@@ -403,6 +419,15 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
           </Field>
           <div className="hint">Dates are shown as DD MMM YYYY (e.g. {fmtDate('2009-01-01')}) system-wide.</div>
         </Card>
+
+        {me?.kind === 'staff' && (
+          <Card label="My email sign-off" right={<span className="save-state">{sigState}</span>}>
+            <div className="hint" style={{ marginBottom: 8 }}>
+              Your personal sign-off, used by the <code>[Signature]</code> field when you send an email from a case. It sends as formatted HTML, so a logo or formatting comes across. This is yours alone — each staff member sets their own.
+            </div>
+            <SignatureEditor value={mySig} onChange={onMySig} />
+          </Card>
+        )}
 
         {isFull && (
           <Card label="Staff users">

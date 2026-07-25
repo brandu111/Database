@@ -25,13 +25,14 @@ export class ApiError extends Error {
   }
 }
 
-export type Me = { kind: 'staff'; name: string; level: string } | { kind: 'client'; company: string };
+export type Me = { kind: 'staff'; id?: string; name: string; level: string; signature?: string } | { kind: 'client'; company: string };
 
 export const api = {
   me: () => req<Me>('GET', '/api/auth/me'),
   login: (username: string, password: string) => req<{ name: string; level: string }>('POST', '/api/auth/login', { username, password }),
   clientLogin: (userId: string, password: string) => req<{ company: string }>('POST', '/api/auth/client-login', { userId, password }),
   logout: () => req<{ ok: true }>('POST', '/api/auth/logout'),
+  saveMySignature: (signature: string) => req<{ ok: true }>('PUT', '/api/auth/me/signature', { signature }),
 
   marks: () => req<Mark[]>('GET', '/api/marks'),
   mark: (id: string) => req<Mark>('GET', `/api/marks/${id}`),
@@ -71,9 +72,9 @@ export const api = {
   settings: () => req<FirmSettings>('GET', '/api/settings'),
   saveSettings: (s: FirmSettings) => req<FirmSettings>('PUT', '/api/settings', s),
 
-  users: () => req<{ id: string; name: string; level: string }[]>('GET', '/api/users'),
+  users: () => req<{ id: string; name: string; level: string; signature?: string }[]>('GET', '/api/users'),
   createUser: (u: { name: string; level: string; password: string }) => req<{ id: string }>('POST', '/api/users', u),
-  updateUser: (id: string, u: { name?: string; level?: string; password?: string }) => req<{ id: string }>('PUT', `/api/users/${id}`, u),
+  updateUser: (id: string, u: { name?: string; level?: string; password?: string; signature?: string }) => req<{ id: string }>('PUT', `/api/users/${id}`, u),
   deleteUser: (id: string) => req<{ ok: true }>('DELETE', `/api/users/${id}`),
 
   clientAccess: () => req<{ id: string; company: string; userId: string; active: number; createdAt: string }[]>('GET', '/api/client-access'),

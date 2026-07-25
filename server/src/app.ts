@@ -219,8 +219,20 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.get('/api/auth/me', (req, res) => {
     const session = readSession(db, req);
     if (!session) return res.status(401).json({ error: 'Not signed in' });
-    if (session.kind === 'staff') return res.json({ kind: 'staff', name: session.name, level: session.level });
+    if (session.kind === 'staff') {
+      const row = db.prepare(`SELECT signature FROM staff_users WHERE id=?`).get(session.id) as { signature?: string } | undefined;
+      return res.json({ kind: 'staff', id: session.id, name: session.name, level: session.level, signature: row?.signature || '' });
+    }
     res.json({ kind: 'client', company: session.company });
+  });
+
+  // A staff member updates their own email sign-off (individual signature).
+  app.put('/api/auth/me/signature', edit, (req, res) => {
+    const session = readSession(db, req);
+    if (!session || session.kind !== 'staff') return res.status(401).json({ error: 'Not signed in' });
+    const signature = String((req.body || {}).signature || '');
+    db.prepare(`UPDATE staff_users SET signature=? WHERE id=?`).run(signature, session.id);
+    res.json({ ok: true });
   });
 
   // ---- marks ---------------------------------------------------------------
@@ -634,7 +646,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   });
 
   app.get('/api/users', full, (_req, res) => {
-    res.json(db.prepare(`SELECT id, name, level FROM staff_users ORDER BY name`).all());
+    res.json(db.prepare(`SELECT id, name, level, signature FROM staff_users ORDER BY name`).all());
   });
 
   app.post('/api/users', full, (req, res) => {
@@ -653,10 +665,12 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const { name, level, password } = req.body || {};
     const row = db.prepare(`SELECT id FROM staff_users WHERE id=?`).get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
+    const { signature } = req.body || {};
     if (name) db.prepare(`UPDATE staff_users SET name=? WHERE id=?`).run(String(name), req.params.id);
     if (level) db.prepare(`UPDATE staff_users SET level=? WHERE id=?`).run(String(level), req.params.id);
     if (password) db.prepare(`UPDATE staff_users SET password_hash=? WHERE id=?`).run(hashPassword(String(password)), req.params.id);
-    res.json(db.prepare(`SELECT id, name, level FROM staff_users WHERE id=?`).get(req.params.id));
+    if (signature !== undefined) db.prepare(`UPDATE staff_users SET signature=? WHERE id=?`).run(String(signature || ''), req.params.id);
+    res.json(db.prepare(`SELECT id, name, level, signature FROM staff_users WHERE id=?`).get(req.params.id));
   });
 
   app.delete('/api/users/:id', full, (req, res) => {
