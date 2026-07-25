@@ -265,7 +265,6 @@ function CompanyDetail({ initial, marks, canEdit, openMark, onBack, onChanged, o
                 </div>
                 <div className="row">
                   <label className="hint"><input type="checkbox" checked={!!p.allTrademarks} disabled={ro} onChange={() => setContact(i, { allTrademarks: !p.allTrademarks }, true)} /> Copy on all trade marks</label>
-                  <label className="hint"><input type="checkbox" checked={!!p.allPatents} disabled={ro} onChange={() => setContact(i, { allPatents: !p.allPatents }, true)} /> Copy on all patents</label>
                 </div>
               </div>
             ))}

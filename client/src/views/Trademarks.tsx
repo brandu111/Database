@@ -446,6 +446,32 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
     update({ contacts: [...(m.contacts || []), ...add] }, true);
   };
 
+  // Directory of every contact recorded on the Contacts (companies) tab, so a
+  // case contact can be auto-filled by name.
+  const contactDirectory = useMemo(() => {
+    const list: { name: string; company: string; position: string; phone: string; email: string }[] = [];
+    for (const co of companies) {
+      for (const cc of co.contacts || []) {
+        const name = (cc.name || [cc.first, cc.middle, cc.last].filter(Boolean).join(' ')).trim();
+        if (!name) continue;
+        list.push({ name, company: co.name || '', position: cc.position || cc.title || '', phone: cc.phone || '', email: cc.email || '' });
+      }
+    }
+    return list;
+  }, [companies]);
+  const contactNames = useMemo(() => [...new Set(contactDirectory.map((c) => c.name))].sort(), [contactDirectory]);
+
+  // When a case contact's name matches someone in the directory, copy their
+  // company, position, phone and email across. If the same name appears under
+  // several companies, prefer the one already named on the row.
+  const setContactName = (i: number, name: string) => {
+    const row = m.contacts[i];
+    const matches = contactDirectory.filter((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+    const match = matches.find((c) => c.company === row.company) || matches[0];
+    const next = match ? { ...row, name, company: match.company, position: match.position, phone: match.phone, email: match.email } : { ...row, name };
+    update({ contacts: m.contacts.map((x, j) => (j === i ? next : x)) }, !!match);
+  };
+
   const selectOwner = (name: string) => {
     const co = companies.find((c) => c.name === name);
     const patch: Partial<Mark> = { owner: name };
@@ -757,8 +783,13 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
                     <tr key={i}>
                       {(['name', 'company', 'position', 'phone', 'email'] as const).map((k) => (
                         <td key={k}>
-                          <input type="text" value={c[k] || ''} disabled={ro}
-                            onChange={(e) => update({ contacts: m.contacts.map((x, j) => (j === i ? { ...x, [k]: e.target.value } : x)) })} />
+                          {k === 'name' ? (
+                            <input type="text" value={c.name || ''} disabled={ro} list="case-contact-names" autoComplete="off"
+                              onChange={(e) => setContactName(i, e.target.value)} />
+                          ) : (
+                            <input type="text" value={c[k] || ''} disabled={ro}
+                              onChange={(e) => update({ contacts: m.contacts.map((x, j) => (j === i ? { ...x, [k]: e.target.value } : x)) })} />
+                          )}
                         </td>
                       ))}
                       <td>{canEdit && <button className="btn danger-link" onClick={() => update({ contacts: m.contacts.filter((_, j) => j !== i) }, true)}>✕</button>}</td>
@@ -767,6 +798,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, canE
                 </tbody>
               </table>
             )}
+            <datalist id="case-contact-names">{contactNames.map((n) => <option key={n} value={n} />)}</datalist>
           </Card>
 
           <Card label="Trade mark actions" right={canEdit ? <button className="btn small" onClick={() => update({ actions: [...(m.actions || []), { date: todayISO(), text: '', done: false }] }, true)}>+ Add action</button> : undefined}>
