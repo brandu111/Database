@@ -29,6 +29,12 @@ export interface MarkDate {
   auUnit?: DateUnit;
   /** Monthly reminder count attached to the rule. */
   auRem?: number;
+  /**
+   * Completed renewal cycles. A renewal deadline computes as base + (auCycle+1)
+   * × offset, so ticking the current renewal off rolls it forward to the next
+   * period (e.g. +10 years) with fresh reminders. 0/undefined for every other row.
+   */
+  auCycle?: number;
   /** Row was auto-generated (reminders) — safe to delete/recompute. */
   auGen?: boolean;
   /** Row is a manual input date seeded by a status stage. */

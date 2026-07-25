@@ -77,7 +77,10 @@ export function auRecompute(m: Mark): void {
   computed.forEach((dr) => {
     const base = m.dates.find((x) => x.name === dr.auBase);
     const bd = base && base.date ? base.date : '';
-    dr.date = bd ? shift(bd, dr.auOff || 0, dr.auUnit || 'months') : '';
+    // Renewal rows carry a completed-cycle count so a ticked-off renewal rolls
+    // to the next period; every other row has auCycle 0 (multiplier 1, no change).
+    const cyc = Math.trunc(Number(dr.auCycle)) || 0;
+    dr.date = bd ? shift(bd, (dr.auOff || 0) * (cyc + 1), dr.auUnit || 'months') : '';
     const rem = Math.trunc(Number(dr.auRem)) || 0;
     for (let k = 1; k <= 6; k++) {
       const rn = `${dr.name} — Reminder ${k} of ${rem}`;
@@ -131,12 +134,35 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
     if (!gateOk) return;
     ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0 });
   });
+  rollCompletedRenewals(m);
   // Two passes so rows whose base was itself just computed resolve in one call.
   auRecompute(m);
   auRecompute(m);
   if (allMarks) {
     linkDesignationRenewal(m, allMarks);
     allMarks.filter((x) => x.irId === m.id).forEach((des) => linkDesignationRenewal(des, allMarks));
+  }
+}
+
+/**
+ * When a computed renewal deadline is ticked off, roll it forward to the next
+ * period (base + (auCycle+1) × offset) and un-tick it, so a fresh renewal
+ * deadline and its reminders appear automatically. The reminder / grace rows
+ * for that renewal are reset to not-done for the new cycle. Designation
+ * renewals (linkedToIR) are driven by their International Registration, so they
+ * are left for `linkDesignationRenewal` to re-propagate.
+ */
+function rollCompletedRenewals(m: Mark): void {
+  for (const ren of (m.dates || []).filter((d) => /renewal deadline/i.test(d.name) && d.auBase && !d.linkedToIR)) {
+    if (!ren.done || !ren.date) continue;
+    ren.auCycle = (Math.trunc(Number(ren.auCycle)) || 0) + 1;
+    ren.done = false;
+    ren.note = 'Renewed — next renewal deadline';
+    // Reset the reminder and grace rows tied to this renewal for the new cycle.
+    (m.dates || []).forEach((r) => {
+      if (r === ren) return;
+      if (r.emailFor === ren.name || r.name.startsWith(`${ren.name} — Reminder`) || /renewal (reminder|grace)/i.test(r.name)) r.done = false;
+    });
   }
 }
 
@@ -157,6 +183,12 @@ export function linkDesignationRenewal(m: Mark, allMarks: Mark[]): void {
   if (!row) {
     row = { name: 'Renewal Deadline', date: '', done: false };
     m.dates.push(row);
+  }
+  // If the IR renewal rolled forward to a new cycle, the designation follows and
+  // its renewal (and reminders) reopen for the new period.
+  if (row.date && row.date !== irRen.date) {
+    row.done = false;
+    m.dates.forEach((r) => { if (r.emailFor === 'Renewal Deadline' || /renewal (reminder|grace)/i.test(r.name)) r.done = false; });
   }
   row.date = irRen.date;
   row.auBase = '';

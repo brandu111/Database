@@ -75,7 +75,10 @@ interface ApiTrademark {
   words?: (string | null)[] | null;
   kind?: (string | null)[] | null;
   markCategories?: (string | null)[] | null;
-  goodsAndServices?: ({ class?: string | null; descriptionText?: string | null } | null)[] | null;
+  goodsAndServices?: (GoodsService | null)[] | null;
+  goodsAndServicesText?: (GoodsService | null)[] | null;
+  classes?: (string | number | null)[] | null;
+  niceClasses?: (string | number | null)[] | null;
   owner?: (ApiPartyType | null)[] | null;
   filingDate?: string | null;
   priorityDate?: string | null;
@@ -91,6 +94,15 @@ interface ApiTrademark {
   statusGroup?: string | null;
   irNumber?: string | null;
   images?: { description?: (string | null)[] | null; images?: (string | null)[] | null } | null;
+}
+
+interface GoodsService {
+  class?: string | number | null;
+  classNumber?: string | number | null;
+  niceClass?: string | number | null;
+  descriptionText?: string | null;
+  description?: string | null;
+  text?: string | null;
 }
 
 interface ApiPartyType {
@@ -154,12 +166,26 @@ function mapType(tm: ApiTrademark): string {
 export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
   const words = (tm.words || []).map(clean).filter(Boolean);
   const name = words.join('; ');
-  const gs = (tm.goodsAndServices || []).filter(Boolean) as { class?: string | null; descriptionText?: string | null }[];
-  const classes = [...new Set(gs.map((g) => clean(g.class)).filter(Boolean))].join(', ');
+  // Goods/services can arrive under a couple of field names, and the class can be
+  // `class`, `classNumber` or `niceClass` — read whichever is present.
+  const gs = ((tm.goodsAndServices || tm.goodsAndServicesText || []).filter(Boolean) as GoodsService[]);
+  const gClass = (g: GoodsService) => clean((g.class ?? g.classNumber ?? g.niceClass) as string | null | undefined).replace(/^0+(?=\d)/, '');
+  const gText = (g: GoodsService) => clean(g.descriptionText ?? g.description ?? g.text);
+  const numeric = (arr: (string | number | null)[] | null | undefined) =>
+    (arr || []).map((c) => clean(c == null ? '' : String(c)).replace(/^0+(?=\d)/, '')).filter(Boolean);
+  // Classes: from the goods rows, plus any top-level class list, plus a
+  // fallback scan of the goods text for "Class NN" — deduped and sorted.
+  const fromRows = gs.map(gClass).filter(Boolean);
+  const fromTop = [...numeric(tm.classes), ...numeric(tm.niceClasses)];
   const goods = gs
-    .map((g) => (clean(g.class) ? `Class ${clean(g.class)}: ${clean(g.descriptionText)}` : clean(g.descriptionText)))
+    .map((g) => (gClass(g) ? `Class ${gClass(g)}: ${gText(g)}` : gText(g)))
     .filter(Boolean)
     .join('\n');
+  const fromText = [...goods.matchAll(/\bclass(?:es)?\s*[:.]?\s*(\d{1,2})/gi)].map((mm) => mm[1]);
+  const classes = [...new Set([...fromRows, ...fromTop, ...fromText])]
+    .filter((c) => Number(c) >= 1 && Number(c) <= 45)
+    .sort((a, b) => Number(a) - Number(b))
+    .join(', ');
 
   const owner = (tm.owner || []).find(Boolean) || null;
   const addr = owner?.structuredAddress || null;

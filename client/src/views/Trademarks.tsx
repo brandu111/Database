@@ -17,7 +17,7 @@ import type { Nav } from '../App';
 import { api, uploadFile } from '../api';
 import { buildDeadlineEmail, templateForDate, type ComposedEmail } from '../email';
 import { EmailComposeModal } from '../EmailComposeModal';
-import { Card, Field, SortArrow, StatusBadge, confirmDelete } from '../ui';
+import { Card, DateInput, Field, SortArrow, StatusBadge, confirmDelete } from '../ui';
 
 const MARK_TYPES = ['Word', 'Logo', 'Combined', '3D Shape', 'Series', 'Sound', 'Scent', 'Movement', 'Colour'];
 
@@ -59,8 +59,16 @@ export function Trademarks({ nav, go, canEdit }: Props) {
   if (nav.markId) {
     const sel = marks.find((m) => m.id === nav.markId);
     if (!sel) {
-      go({ markId: null });
-      return null;
+      // Not in the loaded list yet — e.g. a just-created Madrid IR / designation.
+      // Fetch it directly and keep the user inside the case rather than bouncing
+      // back to the list.
+      return (
+        <OpenMissingMark
+          id={nav.markId}
+          onLoaded={(mk) => setMarks((cur) => (cur ? (cur.some((x) => x.id === mk.id) ? cur : [mk, ...cur]) : [mk]))}
+          onMissing={() => go({ markId: null })}
+        />
+      );
     }
     return (
       <MarkDetail
@@ -90,6 +98,21 @@ export function Trademarks({ nav, go, canEdit }: Props) {
   }
 
   return <MarkList marks={marks} canEdit={canEdit} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
+}
+
+// Loads a case that isn't in the in-memory list yet (freshly created Madrid
+// cases, deep links) and hands it back so the parent can render its detail.
+function OpenMissingMark({ id, onLoaded, onMissing }: { id: string; onLoaded: (m: Mark) => void; onMissing: () => void }) {
+  useEffect(() => {
+    let live = true;
+    api.mark(id).then(
+      (m) => { if (live) onLoaded(m); },
+      () => { if (live) onMissing(); }
+    );
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  return <div className="hint" style={{ padding: 18 }}>Loading case…</div>;
 }
 
 // ---------------------------------------------------------------------------- list
@@ -694,8 +717,8 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                         {d.linkedToIR && <span className="hint" title="Linked to IR renewal date"> ⟳ IR</span>}
                       </td>
                       <td>
-                        <input type="date" value={d.date || ''} disabled={ro || !!d.linkedToIR}
-                          onChange={(e) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)) }, true)} />
+                        <DateInput value={d.date || ''} disabled={ro || !!d.linkedToIR}
+                          onChange={(iso) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, date: iso } : x)) }, true)} />
                       </td>
                       <td>
                         <input type="text" value={d.note || ''} placeholder="" disabled={ro}
@@ -714,7 +737,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
               <div className="row" style={{ marginTop: 10 }}>
                 <input type="text" list="date-names" placeholder="Add date…" style={{ flex: 2 }} value={addDateName} onChange={(e) => setAddDateName(e.target.value)} />
                 <datalist id="date-names">{jurNames.map((n) => <option key={n} value={n} />)}</datalist>
-                <input type="date" style={{ width: 150 }} value={addDateDate} onChange={(e) => setAddDateDate(e.target.value)} />
+                <DateInput value={addDateDate} onChange={setAddDateDate} style={{ width: 150 }} />
                 <button className="btn small" disabled={!addDateName} onClick={() => {
                   update({ dates: [...m.dates, { name: addDateName, date: addDateDate || todayISO(), done: false, createdBy: myName, notify: true }] }, true);
                   setAddDateName('');
@@ -766,7 +789,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             {(m.actions || []).map((a, i) => (
               <div key={i} className="row" style={{ marginBottom: 6 }}>
                 <input type="checkbox" checked={!!a.done} disabled={ro} onChange={() => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) }, true)} />
-                <input type="date" style={{ width: 140 }} value={a.date} disabled={ro} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)) })} />
+                <DateInput value={a.date} disabled={ro} style={{ width: 140 }} onChange={(iso) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, date: iso } : x)) }, true)} />
                 <input type="text" style={{ flex: 1 }} className={a.done ? 'done' : ''} value={a.text} disabled={ro} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)) })} />
                 <button className="btn danger-link" title={a.alert ? 'Alert on — shows in Alerts tab' : 'Alert off'} disabled={ro}
                   style={{ color: a.alert ? 'var(--accent)' : '#c8c7c2' }}
@@ -840,7 +863,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             </div>
             <div className="grid2">
               <Field label={mpModal === 'file' ? 'International registration (filing) date' : 'Designation filing date'}>
-                <input type="date" value={mpFilingDate} onChange={(e) => setMpFilingDate(e.target.value)} />
+                <DateInput value={mpFilingDate} onChange={setMpFilingDate} />
               </Field>
               <Field label="Find a member">
                 <input type="text" placeholder="Search Madrid members…" value={mpCountry} onChange={(e) => setMpCountry(e.target.value)} />

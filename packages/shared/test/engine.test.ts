@@ -55,6 +55,25 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     expect(dateOf(m, 'Non-use vulnerability date')).toBe('2024-02-10');
   });
 
+  it('rolls a completed renewal forward to the next period with fresh reminders', () => {
+    const m = blankMark();
+    m.dates.push({ name: 'Application Filed', date: '2020-08-15', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2021-02-10', done: true });
+    ensureRuleRows(m, rules);
+    expect(dateOf(m, 'Renewal Deadline')).toBe('2030-08-15');
+    // Tick the current renewal (and its reminders) off, then re-run the engine.
+    m.dates.forEach((d) => { if (/renewal/i.test(d.name)) d.done = true; });
+    ensureRuleRows(m, rules);
+    // Next renewal is +10 years, reopened, with the reminder chain regenerated.
+    const ren = m.dates.find((d) => d.name === 'Renewal Deadline')!;
+    expect(ren.date).toBe('2040-08-15');
+    expect(ren.done).toBe(false);
+    expect(dateOf(m, 'Renewal Reminder')).toBe('2040-02-15');
+    expect(dateOf(m, 'Renewal Reminder - Final')).toBe('2040-07-15');
+    expect(dateOf(m, '6 Month Renewal Grace Period')).toBe('2041-02-15');
+    expect(m.dates.find((d) => d.name === 'Renewal Reminder')!.done).toBe(false);
+  });
+
   it('does not create renewal rows before a Registration Date exists', () => {
     const m = blankMark();
     m.dates.push({ name: 'Application Filed', date: '2020-08-15', done: true });

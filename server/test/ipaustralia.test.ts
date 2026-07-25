@@ -45,6 +45,21 @@ describe('mapApiTrademark', () => {
     expect(m.jurisdiction).toBe('Australia');
   });
 
+  it('extracts classes from alternate field shapes (classNumber, top-level list, sorted)', () => {
+    const m = mapApiTrademark({
+      number: '55',
+      words: ['ACME'],
+      goodsAndServicesText: [
+        { classNumber: '25', description: 'Clothing' },
+        { classNumber: 9, text: 'Software' },
+      ],
+      classes: ['09', '35'],
+    });
+    // Deduped, numeric-sorted, leading zeros stripped, and the top-level list merged in.
+    expect(m.classes).toBe('9, 25, 35');
+    expect(m.goods).toContain('Class 25: Clothing');
+  });
+
   it('maps owner name, address, ABN and ACN', () => {
     const m = mapApiTrademark(sample);
     expect(m.owner).toBe('ScoliCare IP Pty Ltd');
