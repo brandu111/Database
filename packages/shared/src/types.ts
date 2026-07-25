@@ -120,6 +120,8 @@ export interface Mark {
   basicId?: string;
   /** On a designation: the id of its parent International Registration. */
   irId?: string;
+  /** International Registration number (Madrid Protocol), when this case is a designation. */
+  irNumber?: string;
   treaty?: { basis: string; date: string; desigs: unknown[] };
   madridCopy?: { classes: boolean; goods: boolean; disclaimers: boolean; contacts: boolean };
   promptEmail?: boolean;

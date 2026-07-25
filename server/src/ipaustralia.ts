@@ -174,12 +174,17 @@ export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
   addDate('Registration Date', isoDate(tm.enteredOnRegisterDate) || isoDate(tm.registeredFromDate));
 
   const image = imageUrlOf(tm) || null;
+  const number = clean(tm.number);
+  const registered = !!(isoDate(tm.enteredOnRegisterDate) || isoDate(tm.registeredFromDate));
 
   const out: Partial<Mark> = {
     name,
     wordText: name,
     type: mapType(tm),
-    application: clean(tm.number),
+    application: number,
+    // In Australia the trade mark number serves as both the application and the
+    // registration number, so populate the registration field once registered.
+    registration: registered ? number : '',
     classes,
     goods,
     status: mapStatus(tm),
@@ -187,7 +192,10 @@ export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
     dates,
   };
   if (image) out.image = image;
-  if (tm.irNumber) out.filingBasis = 'Madrid Protocol';
+  if (tm.irNumber) {
+    out.irNumber = clean(tm.irNumber);
+    out.filingBasis = 'Madrid Protocol';
+  }
   if (owner) {
     out.owner = clean(owner.name);
     out.ownerType = owner.abn || owner.acnOrArbn ? 'Company' : 'Individual';

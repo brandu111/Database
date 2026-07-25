@@ -457,6 +457,10 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, canEdit, o
               <Field label="Registration no."><input type="text" value={m.registration} onChange={(e) => update({ registration: e.target.value })} disabled={ro} /></Field>
               <Field label="Classes"><input type="text" value={m.classes} onChange={(e) => update({ classes: e.target.value })} disabled={ro} /></Field>
             </div>
+            <Field label="International registration no. (Madrid Protocol)">
+              <input type="text" value={m.irNumber || ''} onChange={(e) => update({ irNumber: e.target.value })} disabled={ro}
+                placeholder="If this case is a designation under an overseas Madrid registration, e.g. IR No. 1234567" />
+            </Field>
             {canEdit && m.jurisdiction === 'Australia' && (
               <div className="row" style={{ marginTop: -2, marginBottom: 8 }}>
                 <button className="btn secondary small" disabled={lookupBusy} onClick={lookupIpAustralia} title="Fetch details from the IP Australia register using the application or registration number">
