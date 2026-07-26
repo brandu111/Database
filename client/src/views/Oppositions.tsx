@@ -280,7 +280,10 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
                   {o.contacts.map((c, i) => (
                     <tr key={i}>
                       <td><input type="text" value={c.name || ''} disabled={ro} onChange={(e) => update({ contacts: o.contacts.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} /></td>
-                      <td><input type="text" value={c.position || c.role || ''} disabled={ro} onChange={(e) => update({ contacts: o.contacts.map((x, j) => (j === i ? { ...x, position: e.target.value } : x)) })} /></td>
+                      <td>
+                        <input type="text" list="opp-contact-roles" value={c.position || c.role || ''} disabled={ro} placeholder="Role"
+                          onChange={(e) => update({ contacts: o.contacts.map((x, j) => (j === i ? { ...x, position: e.target.value } : x)) })} />
+                      </td>
                       <td><input type="text" value={c.phone || ''} disabled={ro} onChange={(e) => update({ contacts: o.contacts.map((x, j) => (j === i ? { ...x, phone: e.target.value } : x)) })} /></td>
                       <td><input type="text" value={c.email || ''} disabled={ro} onChange={(e) => update({ contacts: o.contacts.map((x, j) => (j === i ? { ...x, email: e.target.value } : x)) })} /></td>
                       <td>{canEdit && <button className="btn danger-link" onClick={() => update({ contacts: o.contacts.filter((_, j) => j !== i) }, true)}>✕</button>}</td>
@@ -289,6 +292,9 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
                 </tbody>
               </table>
             )}
+            <datalist id="opp-contact-roles">
+              {['Client', 'Opponent', 'Applicant', 'Associate / Foreign agent', 'Instructing firm', 'Counsel', 'Firm Admin', 'Other'].map((rn) => <option key={rn} value={rn} />)}
+            </datalist>
           </Card>
         </div>
       </div>

@@ -79,9 +79,10 @@ export const api = {
   settings: () => req<FirmSettings>('GET', '/api/settings'),
   saveSettings: (s: FirmSettings) => req<FirmSettings>('PUT', '/api/settings', s),
 
-  users: () => req<{ id: string; name: string; level: string; signature?: string; email?: string }[]>('GET', '/api/users'),
+  staffNames: () => req<{ name: string; title?: string }[]>('GET', '/api/staff-names'),
+  users: () => req<{ id: string; name: string; level: string; signature?: string; email?: string; title?: string }[]>('GET', '/api/users'),
   createUser: (u: { name: string; level: string; password: string }) => req<{ id: string }>('POST', '/api/users', u),
-  updateUser: (id: string, u: { name?: string; level?: string; password?: string; signature?: string; email?: string }) => req<{ id: string }>('PUT', `/api/users/${id}`, u),
+  updateUser: (id: string, u: { name?: string; level?: string; password?: string; signature?: string; email?: string; title?: string }) => req<{ id: string }>('PUT', `/api/users/${id}`, u),
   deleteUser: (id: string) => req<{ ok: true }>('DELETE', `/api/users/${id}`),
 
   clientAccess: () => req<{ id: string; company: string; userId: string; active: number; createdAt: string }[]>('GET', '/api/client-access'),

@@ -66,7 +66,7 @@ describe('marks and the server-side date engine', () => {
     const r = await admin.put(`/api/marks/${id}`).send(m).expect(200);
     const byName = Object.fromEntries(r.body.dates.map((d: { name: string; date: string }) => [d.name, d.date]));
     expect(byName['Renewal Deadline']).toBe('2030-08-15');
-    expect(byName['Renewal Reminder - 1 Week']).toBe('2030-08-08');
+    expect(byName['Renewal Deadline — 1 Week Reminder']).toBe('2030-08-08');
     expect(byName['6 Month Renewal Grace Period']).toBe('2031-02-15');
     expect(byName['Non-use vulnerability date']).toBe('2024-02-10');
   });

@@ -165,6 +165,32 @@ function diffMarkSummary(prev: Mark | null, next: Mark): string {
   return parts.slice(0, 12).join('; ');
 }
 
+/**
+ * One-time, idempotent correction of three email-template date mappings on
+ * instances seeded before the fix. Only rewrites a template still holding the
+ * known-old value, so user edits are never clobbered.
+ */
+function fixTemplateMappings(db: DB): void {
+  const fixes: { id: string; from: string; to: string }[] = [
+    { id: 'au-28', from: '', to: 'Accepted - Awaiting Advertisement' },
+    { id: 'au-29', from: 'Opposition period expires', to: 'Publication Date' },
+    { id: 'au-32', from: 'Renewal Deadline', to: 'Registration Date' },
+  ];
+  for (const f of fixes) {
+    const row = db.prepare('SELECT doc FROM email_templates WHERE id=?').get(f.id) as { doc: string } | undefined;
+    if (!row) continue;
+    try {
+      const t = JSON.parse(row.doc);
+      if (t.dateField === f.from) {
+        t.dateField = f.to;
+        db.prepare('UPDATE email_templates SET doc=? WHERE id=?').run(JSON.stringify(t), f.id);
+      }
+    } catch {
+      /* leave malformed rows alone */
+    }
+  }
+}
+
 function recordHistory(db: DB, markId: string, userName: string, summary: string): void {
   if (!summary) return;
   db.prepare('INSERT INTO mark_history(mark_id, at, user_name, summary) VALUES(?,?,?,?)').run(markId, new Date().toISOString(), userName || '', summary);
@@ -247,7 +273,7 @@ export function buildDigests(db: DB, today: string): DigestBucket[] {
       if (a.done || !a.alert) continue;
       const when = a.alertDate || a.date;
       if (!due(when)) continue;
-      add(a.createdBy, { date: when, name: a.text || 'Action', mark: m.name || '(untitled)', jur: m.jurisdiction || '', overdue: when < today });
+      add(a.assignee || a.createdBy, { date: when, name: a.text || 'Action', mark: m.name || '(untitled)', jur: m.jurisdiction || '', overdue: when < today });
     }
   }
   // Opposition deadlines have no individual owner — route them to the fallback.
@@ -306,7 +332,7 @@ function computeAlerts(db: DB, alertDays: number, forCompany?: string): AlertRow
     if (forCompany && m.owner !== forCompany) continue;
     (m.actions || []).forEach((a) => {
       if (a.alert && !a.done && a.alertDate)
-        rows.push({ date: a.alertDate, kind: 'Action', refType: 'mark', refId: m.id, mark: m.name || '(untitled)', jur: m.jurisdiction || '', text: a.text || 'Action alert', owner: a.createdBy });
+        rows.push({ date: a.alertDate, kind: 'Action', refType: 'mark', refId: m.id, mark: m.name || '(untitled)', jur: m.jurisdiction || '', text: a.text || 'Action alert', owner: a.assignee || a.createdBy });
     });
     (m.dates || []).forEach((d) => {
       if (d.done || !d.date) return;
@@ -339,6 +365,7 @@ function computeAlerts(db: DB, alertDays: number, forCompany?: string): AlertRow
 export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: string } = {}): Express {
   const app = express();
   const secret = getSecret(db);
+  fixTemplateMappings(db);
   const uploadsDir = opts.uploadsDir || path.resolve('uploads');
   fs.mkdirSync(uploadsDir, { recursive: true });
   app.use(express.json({ limit: '25mb' }));
@@ -902,7 +929,13 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   });
 
   app.get('/api/users', full, (_req, res) => {
-    res.json(db.prepare(`SELECT id, name, level, signature, email FROM staff_users ORDER BY name`).all());
+    res.json(db.prepare(`SELECT id, name, level, signature, email, title FROM staff_users ORDER BY name`).all());
+  });
+
+  // Lightweight staff directory for populating "responsible attorney" / assignee
+  // dropdowns — readable by any signed-in staff member (not just admins).
+  app.get('/api/staff-names', view, (_req, res) => {
+    res.json(db.prepare(`SELECT name, title FROM staff_users WHERE level <> 'No Access' ORDER BY name`).all());
   });
 
   app.post('/api/users', full, (req, res) => {
@@ -921,13 +954,14 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const { name, level, password } = req.body || {};
     const row = db.prepare(`SELECT id FROM staff_users WHERE id=?`).get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
-    const { signature, email } = req.body || {};
+    const { signature, email, title } = req.body || {};
     if (name) db.prepare(`UPDATE staff_users SET name=? WHERE id=?`).run(String(name), req.params.id);
     if (level) db.prepare(`UPDATE staff_users SET level=? WHERE id=?`).run(String(level), req.params.id);
     if (password) db.prepare(`UPDATE staff_users SET password_hash=? WHERE id=?`).run(hashPassword(String(password)), req.params.id);
     if (signature !== undefined) db.prepare(`UPDATE staff_users SET signature=? WHERE id=?`).run(String(signature || ''), req.params.id);
     if (email !== undefined) db.prepare(`UPDATE staff_users SET email=? WHERE id=?`).run(String(email || '').trim(), req.params.id);
-    res.json(db.prepare(`SELECT id, name, level, signature, email FROM staff_users WHERE id=?`).get(req.params.id));
+    if (title !== undefined) db.prepare(`UPDATE staff_users SET title=? WHERE id=?`).run(String(title || '').trim(), req.params.id);
+    res.json(db.prepare(`SELECT id, name, level, signature, email, title FROM staff_users WHERE id=?`).get(req.params.id));
   });
 
   app.delete('/api/users/:id', full, (req, res) => {

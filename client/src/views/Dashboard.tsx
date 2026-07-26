@@ -160,7 +160,7 @@ export function Dashboard({ openMark, openOpposition, go, canEdit }: {
                 <span className="mono" style={{ width: 92, color: a.overdue ? 'var(--danger)' : undefined, fontSize: 12 }}>{fmtDate(a.date)}</span>
                 <button className="back" style={{ margin: 0, fontWeight: 600, flex: 1, textAlign: 'left' }} onClick={() => (a.refType === 'mark' ? openMark(a.refId) : openOpposition(a.refId))}>{a.mark}</button>
                 <span className="hint" style={{ flex: 1 }}>{a.text}</span>
-                {canEdit && canEmail(a) && <button className="btn secondary small" disabled={!!sending} onClick={() => sendEmail(a)}>✉</button>}
+                {canEdit && canEmail(a) && <button className="btn secondary small email-btn" title="Send client email" disabled={!!sending} onClick={() => sendEmail(a)}><span className="email-ico">✉</span></button>}
               </div>
             ))}
           </div>

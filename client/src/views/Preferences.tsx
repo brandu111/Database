@@ -340,7 +340,7 @@ function RuleRow({ r, i, isFull, expanded, onToggle, onChange, onDelete }: {
 
 function SettingsUsers({ isFull }: { isFull: boolean }) {
   const [fs, setFs] = useState<FirmSettings | null>(null);
-  const [users, setUsers] = useState<{ id: string; name: string; level: string; email?: string }[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string; level: string; email?: string; title?: string }[]>([]);
   const [access, setAccess] = useState<{ id: string; company: string; userId: string; active: number; createdAt: string }[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
   const [grantCompany, setGrantCompany] = useState('');
@@ -467,11 +467,15 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
         {isFull && (
           <Card label="Staff users" right={mailConfigured ? <button className="btn secondary small" onClick={() => api.runDailyDigest().then((r) => window.alert(`Digest sent to ${r.sent} user(s).`), (e) => window.alert(e instanceof Error ? e.message : 'Failed'))}>Send digest now</button> : undefined}>
             <table className="list">
-              <thead><tr><th>Name</th><th>Email</th><th>Permission level</th><th>Password</th><th /></tr></thead>
+              <thead><tr><th>Name</th><th>Title</th><th>Email</th><th>Permission level</th><th>Password</th><th /></tr></thead>
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id}>
                     <td>{u.name}</td>
+                    <td>
+                      <input type="text" defaultValue={u.title || ''} placeholder="e.g. Principal" style={{ minWidth: 130 }}
+                        onBlur={(e) => { if (e.target.value !== (u.title || '')) api.updateUser(u.id, { title: e.target.value }).then(() => api.users().then(setUsers)); }} />
+                    </td>
                     <td>
                       <input type="email" defaultValue={u.email || ''} placeholder="—" style={{ minWidth: 160 }}
                         onBlur={(e) => { if (e.target.value !== (u.email || '')) api.updateUser(u.id, { email: e.target.value }).then(() => api.users().then(setUsers)); }} />

@@ -40,7 +40,7 @@ export function stageConfig(): Record<string, StageCfg> {
       extra: [{ name: 'OA Issued?', base: 'Application Filed', off: 5, unit: 'months', alert: true }],
     },
     'Pending - Under Examination': { inputs: ['OA Issued'], activate: ['OA Response Due'] },
-    'Accepted - Awaiting Advertisement': { inputs: [] },
+    'Accepted - Awaiting Advertisement': { inputs: ['Accepted - Awaiting Advertisement'] },
     Accepted: { inputs: ['Publication Date'], activate: ['Opposition period expires'], prompt: true },
     Registered: { inputs: ['Registration Date'], activate: ['Renewal Deadline'], activateTrigger: 'Registration Date' },
   };
@@ -97,6 +97,19 @@ export function auRecompute(m: Mark): void {
         m.dates.splice(ex, 1);
       }
     }
+    // Universal "1 week before" reminder for every alerting deadline. Excludes
+    // reminder rows, grace periods and the "OA Issued?" prompt (which are not
+    // themselves deadlines).
+    const isDeadline = dr.auAlert && (dr.auOff || 0) > 0 && !dr.reminder && !/grace|issued\?/i.test(dr.name);
+    const wkName = `${dr.name} — 1 Week Reminder`;
+    const wex = m.dates.findIndex((x) => x.name === wkName);
+    if (isDeadline && dr.date) {
+      const wd = shift(dr.date, -7, 'days');
+      if (wex < 0) m.dates.push({ name: wkName, date: wd, done: false, reminder: true, emailFor: dr.name, auGen: true });
+      else { m.dates[wex].date = wd; m.dates[wex].emailFor = dr.name; }
+    } else if (wex >= 0 && m.dates[wex].auGen) {
+      m.dates.splice(wex, 1);
+    }
   });
   m.dates = m.dates.filter((x) => !(x.reminder && x.auGen && !x.date));
 }
@@ -135,10 +148,12 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
   list.forEach((r) => {
     if (!r.name || !r.trigger) return;
     if (/convention priority/i.test(r.name) && !conventionAllowed) return;
-    const post = POST_REGISTRATION.test(r.name);
+    // Post-registration gate, except a Declaration of Actual Use that runs from
+    // the filing/designation date — that deadline is independent of registration.
+    const post = POST_REGISTRATION.test(r.name) && !(/\bdau\b/i.test(r.name) && r.trigger === 'Application Filed');
     const gateOk = post ? (isMadridIr ? !!val(r.trigger) : regPresent) : val(r.trigger);
     if (!gateOk) return;
-    ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0 });
+    ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts });
   });
   // Remove any auto-generated Convention Priority rows that shouldn't be here
   // (e.g. on a Madrid designation), along with their reminder rows.
@@ -245,12 +260,12 @@ export function applyStage(m: Mark, rules: RuleBook, status: string): void {
   (cfg.activate || []).forEach((n) => {
     if (n === 'Convention Priority Deadline' && (!['Australia', 'New Zealand'].includes(m.jurisdiction) || m.irId)) return;
     const r = ruleByName(rules, m.jurisdiction, n);
-    if (r) ensureRow(m, n, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0 });
+    if (r) ensureRow(m, n, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts });
   });
   if (cfg.activateTrigger) {
     rulesFor(rules, m.jurisdiction)
       .filter((r) => r.trigger === cfg.activateTrigger && r.name)
-      .forEach((r) => ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0 }));
+      .forEach((r) => ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts }));
   }
   (cfg.extra || []).forEach((e) => ensureRow(m, e.name, { auBase: e.base, auOff: e.off, auUnit: e.unit, auRem: 0, auAlert: !!e.alert }));
   if (cfg.prompt) m.promptEmail = true;

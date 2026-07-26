@@ -334,7 +334,9 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   const [mpFilingDate, setMpFilingDate] = useState('');
   const [mpBusy, setMpBusy] = useState(false);
   const [showRelated, setShowRelated] = useState(false);
+  const [staff, setStaff] = useState<{ name: string; title?: string }[]>([]);
   const [email, setEmail] = useState<ComposedEmail | null>(null);
+  useEffect(() => { api.staffNames().then(setStaff, () => undefined); }, []);
   const timer = useRef<number | null>(null);
   const latest = useRef(m);
   latest.current = m;
@@ -432,7 +434,6 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
 
   const schema = addrSchema(m.country || '');
   const ownerCompany = companies.find((c) => (c.name || '') === (m.owner || ''));
-  const attorneyNames = useMemo(() => [...new Set(allMarks.map((x) => x.attorney).filter(Boolean))].sort() as string[], [allMarks]);
 
   // Reminder rows: show only the next not-done reminder per deadline group.
   const visibleDates = useMemo(() => {
@@ -641,6 +642,12 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 </select>
               </Field>
             </div>
+            {m.type !== 'Word' && (
+              <Field label="Trade mark name">
+                <input type="text" value={m.name} onChange={(e) => update({ name: e.target.value })} disabled={ro}
+                  placeholder="Name / reference for this mark (e.g. wording in the logo, or a descriptive label)" />
+              </Field>
+            )}
             <TypeFields m={m} update={update} ro={ro} />
             <div className="grid3">
               <Field label="Application no."><input type="text" value={m.application} onChange={(e) => update({ application: e.target.value })} disabled={ro} /></Field>
@@ -669,13 +676,21 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             <div className="grid3">
               <Field label="BrandU Legal file no."><input type="text" value={m.matter} onChange={(e) => update({ matter: e.target.value })} disabled={ro} /></Field>
               <Field label="Client ref."><input type="text" value={m.clientDocket} onChange={(e) => update({ clientDocket: e.target.value })} disabled={ro} /></Field>
-              <Field label="Responsible attorney">
-                <input type="text" list="attorney-names" value={m.attorney || ''} onChange={(e) => update({ attorney: e.target.value })} disabled={ro} />
-                <datalist id="attorney-names">{attorneyNames.map((n) => <option key={n} value={n} />)}</datalist>
+              <Field label="Responsible attorney (staff member)">
+                <select value={m.attorney || ''} onChange={(e) => update({ attorney: e.target.value })} disabled={ro}>
+                  <option value="">— Unassigned —</option>
+                  {[...new Set([...staff.map((s) => s.name), ...(m.attorney ? [m.attorney] : [])])].map((n) => (
+                    <option key={n} value={n}>{n}{staff.find((s) => s.name === n)?.title ? ` — ${staff.find((s) => s.name === n)!.title}` : ''}</option>
+                  ))}
+                </select>
               </Field>
             </div>
             <div className="grid3">
-              <Field label="Foreign associate / agent"><input type="text" value={m.associate || ''} onChange={(e) => update({ associate: e.target.value })} disabled={ro} /></Field>
+              <Field label="Foreign associate / agent">
+                <input type="text" list="associate-contacts" value={m.associate || ''} onChange={(e) => update({ associate: e.target.value })} disabled={ro}
+                  placeholder="Start typing to pull from Contacts…" />
+                <datalist id="associate-contacts">{companies.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+              </Field>
               <Field label="Associate’s file ref."><input type="text" value={m.associateRef || ''} onChange={(e) => update({ associateRef: e.target.value })} disabled={ro} /></Field>
               <Field label="Renewal fee estimate ($)"><input type="number" value={m.renewalFee ?? ''} onChange={(e) => update({ renewalFee: e.target.value ? Number(e.target.value) : undefined })} disabled={ro} /></Field>
             </div>
@@ -797,7 +812,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                           onChange={(e) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)) })} />
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        {sendEmail && <button className="btn danger-link" title="Send client email" onClick={sendEmail}>✉</button>}
+                        {sendEmail && <button className="btn danger-link email-btn" title="Send client email" onClick={sendEmail}><span className="email-ico">✉</span></button>}
                         {canEdit && <button className="btn danger-link" onClick={() => update({ dates: m.dates.filter((_, j) => j !== i) }, true)}>✕</button>}
                       </td>
                     </tr>
@@ -863,6 +878,11 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 <input type="checkbox" checked={!!a.done} disabled={ro} onChange={() => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) }, true)} />
                 <DateInput value={a.date} disabled={ro} style={{ width: 140 }} onChange={(iso) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, date: iso } : x)) }, true)} />
                 <input type="text" style={{ flex: 1 }} className={a.done ? 'done' : ''} value={a.text} disabled={ro} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)) })} />
+                <select value={a.assignee || ''} disabled={ro} title="Assign to a staff member — the alert is forwarded to them and shows under their dashboard"
+                  style={{ width: 150 }} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, assignee: e.target.value } : x)) }, true)}>
+                  <option value="">Assign to…</option>
+                  {[...new Set([...staff.map((s) => s.name), ...(a.assignee ? [a.assignee] : [])])].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
                 <button className="btn danger-link" title={a.alert ? 'Alert on — shows in Alerts tab' : 'Alert off'} disabled={ro}
                   style={{ color: a.alert ? 'var(--accent)' : '#c8c7c2' }}
                   onClick={() => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, alert: !x.alert, alertDate: x.alertDate || x.date || todayISO() } : x)) }, true)}>

@@ -180,7 +180,7 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
                       <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
                         {canEdit && canEmail(a) && (
                           <button className="btn secondary small" disabled={sending === key} onClick={() => sendEmail(a)}>
-                            {sending === key ? '…' : '✉ Email'}
+                            {sending === key ? '…' : <><span className="email-ico">✉</span> Email</>}
                           </button>
                         )}
                         {canEdit && (
@@ -218,7 +218,7 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
                                 <button className="btn secondary small" onClick={() => openMark(a.refId)}>Open case</button>
                                 {canEdit && canEmail(a) && (
                                   <button className="btn small" disabled={sending === key} onClick={() => sendEmail(a)}>
-                                    {sending === key ? 'Preparing…' : '✉ Send email'}
+                                    {sending === key ? 'Preparing…' : <><span className="email-ico">✉</span> Send email</>}
                                   </button>
                                 )}
                                 {canEdit && !canEmail(a) && <span className="hint">No email template linked to this deadline.</span>}

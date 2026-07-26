@@ -139,3 +139,7 @@ table.list td input, table.list td select { padding: 5px 7px; font-size: 12.5px;
 
 .detail-cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 1100px) { .detail-cols { grid-template-columns: 1fr; } }
+
+/* Email-send glyph — enlarged for quick scanning across Alerts, Dashboard and cases. */
+.email-ico { font-size: 1.4em; line-height: 1; vertical-align: -0.1em; }
+button.email-btn { font-size: 1.2em; }

@@ -72,6 +72,9 @@ export interface MarkAction {
   alertDate?: string;
   /** Staff member who added this action (for alert attribution / notification). */
   createdBy?: string;
+  /** Staff member the action is assigned to — receives its alert / digest and
+   * sees it under "my cases" on the dashboard. Falls back to createdBy. */
+  assignee?: string;
 }
 
 export interface MarkDoc {
@@ -238,9 +241,17 @@ export interface Partner {
   email: string;
 }
 
+/** Role/category of a contact record (independent of the structural type). */
+export const CONTACT_TYPES = [
+  'Applicant', 'Owner', 'Client', 'Associate / Foreign agent', 'Opponent',
+  'Licensee', 'Instructing firm', 'Inventor', 'Individual', 'Company', 'Other',
+] as const;
+
 export interface Company {
   id: string;
   type: 'Company' | 'Individual' | 'Partnership';
+  /** Role/category (Applicant, Owner, Associate, Opponent, …). */
+  contactType?: string;
   name: string;
   first?: string;
   last?: string;

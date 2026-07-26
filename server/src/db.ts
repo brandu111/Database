@@ -85,6 +85,7 @@ function migrate(db: DB): void {
   // them up without losing data.
   addColumn(db, 'staff_users', 'signature', "TEXT NOT NULL DEFAULT ''");
   addColumn(db, 'staff_users', 'email', "TEXT NOT NULL DEFAULT ''");
+  addColumn(db, 'staff_users', 'title', "TEXT NOT NULL DEFAULT ''");
   ensureRulesCurrent(db);
 }
 

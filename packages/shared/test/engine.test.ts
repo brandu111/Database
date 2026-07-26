@@ -39,6 +39,32 @@ function blankMark(over: Partial<Mark> = {}): Mark {
 const rules: RuleBook = defaultRules();
 const dateOf = (m: Mark, n: string) => m.dates.find((x) => x.name === n)?.date;
 
+describe('Philippines DAU is a designation obligation, not an IR one', () => {
+  it('a Madrid International Registration carries no Philippines dates', () => {
+    const m = blankMark({ jurisdiction: 'Madrid Protocol (WIPO)' });
+    m.dates.push({ name: 'Application Filed', date: '2020-01-01', done: true });
+    ensureRuleRows(m, rules);
+    expect(m.dates.some((d) => /philippines/i.test(d.name))).toBe(false);
+  });
+  it('a Philippines case carries the 3-year DAU from filing', () => {
+    const m = blankMark({ jurisdiction: 'Philippines' });
+    m.dates.push({ name: 'Application Filed', date: '2020-01-01', done: true });
+    ensureRuleRows(m, rules);
+    expect(dateOf(m, 'Philippines DAU deadline (3 years from filing)')).toBe('2023-01-01');
+  });
+});
+
+describe('every alerting deadline gets an automatic 1-week reminder', () => {
+  it('the AU acceptance deadline has a −1 week reminder', () => {
+    const m = blankMark({ jurisdiction: 'Australia' });
+    m.dates.push({ name: 'OA Issued', date: '2024-01-15', done: true });
+    ensureRuleRows(m, rules);
+    // Acceptance Deadline = OA Issued + 15 months = 2025-04-15; −1 week = 2025-04-08.
+    expect(dateOf(m, 'Acceptance Deadline')).toBe('2025-04-15');
+    expect(dateOf(m, 'Acceptance Deadline — 1 Week Reminder')).toBe('2025-04-08');
+  });
+});
+
 describe('ensureRuleRows — the client-verified AU example', () => {
   it('entering the Registration Date on an AU case creates Renewal Deadline = Application Filed + 10 years', () => {
     const m = blankMark();
@@ -46,11 +72,12 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     m.dates.push({ name: 'Registration Date', date: '2021-02-10', done: true });
     ensureRuleRows(m, rules);
     expect(dateOf(m, 'Renewal Deadline')).toBe('2030-08-15');
-    // Full AU reminder chain: −6m, −3m (Second), −1m (Final), −1 week; grace +6m
+    // Full AU reminder chain: −6m, −3m (Second), −1m (Final); grace +6m; and the
+    // engine's automatic −1 week reminder on the deadline.
     expect(dateOf(m, 'Renewal Reminder')).toBe('2030-02-15');
     expect(dateOf(m, 'Renewal Reminder - Second')).toBe('2030-05-15');
     expect(dateOf(m, 'Renewal Reminder - Final')).toBe('2030-07-15');
-    expect(dateOf(m, 'Renewal Reminder - 1 Week')).toBe('2030-08-08');
+    expect(dateOf(m, 'Renewal Deadline — 1 Week Reminder')).toBe('2030-08-08');
     expect(dateOf(m, '6 Month Renewal Grace Period')).toBe('2031-02-15');
     expect(dateOf(m, 'Non-use vulnerability date')).toBe('2024-02-10');
   });
@@ -127,7 +154,10 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     ensureRuleRows(m, rules);
     expect(dateOf(m, 'OA Response Due')).toBe('2018-07-15');
     expect(dateOf(m, 'Renewal Deadline')).toBe('2028-02-13');
-    expect(dateOf(m, 'Section 8 Declaration Due')).toBe('2024-02-13');
+    // §8 Declaration of Use falls in the 5th–6th year (6 years from registration).
+    expect(dateOf(m, '§8 Declaration of Use (5th–6th year)')).toBe('2024-02-13');
+    // Engine adds an automatic 1-week reminder before the OA response deadline.
+    expect(dateOf(m, 'OA Response Due — 1 Week Reminder')).toBe('2018-07-08');
   });
 
   it('AU opposition period runs 2 months from the advertisement/publication date', () => {

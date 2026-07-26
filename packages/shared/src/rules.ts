@@ -8,7 +8,7 @@ import type { OppDateMaster, OppSchedule, Rule, RuleBook } from './types.js';
  * If any built-in rule changes, bump RULES_VERSION and let migrateRules()
  * refresh stored rulebooks (user rules flagged `custom: true` survive).
  */
-export const RULES_VERSION = 8;
+export const RULES_VERSION = 9;
 
 const T_REN =
   'Dear {{client}},\n\nRe: Trade mark {{mark}} ({{jurisdiction}})\n\nThis is a reminder that the renewal deadline for the above trade mark is {{deadline}}. Please confirm whether you would like us to attend to the renewal, and we will provide a cost estimate.\n\nKind regards\nBrandU Legal';
@@ -30,11 +30,12 @@ const r = (
  * reminders at −6 months / −2 months (Final) / −1 week, and the 6-month grace
  * period after the deadline.
  */
+// The engine adds a "— 1 Week Reminder" to every alerting deadline automatically,
+// so the chains below only carry the longer-lead client reminders.
 const renewalChain = (regTrigger: string, years: number): Rule[] => [
   r('Renewal Deadline', regTrigger, years, 'years', true, T_REN),
   r('Renewal Reminder', 'Renewal Deadline', -6, 'months', true, T_REN),
   r('Renewal Reminder - Final', 'Renewal Deadline', -2, 'months', true, T_REN),
-  r('Renewal Reminder - 1 Week', 'Renewal Deadline', -7, 'days', true, T_REN),
   r('6 Month Renewal Grace Period', 'Renewal Deadline', 6, 'months', false),
 ];
 
@@ -54,6 +55,7 @@ export function defaultRules(): RuleBook {
     _default: [
       r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
       r('OA Response Due', 'OA Issued', 2, 'months', true, T_OA),
+      r('OA Response - Instructions Reminder', 'OA Response Due', -1, 'months', true, T_OA),
       r('Opposition response due', 'Opposition filed', 2, 'months', true),
       ...renewalChain('Registration Date', 10),
     ],
@@ -63,13 +65,16 @@ export function defaultRules(): RuleBook {
       // 15 months from the date of the first report. A 6-month extension (no
       // statutory declaration) exists but is added manually when needed.
       r('Acceptance Deadline', 'OA Issued', 15, 'months', true, T_OA),
+      // Chase the client for instructions well before the acceptance deadline
+      // (plus the automatic 1-week reminder the engine adds).
+      r('Acceptance Deadline - Instructions Reminder', 'Acceptance Deadline', -3, 'months', true, T_OA),
+      r('Acceptance Deadline - Final Reminder', 'Acceptance Deadline', -1, 'months', true, T_OA),
       r('Opposition period expires', 'Publication Date', 2, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
       r('Renewal Deadline', 'Application Filed', 10, 'years', true, T_REN),
       r('Renewal Reminder', 'Renewal Deadline', -6, 'months', true, T_REN),
       r('Renewal Reminder - Second', 'Renewal Deadline', -3, 'months', true, T_REN),
       r('Renewal Reminder - Final', 'Renewal Deadline', -1, 'months', true, T_REN),
-      r('Renewal Reminder - 1 Week', 'Renewal Deadline', -7, 'days', true, T_REN),
       r('6 Month Renewal Grace Period', 'Renewal Deadline', 6, 'months', false),
     ],
     'New Zealand': [
@@ -82,14 +87,22 @@ export function defaultRules(): RuleBook {
     USA: [
       r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
       r('OA Response Due', 'OA Issued', 6, 'months', true, T_OA),
+      r('OA Response - Instructions Reminder', 'OA Response Due', -2, 'months', true, T_OA),
       r('Statement of Use Due', 'Notice of Allowance', 6, 'months', true),
-      // §8 declaration window 5th–6th year; §9/§8&9 at 9–10 years.
-      r('Section 8 Declaration Due', 'Registration Date', 6, 'years', true, T_REN),
-      r('US Declaration of Use (5th-6th year)', 'Registration Date', 6, 'years', true, '', 3),
-      r('US Declaration of Use / Renewal (9th-10th year)', 'Registration Date', 10, 'years', true, '', 3),
-      r('6 Month DOU Grace Period', 'US Declaration of Use (5th-6th year)', 6, 'months', false),
       r('Opposition period expires', 'Publication Date', 30, 'days', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
+      // §8 Declaration of Use — 5th–6th year window; grace to 6.5 years.
+      // First client reminder one year out, then six months, then the automatic
+      // 1-week reminder the engine adds.
+      r('§8 Declaration of Use (5th–6th year)', 'Registration Date', 6, 'years', true, T_REN),
+      r('§8 Declaration - 1 Year Reminder', '§8 Declaration of Use (5th–6th year)', -12, 'months', true, T_REN),
+      r('§8 Declaration - 6 Month Reminder', '§8 Declaration of Use (5th–6th year)', -6, 'months', true, T_REN),
+      r('6 Month §8 Grace Period', '§8 Declaration of Use (5th–6th year)', 6, 'months', false),
+      // §8 & §9 combined Declaration + Renewal — 9th–10th year, then every 10 years.
+      // This is the US renewal; the standard renewal chain provides the ongoing
+      // 10-year cycle and its reminders, and we add the one-year lead reminder.
+      r('§8 & §9 Declaration + Renewal (9th–10th year)', 'Renewal Deadline', 0, 'days', true, T_REN),
+      r('Renewal Reminder - 1 Year', 'Renewal Deadline', -12, 'months', true, T_REN),
       ...renewalChain('Registration Date', 10),
     ],
     'United Kingdom': [
@@ -113,7 +126,9 @@ export function defaultRules(): RuleBook {
       // registration date. Designations inherit the IR renewal date.
       r('Dependency Period Ends', 'Application Filed', 5, 'years', true),
       r('Irregularities notice response due', 'Irregularities Notice Issued', 3, 'months', true),
-      r('Philippines DAU deadline (3 years from IR/designation date)', 'Application Filed', 3, 'years', true, '', 3),
+      // NB: country-specific obligations (e.g. the Philippines Declaration of
+      // Actual Use) belong on the individual designation case, whose jurisdiction
+      // is that country — not on the Madrid IR itself.
       ...renewalChain('Application Filed', 10),
     ],
     Canada: [
@@ -141,10 +156,9 @@ export function defaultRules(): RuleBook {
       ...renewalChain('Application Filed', 10),
     ],
     Philippines: [
-      // Declaration of Actual Use: at the 3rd anniversary of filing, and
-      // within 1 year of each renewal.
+      // Declaration of Actual Use: 3rd anniversary of the filing / designation
+      // date. (The DAU within 1 year of each renewal can be added later.)
       r('Philippines DAU deadline (3 years from filing)', 'Application Filed', 3, 'years', true, '', 3),
-      r('Philippines DAU deadline (1 year from renewal)', 'Renewal Date', 1, 'years', true, '', 3),
       ...renewalChain('Registration Date', 10),
     ],
     Mexico: [
@@ -275,6 +289,88 @@ export function oppSchedule(jurisdiction: string): OppSchedule | null {
       steps: [
         { name: 'Opposition due', off: 2, unit: 'm', from: 'anchor', note: '2 months from publication of registration (non-extendable)' },
         { name: 'Statement of grounds due', off: 30, unit: 'd', from: 'Opposition due', note: 'Grounds within 30 days of opposition (foreign opponents: +60 days on request)' },
+      ],
+    };
+  // ---- Additional major jurisdictions (first-pass defaults — please verify the
+  // statutory periods for the specific matter; each generated row is editable).
+  if (jur.includes('canada'))
+    return {
+      anchor: 'Advertised in Trademarks Journal',
+      role: 'CIPO · from advertisement',
+      steps: [
+        { name: 'Statement of Opposition due', off: 2, unit: 'm', from: 'anchor', note: '2 months from advertisement (extendable, cooling-off available)' },
+        { name: 'Counter Statement due', off: 2, unit: 'm', from: 'Statement of Opposition due', note: 'Applicant · 2 months from being served' },
+        { name: 'Opponent’s evidence due', off: 4, unit: 'm', from: 'Counter Statement due', note: 'Opponent · 4 months' },
+        { name: 'Applicant’s evidence due', off: 4, unit: 'm', from: 'Opponent’s evidence due', note: 'Applicant · 4 months' },
+        { name: 'Reply evidence due', off: 1, unit: 'm', from: 'Applicant’s evidence due', note: 'Opponent · 1 month' },
+      ],
+    };
+  if (jur.includes('china'))
+    return {
+      anchor: 'Preliminary approval published',
+      role: 'CNIPA · post-publication, pre-registration',
+      steps: [
+        { name: 'Opposition due', off: 3, unit: 'm', from: 'anchor', note: '3 months from publication (non-extendable)' },
+        { name: 'Applicant response / evidence due', off: 30, unit: 'd', from: 'Opposition due', note: 'Applicant · 30 days from notification (evidence supplement +3 months)' },
+      ],
+    };
+  if (jur.includes('singapore'))
+    return {
+      anchor: 'Published for opposition',
+      role: 'IPOS · from publication',
+      steps: [
+        { name: 'Notice of Opposition due', off: 2, unit: 'm', from: 'anchor', note: '2 months from publication (extendable)' },
+        { name: 'Counter-Statement due', off: 2, unit: 'm', from: 'Notice of Opposition due', note: 'Applicant · 2 months' },
+        { name: 'Opponent’s evidence due', off: 2, unit: 'm', from: 'Counter-Statement due', note: 'Opponent · 2 months' },
+        { name: 'Applicant’s evidence due', off: 3, unit: 'm', from: 'Opponent’s evidence due', note: 'Applicant · 3 months' },
+        { name: 'Reply evidence due', off: 3, unit: 'm', from: 'Applicant’s evidence due', note: 'Opponent · 3 months' },
+      ],
+    };
+  if (jur.includes('germany') || jur === 'de')
+    return {
+      anchor: 'Registration published',
+      role: 'DPMA · post-registration',
+      steps: [
+        { name: 'Opposition due', off: 3, unit: 'm', from: 'anchor', note: '3 months from publication of registration (non-extendable)' },
+      ],
+    };
+  if (jur.includes('india'))
+    return {
+      anchor: 'Advertised in Trade Marks Journal',
+      role: 'India TMR · from advertisement',
+      steps: [
+        { name: 'Notice of Opposition due', off: 4, unit: 'm', from: 'anchor', note: '4 months from advertisement (non-extendable)' },
+        { name: 'Counter-Statement due', off: 2, unit: 'm', from: 'Notice of Opposition due', note: 'Applicant · 2 months from being served (non-extendable)' },
+        { name: 'Opponent’s evidence (Rule 45) due', off: 2, unit: 'm', from: 'Counter-Statement due', note: 'Opponent · 2 months' },
+        { name: 'Applicant’s evidence (Rule 46) due', off: 2, unit: 'm', from: 'Opponent’s evidence (Rule 45) due', note: 'Applicant · 2 months' },
+        { name: 'Reply evidence (Rule 47) due', off: 1, unit: 'm', from: 'Applicant’s evidence (Rule 46) due', note: 'Opponent · 1 month' },
+      ],
+    };
+  if (jur.includes('mexico'))
+    return {
+      anchor: 'Published in Official Gazette',
+      role: 'IMPI · from publication',
+      steps: [
+        { name: 'Opposition due', off: 1, unit: 'm', from: 'anchor', note: '1 month from publication' },
+        { name: 'Applicant response due', off: 1, unit: 'm', from: 'Opposition due', note: 'Applicant · 1 month' },
+      ],
+    };
+  if (jur.includes('korea'))
+    return {
+      anchor: 'Published for opposition',
+      role: 'KIPO · post-publication, pre-registration',
+      steps: [
+        { name: 'Opposition due', off: 2, unit: 'm', from: 'anchor', note: '2 months from publication (non-extendable)' },
+        { name: 'Statement of grounds / evidence due', off: 30, unit: 'd', from: 'Opposition due', note: 'Grounds may be supplemented within 30 days' },
+      ],
+    };
+  if (jur.includes('brazil'))
+    return {
+      anchor: 'Published in RPI',
+      role: 'INPI · from publication',
+      steps: [
+        { name: 'Opposition due', off: 60, unit: 'd', from: 'anchor', note: '60 days from publication' },
+        { name: 'Applicant response due', off: 60, unit: 'd', from: 'Opposition due', note: 'Applicant · 60 days from notice of opposition' },
       ],
     };
   return null;

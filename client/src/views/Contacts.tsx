@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { allJurisdictions, fmtDate, type Company, type CompanyContact, type Mark } from '@brandu/shared';
+import { allJurisdictions, CONTACT_TYPES, fmtDate, type Company, type CompanyContact, type Mark } from '@brandu/shared';
 import type { Nav } from '../App';
 import { api } from '../api';
 import { Card, Field, StatusBadge, confirmDelete } from '../ui';
@@ -166,13 +166,21 @@ function CompanyDetail({ initial, marks, canEdit, openMark, onBack, onChanged, o
       <div className="detail-cols">
         <div>
           <Card label="Record">
-            <Field label="Type">
-              <select value={c.type} disabled={ro} onChange={(e) => update({ type: e.target.value as Company['type'] }, true)}>
-                <option>Company</option>
-                <option>Individual</option>
-                <option>Partnership</option>
-              </select>
-            </Field>
+            <div className="grid2">
+              <Field label="Structure">
+                <select value={c.type} disabled={ro} onChange={(e) => update({ type: e.target.value as Company['type'] }, true)}>
+                  <option>Company</option>
+                  <option>Individual</option>
+                  <option>Partnership</option>
+                </select>
+              </Field>
+              <Field label="Contact type">
+                <select value={c.contactType || ''} disabled={ro} onChange={(e) => update({ contactType: e.target.value }, true)}>
+                  <option value="">— Not set —</option>
+                  {CONTACT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+            </div>
             {c.type === 'Individual' ? (
               <div className="grid2">
                 <Field label="First name"><input type="text" value={c.first || ''} disabled={ro} onChange={(e) => update({ first: e.target.value })} /></Field>
