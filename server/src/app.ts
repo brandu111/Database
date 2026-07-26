@@ -515,6 +515,21 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ ok: true });
   });
 
+  // Re-run the deadline engine over every case, so rulebook changes (new
+  // reminders, jurisdiction dates) backfill onto existing cases. Madrid families
+  // are recomputed with the full set so designation renewals re-link correctly.
+  app.post('/api/marks/recompute-all', full, (_req, res) => {
+    const all = listMarks(db);
+    const tx = db.transaction(() => {
+      for (const m of all) {
+        const fresh = getMark(db, m.id);
+        if (fresh) processMarkWrite(db, fresh, fresh);
+      }
+    });
+    tx();
+    res.json({ recomputed: all.length });
+  });
+
   // Bulk import cases from parsed CSV rows. Each row becomes a case, run through
   // the deadline engine so renewals/reminders compute from the imported dates.
   app.post('/api/marks/import', full, (req, res) => {

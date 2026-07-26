@@ -689,6 +689,23 @@ function DataImport() {
           )}
         </Card>
 
+        <Card label="Recompute all deadlines">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Re-runs the deadline engine over every existing case so new rules — the automatic 1-week reminders, the Mexico declaration-of-use dates, the USA maintenance reminders, and so on — backfill onto cases that were entered earlier. Safe to run any time; only auto-generated rows are recomputed and Madrid families re-link correctly.
+          </div>
+          <button className="btn secondary small" disabled={busy} onClick={async () => {
+            setBusy(true);
+            try {
+              const r = await api.recomputeAll();
+              window.alert(`Recomputed ${r.recomputed} case${r.recomputed === 1 ? '' : 's'}.`);
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : 'Recompute failed.');
+            } finally {
+              setBusy(false);
+            }
+          }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
+        </Card>
+
         <Card label="⚠ Danger zone — delete all cases">
           <div className="hint" style={{ marginBottom: 8 }}>
             Removes <strong>every</strong> case from the portal so you can start fresh before importing. This cannot be undone — take a backup of <code>data/brandu.sqlite</code> on the server first. Oppositions, contacts and templates are not affected.

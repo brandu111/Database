@@ -76,6 +76,19 @@ describe('Mexico Declaration of Use', () => {
     // not the IR date (2019-04-04) which would give 2022-07-04.
     expect(dateOf(des, 'Mexico Declaration of Use deadline')).toBe('2024-12-01');
   });
+
+  it('renewal DoU stays dormant until the WIPO renewal-notice recording date is entered, then runs +3 months', () => {
+    const m = blankMark({ jurisdiction: 'Mexico', country: 'Mexico', irId: 'ir9' });
+    m.dates.push({ name: 'Registration Date', date: '2015-01-10', done: true });
+    ensureRuleRows(m, rules);
+    const key = 'Mexico DoU (renewal) deadline — 3 months from IMPI recording of WIPO renewal notice';
+    // No recording date yet → no deadline row.
+    expect(m.dates.some((d) => d.name === key)).toBe(false);
+    // Enter the date IMPI records the WIPO renewal notice → deadline = +3 months.
+    m.dates.push({ name: 'WIPO renewal notice recorded by IMPI', date: '2025-02-01', done: true });
+    ensureRuleRows(m, rules);
+    expect(dateOf(m, key)).toBe('2025-05-01');
+  });
 });
 
 describe('every alerting deadline gets an automatic 1-week reminder', () => {

@@ -172,12 +172,17 @@ export function defaultRules(): RuleBook {
       // date IMPI grants protection), NOT the international registration date — so
       // the 3-year declaration is standalone to the Mexican case, national or IR.
       r('Mexico Declaration of Use window opens (3rd anniversary)', 'Registration Date', 3, 'years', false),
-      r('Mexico Declaration of Use deadline', 'Mexico Declaration of Use window opens (3rd anniversary)', 3, 'months', true, '', 2),
+      r('Mexico Declaration of Use deadline', 'Registration Date', 39, 'months', true, '', 2),
       r('Mexico DoU grace period (with surcharge)', 'Mexico Declaration of Use deadline', 3, 'months', false),
-      // A declaration of use must also accompany each renewal. For a Madrid
-      // designation the renewal date is inherited from the parent IR, so this
-      // (anchored on Renewal Deadline) correctly follows the Madrid case.
-      r('Mexico Declaration of Use (with renewal)', 'Renewal Deadline', 0, 'days', true, '', 2),
+      // Renewal Declaration of Use — Madrid designations of Mexico. The declaration
+      // must be filed with IMPI within 3 months of the date IMPI records/publishes
+      // the 10-year international renewal notification from WIPO's International
+      // Bureau. Add that recording date ("WIPO renewal notice recorded by IMPI")
+      // on the case and this deadline computes; until then it stays dormant.
+      r('Mexico DoU (renewal) deadline — 3 months from IMPI recording of WIPO renewal notice', 'WIPO renewal notice recorded by IMPI', 3, 'months', true, '', 2),
+      // Renewal Declaration of Use — national Mexican registrations, filed together
+      // with the 10-year renewal.
+      r('Mexico Declaration of Use (national — with renewal)', 'Renewal Deadline', 0, 'days', true, '', 2),
       ...renewalChain('Registration Date', 10),
     ],
   };

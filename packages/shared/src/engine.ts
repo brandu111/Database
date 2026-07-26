@@ -148,9 +148,15 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
   list.forEach((r) => {
     if (!r.name || !r.trigger) return;
     if (/convention priority/i.test(r.name) && !conventionAllowed) return;
-    // Post-registration gate, except a Declaration of Actual Use that runs from
-    // the filing/designation date — that deadline is independent of registration.
-    const post = POST_REGISTRATION.test(r.name) && !(/\bdau\b/i.test(r.name) && r.trigger === 'Application Filed');
+    // Post-registration gate, except deadlines driven by a specific manual event
+    // date rather than a registration date: the Philippines DAU (from the filing /
+    // designation date) and the Mexico renewal declaration (from the date IMPI
+    // records WIPO's renewal notice). Those activate as soon as their own trigger
+    // date exists, and stay dormant until then.
+    const eventAnchored =
+      (/\bdau\b|declaration of use/i.test(r.name) && r.trigger === 'Application Filed') ||
+      r.trigger === 'WIPO renewal notice recorded by IMPI';
+    const post = POST_REGISTRATION.test(r.name) && !eventAnchored;
     const gateOk = post ? (isMadridIr ? !!val(r.trigger) : regPresent) : val(r.trigger);
     if (!gateOk) return;
     ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts });
