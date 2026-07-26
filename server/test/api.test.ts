@@ -98,6 +98,16 @@ describe('marks and the server-side date engine', () => {
     expect(ren.linkedToIR).toBe(true);
   });
 
+  it('carries a logo basic case image down to the IR and its designations', async () => {
+    const basic = (await admin.post('/api/marks').send({ name: 'LOGO MARK', jurisdiction: 'Australia', type: 'Logo' }).expect(201)).body;
+    basic.image = 'https://files.example/logo.png';
+    await admin.put(`/api/marks/${basic.id}`).send(basic).expect(200);
+    const r = await admin.post(`/api/marks/${basic.id}/madrid`).send({ countries: ['Japan'], filingDate: '2015-05-05' }).expect(200);
+    expect(r.body.ir.image).toBe('https://files.example/logo.png');
+    const desig = (await admin.get('/api/marks')).body.find((m: { irId?: string; jurisdiction: string }) => m.irId === r.body.ir.id && m.jurisdiction === 'Japan');
+    expect(desig.image).toBe('https://files.example/logo.png');
+  });
+
   it('adds a subsequent designation dated when filed, sharing the IR renewal', async () => {
     const r = await admin.post(`/api/marks/${id}/madrid`).send({ countries: ['Singapore'], filingDate: '2020-06-15', subsequent: true }).expect(200);
     const sg = r.body.created.find((m: { jurisdiction: string }) => m.jurisdiction === 'Singapore');

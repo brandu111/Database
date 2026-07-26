@@ -113,7 +113,14 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   // (initial and subsequent). Designations are saved below via `touched`.
   if (m.jurisdiction === 'Madrid Protocol (WIPO)') {
     for (const x of all) {
-      if (x.irId === m.id) x.irNumber = m.irNumber || '';
+      if (x.irId === m.id) {
+        x.irNumber = m.irNumber || '';
+        // A designation is the same mark as the IR — backfill its logo/graphic
+        // (and audio) if missing, so existing logo designations get repaired on
+        // the next save / "Recompute all".
+        if (m.image && !x.image) x.image = m.image;
+        if (m.audioUrl && !x.audioUrl) x.audioUrl = m.audioUrl;
+      }
     }
   }
   const touched = all.filter((x) => x.id === m.id || x.irId === m.id);
@@ -665,6 +672,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
         dates: withPriority([{ name: 'Application Filed', date: irFilingDate, done: true, auInput: true }]),
         contacts: clone(basic.contacts || []),
         image: basic.image || null,
+        audioUrl: basic.audioUrl,
         ...ownerBits,
       });
       created.push(ir);
@@ -701,6 +709,10 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
           treaty: { basis: 'Madrid Protocol', date: desigFilingDate, desigs: [] },
           dates: withPriority([{ name: 'Application Filed', date: desigFilingDate, done: true, auInput: true }]),
           contacts: cp.contacts ? clone(basic.contacts || []) : [],
+          // A designation is the same mark — carry the logo/graphic (and any
+          // sound-mark audio) down from the basic case.
+          image: basic.image || null,
+          audioUrl: basic.audioUrl,
           ...ownerBits,
         })
       );
