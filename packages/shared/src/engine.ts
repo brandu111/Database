@@ -1,4 +1,4 @@
-import { shift } from './dates.js';
+import { fmtDate, shift } from './dates.js';
 import type { Mark, MarkDate, Rule, RuleBook } from './types.js';
 
 /**
@@ -128,13 +128,23 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
   // trigger date exists rather than waiting for a separate registration date.
   // (The UI hides the renewal rows on Madrid cases until they are registered.)
   const isMadridIr = m.jurisdiction === 'Madrid Protocol (WIPO)';
+  // Convention Priority only applies to Australian and New Zealand cases, and
+  // never to a Madrid International Registration or its designations (an IR is
+  // never AU/NZ; a designation carries an irId).
+  const conventionAllowed = ['Australia', 'New Zealand'].includes(m.jurisdiction) && !m.irId;
   list.forEach((r) => {
     if (!r.name || !r.trigger) return;
+    if (/convention priority/i.test(r.name) && !conventionAllowed) return;
     const post = POST_REGISTRATION.test(r.name);
     const gateOk = post ? (isMadridIr ? !!val(r.trigger) : regPresent) : val(r.trigger);
     if (!gateOk) return;
     ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0 });
   });
+  // Remove any auto-generated Convention Priority rows that shouldn't be here
+  // (e.g. on a Madrid designation), along with their reminder rows.
+  if (!conventionAllowed) {
+    m.dates = (m.dates || []).filter((d) => !(/convention priority/i.test(d.name) && (d.auBase || d.auGen)));
+  }
   rollCompletedRenewals(m);
   // Two passes so rows whose base was itself just computed resolve in one call.
   auRecompute(m);
@@ -146,25 +156,33 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
 }
 
 /**
- * When a computed renewal deadline is ticked off, roll it forward to the next
- * period (base + (auCycle+1) × offset) and un-tick it, so a fresh renewal
- * deadline and its reminders appear automatically. The reminder / grace rows
- * for that renewal are reset to not-done for the new cycle. Designation
- * renewals (linkedToIR) are driven by their International Registration, so they
- * are left for `linkDesignationRenewal` to re-propagate.
+ * When the current renewal deadline is ticked off, the completed one is kept as
+ * a frozen history row (its original date, still ticked) and the active
+ * "Renewal Deadline" rolls forward to the next period with fresh reminders. So
+ * the old date stays visible — you just complete it — and the next renewal
+ * appears automatically. Designation renewals (linkedToIR) follow their
+ * International Registration, so they are left for `linkDesignationRenewal`.
  */
 function rollCompletedRenewals(m: Mark): void {
-  for (const ren of (m.dates || []).filter((d) => /renewal deadline/i.test(d.name) && d.auBase && !d.linkedToIR)) {
+  // Only the single canonical active row rolls; archived rows have other names.
+  for (const ren of (m.dates || []).filter((d) => d.name === 'Renewal Deadline' && !d.linkedToIR)) {
     if (!ren.done || !ren.date) continue;
+    const oldDate = ren.date;
+    // Preserve the completed renewal as a frozen, ticked history row.
+    const archName = `Renewal Deadline — ${fmtDate(oldDate)} (completed)`;
+    if (!(m.dates || []).some((x) => x.name === archName)) {
+      m.dates.push({ name: archName, date: oldDate, done: true, pinned: true });
+    }
+    // Roll the active renewal forward to the next period and reopen it.
     ren.auCycle = (Math.trunc(Number(ren.auCycle)) || 0) + 1;
     ren.done = false;
-    ren.note = 'Renewed — next renewal deadline';
-    // A pinned renewal won't be recomputed by auRecompute, so advance it here.
-    if (ren.pinned) ren.date = shift(ren.date, ren.auOff || 10, ren.auUnit || 'years');
-    // Reset the reminder and grace rows tied to this renewal for the new cycle.
+    ren.note = 'Next renewal deadline';
+    // A pinned renewal isn't recomputed by auRecompute, so advance it here.
+    if (ren.pinned || !ren.auBase) ren.date = shift(oldDate, ren.auOff || 10, ren.auUnit || 'years');
+    // Reopen the reminder / grace rows for the new cycle.
     (m.dates || []).forEach((r) => {
       if (r === ren) return;
-      if (r.emailFor === ren.name || r.name.startsWith(`${ren.name} — Reminder`) || /renewal (reminder|grace)/i.test(r.name)) r.done = false;
+      if (r.emailFor === 'Renewal Deadline' || r.name.startsWith('Renewal Deadline — Reminder') || /renewal (reminder|grace)/i.test(r.name)) r.done = false;
     });
   }
 }
@@ -225,7 +243,7 @@ export function applyStage(m: Mark, rules: RuleBook, status: string): void {
   if (!cfg) return;
   (cfg.inputs || []).forEach((n) => ensureRow(m, n, { auInput: true }));
   (cfg.activate || []).forEach((n) => {
-    if (n === 'Convention Priority Deadline' && !['Australia', 'New Zealand'].includes(m.jurisdiction)) return;
+    if (n === 'Convention Priority Deadline' && (!['Australia', 'New Zealand'].includes(m.jurisdiction) || m.irId)) return;
     const r = ruleByName(rules, m.jurisdiction, n);
     if (r) ensureRow(m, n, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0 });
   });

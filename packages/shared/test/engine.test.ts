@@ -55,23 +55,41 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     expect(dateOf(m, 'Non-use vulnerability date')).toBe('2024-02-10');
   });
 
-  it('rolls a completed renewal forward to the next period with fresh reminders', () => {
+  it('keeps the completed renewal as a ticked history row and opens the next one', () => {
     const m = blankMark();
     m.dates.push({ name: 'Application Filed', date: '2020-08-15', done: true });
     m.dates.push({ name: 'Registration Date', date: '2021-02-10', done: true });
     ensureRuleRows(m, rules);
     expect(dateOf(m, 'Renewal Deadline')).toBe('2030-08-15');
-    // Tick the current renewal (and its reminders) off, then re-run the engine.
-    m.dates.forEach((d) => { if (/renewal/i.test(d.name)) d.done = true; });
+    // Tick the current renewal off, then re-run the engine.
+    m.dates.find((d) => d.name === 'Renewal Deadline')!.done = true;
     ensureRuleRows(m, rules);
-    // Next renewal is +10 years, reopened, with the reminder chain regenerated.
+    // The completed renewal is preserved (old date, still ticked)…
+    const done = m.dates.find((d) => d.name.startsWith('Renewal Deadline —') && d.name.includes('completed'))!;
+    expect(done.date).toBe('2030-08-15');
+    expect(done.done).toBe(true);
+    // …and the active Renewal Deadline rolls to +10 years, reopened, with reminders.
     const ren = m.dates.find((d) => d.name === 'Renewal Deadline')!;
     expect(ren.date).toBe('2040-08-15');
     expect(ren.done).toBe(false);
     expect(dateOf(m, 'Renewal Reminder')).toBe('2040-02-15');
-    expect(dateOf(m, 'Renewal Reminder - Final')).toBe('2040-07-15');
     expect(dateOf(m, '6 Month Renewal Grace Period')).toBe('2041-02-15');
     expect(m.dates.find((d) => d.name === 'Renewal Reminder')!.done).toBe(false);
+  });
+
+  it('auto-creates Convention Priority only for AU/NZ, never for a Madrid designation', () => {
+    const au = blankMark();
+    au.dates.push({ name: 'Application Filed', date: '2024-01-31', done: true });
+    ensureRuleRows(au, rules);
+    expect(dateOf(au, 'Convention Priority Deadline')).toBe('2024-07-31');
+
+    // A designation (has irId) with the same filing date must not get one, and
+    // an existing auto row is cleaned up.
+    const des = blankMark({ jurisdiction: 'Japan', irId: 'ir-1' });
+    des.dates.push({ name: 'Application Filed', date: '2024-01-31', done: true });
+    des.dates.push({ name: 'Convention Priority Deadline', date: '2024-07-31', done: false, auBase: 'Application Filed' });
+    ensureRuleRows(des, rules);
+    expect(dateOf(des, 'Convention Priority Deadline')).toBeUndefined();
   });
 
   it('honours a pinned (imported) renewal date instead of recomputing it, and still makes reminders', () => {
