@@ -209,6 +209,18 @@ describe('bulk import & clear', () => {
     expect(del.deleted).toBeGreaterThan(0);
     expect((await admin.get('/api/marks')).body).toHaveLength(0);
   });
+
+  it('recomputes all cases without nesting transactions (no 500)', async () => {
+    await admin.post('/api/marks').send({ name: 'RECOMPUTE A', jurisdiction: 'Australia' }).expect(201);
+    const b = (await admin.post('/api/marks').send({ name: 'RECOMPUTE B', jurisdiction: 'USA' }).expect(201)).body;
+    b.dates = [{ name: 'Registration Date', date: '2020-01-10', done: true }];
+    await admin.put(`/api/marks/${b.id}`).send(b).expect(200);
+    const r = (await admin.post('/api/marks/recompute-all').expect(200)).body;
+    expect(r.recomputed).toBeGreaterThanOrEqual(2);
+    expect(r.failed).toHaveLength(0);
+    // Non-full users may not run it.
+    await viewer.post('/api/marks/recompute-all').expect(403);
+  });
 });
 
 describe('oppositions', () => {

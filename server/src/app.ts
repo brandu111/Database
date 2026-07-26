@@ -527,15 +527,24 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   // reminders, jurisdiction dates) backfill onto existing cases. Madrid families
   // are recomputed with the full set so designation renewals re-link correctly.
   app.post('/api/marks/recompute-all', full, (_req, res) => {
+    // Each processMarkWrite runs its own transaction, so we must NOT wrap the
+    // loop in another one (SQLite can't nest BEGIN). Recompute case by case and
+    // report any that fail rather than aborting the whole run.
     const all = listMarks(db);
-    const tx = db.transaction(() => {
-      for (const m of all) {
+    let recomputed = 0;
+    const failed: { id: string; name: string; error: string }[] = [];
+    for (const m of all) {
+      try {
         const fresh = getMark(db, m.id);
-        if (fresh) processMarkWrite(db, fresh, fresh);
+        if (fresh) {
+          processMarkWrite(db, fresh, fresh);
+          recomputed++;
+        }
+      } catch (e) {
+        failed.push({ id: m.id, name: m.name || '(untitled)', error: e instanceof Error ? e.message : String(e) });
       }
-    });
-    tx();
-    res.json({ recomputed: all.length });
+    }
+    res.json({ recomputed, failed });
   });
 
   // Bulk import cases from parsed CSV rows. Each row becomes a case, run through

@@ -249,7 +249,12 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
               </div>
             ) : undefined}
           >
-            {sched && <div className="hint" style={{ marginBottom: 8 }}>{o.jurisdiction} schedule · {sched.role}. Set the anchor date ({sched.anchor}) and generate the timeline; without it the master list is inserted.</div>}
+            {sched && (
+              <div className="hint" style={{ marginBottom: 8, color: sched.verified === false ? 'var(--danger)' : undefined }}>
+                {o.jurisdiction} · {sched.role}. Set the anchor date ({sched.anchor}) then generate the timeline.
+                {sched.verified === false && ' ⚠ These are indicative periods — verify each against the local office and edit as needed.'}
+              </div>
+            )}
             {(o.dates || []).length === 0 && <div className="hint">No dates yet.</div>}
             {(o.dates || []).length > 0 && (
               <table className="list">

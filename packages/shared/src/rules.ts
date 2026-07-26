@@ -411,7 +411,22 @@ export function oppSchedule(jurisdiction: string, kind = ''): OppSchedule | null
         { name: 'Applicant response due', off: 60, unit: 'd', from: 'Opposition due', note: 'Applicant · 60 days from notice of opposition' },
       ],
     };
-  return null;
+  // Generic fallback so "Get dates from template" produces a usable, anchor-based
+  // timeline for every jurisdiction. Periods are indicative only — opposition
+  // windows vary widely (30 days to 4 months; pre- vs post-grant) — so verify the
+  // local statutory periods and adjust each row.
+  return {
+    anchor: 'Publication / advertisement date',
+    role: 'Generic timeline — no jurisdiction-specific schedule; verify local statutory periods',
+    verified: false,
+    steps: [
+      { name: 'Opposition / Notice of Opposition due', off: 3, unit: 'm', from: 'anchor', note: 'Indicative — many offices allow 1–4 months from publication. Confirm locally.' },
+      { name: 'Applicant response / Counter-statement due', off: 2, unit: 'm', from: 'Opposition / Notice of Opposition due', note: 'Indicative — confirm locally.' },
+      { name: 'Opponent’s evidence due', off: 2, unit: 'm', from: 'Applicant response / Counter-statement due', note: 'Indicative — confirm locally.' },
+      { name: 'Applicant’s evidence due', off: 2, unit: 'm', from: 'Opponent’s evidence due', note: 'Indicative — confirm locally.' },
+      { name: 'Reply evidence due', off: 1, unit: 'm', from: 'Applicant’s evidence due', note: 'Indicative — confirm locally.' },
+    ],
+  };
 }
 
 /** IP offices first, then every country — backs the jurisdiction combobox. */

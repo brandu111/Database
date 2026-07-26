@@ -332,4 +332,6 @@ export interface OppSchedule {
   anchor: string;
   role: string;
   steps: OppScheduleStep[];
+  /** false = generic fallback (no jurisdiction-specific schedule); verify locally. */
+  verified?: boolean;
 }

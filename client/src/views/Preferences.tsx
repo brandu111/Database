@@ -697,7 +697,8 @@ function DataImport() {
             setBusy(true);
             try {
               const r = await api.recomputeAll();
-              window.alert(`Recomputed ${r.recomputed} case${r.recomputed === 1 ? '' : 's'}.`);
+              const msg = `Recomputed ${r.recomputed} case${r.recomputed === 1 ? '' : 's'}.`;
+              window.alert(r.failed?.length ? `${msg}\n\n${r.failed.length} could not be recomputed:\n${r.failed.slice(0, 10).map((f) => `• ${f.name}: ${f.error}`).join('\n')}` : msg);
             } catch (e) {
               window.alert(e instanceof Error ? e.message : 'Recompute failed.');
             } finally {

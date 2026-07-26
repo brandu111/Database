@@ -72,6 +72,12 @@ describe('opposition schedules', () => {
     expect(opp.off).toBe(30);
     expect(opp.unit).toBe('d');
   });
+  it('verified jurisdictions are not flagged generic; unlisted ones fall back to a generic timeline', () => {
+    expect(oppSchedule('Australia')!.verified).not.toBe(false);
+    const generic = oppSchedule('France')!;
+    expect(generic.verified).toBe(false);
+    expect(generic.steps.length).toBeGreaterThan(0);
+  });
 });
 
 describe('Mexico Declaration of Use', () => {
