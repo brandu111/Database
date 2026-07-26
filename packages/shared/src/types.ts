@@ -122,6 +122,14 @@ export interface Mark {
   associateRef?: string;
   ourDocket: string;
   clientDocket: string;
+  /** Responsible attorney / fee earner (drives "my portfolio" and workload). */
+  attorney?: string;
+  /** Foreign associate / agent handling the case. */
+  associate?: string;
+  /** Free-form tags/labels for flexible grouping and filtering. */
+  tags?: string[];
+  /** Estimated renewal fee (for upcoming-cost totals). */
+  renewalFee?: number;
   goods: string;
   comments: string;
   disclaimers: string;

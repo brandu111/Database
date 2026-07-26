@@ -5,6 +5,7 @@
 export const IMPORT_COLUMNS: string[] = [
   'MarkName', 'Jurisdiction', 'Type', 'Status', 'ApplicationNo', 'RegistrationNo', 'IRNo',
   'Classes', 'GoodsServices', 'OurRef', 'ClientRef',
+  'ResponsibleAttorney', 'Associate', 'AssociateRef', 'Tags', 'RenewalFee',
   'OwnerName', 'OwnerACN', 'OwnerABN', 'OwnerAddress', 'OwnerCity', 'OwnerState', 'OwnerPostcode', 'OwnerCountry',
   'ClientContactName', 'ClientContactEmail',
   'FiledDate', 'PriorityDate', 'RegistrationDate', 'PublicationDate', 'OAIssuedDate', 'RenewalDate',
@@ -15,6 +16,7 @@ export const IMPORT_COLUMNS: string[] = [
 export const IMPORT_EXAMPLE_ROW: string[] = [
   'BRANDU', 'Australia', 'Word', 'Registered', '2345678', '2345678', '',
   '9, 42', 'Class 9: Downloadable software; Class 42: Legal services', 'TM-1001', 'CLIENT-7',
+  'Natalie Brandu', 'Smith IP (NZ)', 'SIP-9910', 'key brand; watch', '450',
   'BrandU Pty Ltd', '600 123 456', '12 600 123 456', '1 Legal St', 'Sydney', 'NSW', '2000', 'Australia',
   'Jane Client', 'jane@example.com',
   '15/08/2020', '', '10/02/2021', '', '', '',
@@ -34,6 +36,11 @@ export const IMPORT_COLUMN_NOTES: Record<string, string> = {
   GoodsServices: 'Goods/services text (a single cell — wrap in quotes if it contains commas).',
   OurRef: 'Your file/matter reference.',
   ClientRef: 'The client’s own reference.',
+  ResponsibleAttorney: 'The fee earner responsible for the case (drives the dashboard’s "my deadlines").',
+  Associate: 'Foreign associate / agent handling the case, if any.',
+  AssociateRef: 'The associate’s reference number.',
+  Tags: 'Free-form labels separated by ; or , (e.g. "key brand; watch").',
+  RenewalFee: 'Estimated renewal fee, numbers only (e.g. 450).',
   OwnerName: 'Registered owner / applicant name.',
   OwnerACN: 'Owner ACN / ARBN.',
   OwnerABN: 'Owner ABN.',

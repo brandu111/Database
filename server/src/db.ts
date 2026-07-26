@@ -74,6 +74,11 @@ function migrate(db: DB): void {
       sent_at TEXT NOT NULL, to_email TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '',
       body TEXT NOT NULL DEFAULT '', user_name TEXT NOT NULL DEFAULT ''
     );
+    CREATE TABLE IF NOT EXISTS mark_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, mark_id TEXT NOT NULL,
+      at TEXT NOT NULL, user_name TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_history_mark ON mark_history(mark_id);
   `);
   // Per-user HTML email signature (individual sign-offs) and email address (for
   // staff alert notifications). Added by migration so existing databases pick

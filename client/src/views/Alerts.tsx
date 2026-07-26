@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
-import { fmtDate, type AlertRow, type EmailTemplate, type FirmSettings, type Mark, type RuleBook } from '@brandu/shared';
+import { fmtDate, todayISO, type AlertRow, type EmailTemplate, type FirmSettings, type Mark, type RuleBook } from '@brandu/shared';
 import { api } from '../api';
 import { buildDeadlineEmail, templateForDate, type ComposedEmail } from '../email';
 import { EmailComposeModal } from '../EmailComposeModal';
@@ -19,6 +19,7 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
   canEdit: boolean;
 }) {
   const [days, setDays] = useState(30);
+  const [mode, setMode] = useState<'list' | 'calendar'>('list');
   const [rows, setRows] = useState<AlertRow[] | null>(null);
   const [busy, setBusy] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -132,10 +133,16 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
     <>
       <div className="filters">
         <div className="section-label" style={{ marginBottom: 0 }}>Upcoming deadlines, reminders &amp; flagged actions</div>
-        <select value={days} onChange={(e) => setDays(parseInt(e.target.value, 10))} style={{ marginLeft: 'auto' }}>
-          {[14, 30, 60, 90, 180, 365].map((d) => <option key={d} value={d}>Next {d} days</option>)}
-        </select>
+        <div className="row" style={{ marginLeft: 'auto', gap: 6 }}>
+          <button className={`chip${mode === 'list' ? ' on' : ''}`} onClick={() => setMode('list')}>List</button>
+          <button className={`chip${mode === 'calendar' ? ' on' : ''}`} onClick={() => setMode('calendar')}>Calendar</button>
+          <select value={days} onChange={(e) => setDays(parseInt(e.target.value, 10))}>
+            {[14, 30, 60, 90, 180, 365].map((d) => <option key={d} value={d}>Next {d} days</option>)}
+          </select>
+        </div>
       </div>
+      {mode === 'calendar' && <AlertsCalendar rows={rows} openMark={openMark} openOpposition={openOpposition} />}
+      {mode === 'list' && (
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="list">
           <thead>
@@ -228,7 +235,57 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
           </tbody>
         </table>
       </div>
+      )}
       {email && <EmailComposeModal email={email} title={email.title} hasLogo={email.hasLogo} onClose={() => setEmail(null)} />}
     </>
+  );
+}
+
+// Month-grid calendar of deadlines. Uses whatever alert rows are loaded (widen
+// the day window to see further out).
+function AlertsCalendar({ rows, openMark, openOpposition }: { rows: AlertRow[]; openMark: (id: string) => void; openOpposition: (id: string) => void }) {
+  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const byDay = new Map<string, AlertRow[]>();
+  rows.forEach((a) => { const k = a.date; if (!byDay.has(k)) byDay.set(k, []); byDay.get(k)!.push(a); });
+
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const startDow = (first.getDay() + 6) % 7; // Monday-first
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(month.getFullYear(), month.getMonth(), d));
+  while (cells.length % 7 !== 0) cells.push(null);
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayIso = todayISO();
+  const monthName = month.toLocaleString('en-AU', { month: 'long', year: 'numeric' });
+
+  return (
+    <div className="card">
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+        <button className="btn secondary small" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>‹ Prev</button>
+        <div style={{ fontWeight: 700 }}>{monthName}</div>
+        <button className="btn secondary small" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>Next ›</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => <div key={d} className="hint" style={{ textAlign: 'center', fontWeight: 600 }}>{d}</div>)}
+        {cells.map((d, i) => (
+          <div key={i} style={{ minHeight: 78, border: '1px solid var(--border)', borderRadius: 6, padding: 3, background: d && iso(d) === todayIso ? 'var(--panel)' : undefined }}>
+            {d && (
+              <>
+                <div className="hint" style={{ fontSize: 11, textAlign: 'right' }}>{d.getDate()}</div>
+                {(byDay.get(iso(d)) || []).slice(0, 4).map((a, j) => (
+                  <div key={j} title={`${a.mark} — ${a.text}`} onClick={() => (a.refType === 'mark' ? openMark(a.refId) : openOpposition(a.refId))}
+                    style={{ fontSize: 10, cursor: 'pointer', background: a.overdue ? '#fbeceb' : '#eef3fb', color: a.overdue ? '#d34b44' : '#2b4a7a', borderRadius: 3, padding: '1px 3px', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {a.mark}
+                  </div>
+                ))}
+                {(byDay.get(iso(d)) || []).length > 4 && <div className="hint" style={{ fontSize: 10 }}>+{(byDay.get(iso(d)) || []).length - 4} more</div>}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="hint" style={{ marginTop: 8 }}>Showing deadlines in the selected day window. Widen it (top-right) to see further ahead. Click an item to open the case.</div>
+    </div>
   );
 }

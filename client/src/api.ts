@@ -50,6 +50,7 @@ export const api = {
   ipAuConfigured: () => req<{ configured: boolean }>('GET', '/api/lookup/ip-australia'),
   lookupIpAustralia: (number: string) => req<Partial<Mark>>('GET', `/api/lookup/ip-australia/${encodeURIComponent(number.trim())}`),
   logCorrespondence: (id: string, entry: { to: string; subject: string; body: string }) => req<{ ok: true }>('POST', `/api/marks/${id}/correspondence`, entry),
+  markHistory: (id: string) => req<{ at: string; user_name: string; summary: string }[]>('GET', `/api/marks/${id}/history`),
 
   oppositions: () => req<Opposition[]>('GET', '/api/oppositions'),
   createOpposition: (partial: Partial<Opposition>) => req<Opposition>('POST', '/api/oppositions', partial),

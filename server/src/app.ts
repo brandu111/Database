@@ -138,6 +138,38 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
 
 const escHtml = (s: unknown) => String(s ?? '').split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
 
+/** Human-readable summary of what changed between two versions of a mark. */
+function diffMarkSummary(prev: Mark | null, next: Mark): string {
+  const parts: string[] = [];
+  if (!prev) return 'Case created';
+  const fields: [keyof Mark, string][] = [
+    ['name', 'name'], ['status', 'status'], ['owner', 'owner'], ['application', 'application no.'],
+    ['registration', 'registration no.'], ['classes', 'classes'], ['jurisdiction', 'jurisdiction'],
+    ['attorney', 'attorney'], ['associate', 'associate'], ['matter', 'file no.'], ['clientDocket', 'client ref'],
+    ['irNumber', 'IR no.'], ['renewalFee', 'renewal fee'],
+  ];
+  for (const [k, label] of fields) {
+    const a = prev[k] ?? '';
+    const b = next[k] ?? '';
+    if (String(a) !== String(b)) parts.push(`${label} ${a ? `“${a}”` : '(blank)'} → ${b ? `“${b}”` : '(blank)'}`);
+  }
+  const key = (d: { name: string; date: string }) => `${d.name}|${d.date}`;
+  const prevDates = new Map((prev.dates || []).map((d) => [key(d), d]));
+  const nextDates = new Map((next.dates || []).map((d) => [key(d), d]));
+  for (const [k, d] of nextDates) {
+    const before = prevDates.get(k);
+    if (!before) parts.push(`added date ${d.name}${d.date ? ` (${d.date})` : ''}`);
+    else if (!before.done && d.done) parts.push(`completed ${d.name}`);
+  }
+  for (const [k, d] of prevDates) if (!nextDates.has(k)) parts.push(`removed date ${d.name}`);
+  return parts.slice(0, 12).join('; ');
+}
+
+function recordHistory(db: DB, markId: string, userName: string, summary: string): void {
+  if (!summary) return;
+  db.prepare('INSERT INTO mark_history(mark_id, at, user_name, summary) VALUES(?,?,?,?)').run(markId, new Date().toISOString(), userName || '', summary);
+}
+
 /** Look up a staff member's email address by their name (case-insensitive). */
 function staffEmailByName(db: DB, name: string): string | null {
   if (!name) return null;
@@ -432,6 +464,8 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.post('/api/marks', edit, (req, res) => {
     const m = blankMark(req.body || {});
     saveMark(db, m);
+    const s = readSession(db, req);
+    recordHistory(db, m.id, s?.kind === 'staff' ? s.name : '', 'Case created');
     res.status(201).json(m);
   });
 
@@ -439,7 +473,14 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const previous = getMark(db, req.params.id);
     if (!previous) return res.status(404).json({ error: 'Not found' });
     const incoming = { ...clone(req.body), id: req.params.id } as Mark;
-    res.json(processMarkWrite(db, incoming, previous));
+    const result = processMarkWrite(db, incoming, previous);
+    const s = readSession(db, req);
+    recordHistory(db, req.params.id, s?.kind === 'staff' ? s.name : '', diffMarkSummary(previous, result));
+    res.json(result);
+  });
+
+  app.get('/api/marks/:id/history', view, (req, res) => {
+    res.json(db.prepare('SELECT at, user_name, summary FROM mark_history WHERE mark_id=? ORDER BY id DESC LIMIT 200').all(req.params.id));
   });
 
   app.delete('/api/marks/:id', edit, (req, res) => {
@@ -459,6 +500,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
         const partial = csvRowToMark(row);
         const m = blankMark(partial);
         processMarkWrite(db, m, null);
+        recordHistory(db, m.id, 'Import', 'Case created (CSV import)');
         imported++;
       } catch (e) {
         errors.push({ line: i + 2, error: (e as Error).message }); // +2: header row + 1-indexed
@@ -473,6 +515,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     if (String(req.query.confirm) !== 'DELETE-ALL') return res.status(400).json({ error: 'Missing confirmation.' });
     const before = listMarks(db).length;
     db.prepare('DELETE FROM marks').run();
+    db.prepare('DELETE FROM mark_history').run();
     res.json({ deleted: before });
   });
 

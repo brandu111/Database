@@ -97,7 +97,29 @@ export function Trademarks({ nav, go, canEdit }: Props) {
     );
   }
 
-  return <MarkList marks={marks} canEdit={canEdit} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
+  return <MarkList marks={marks} canEdit={canEdit} onReload={reload} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
+}
+
+// Case history / audit trail — who changed what, when. Reloads when the case is
+// saved (saveState flips back to 'saved').
+function MarkHistory({ markId, saveState }: { markId: string; saveState: string }) {
+  const [rows, setRows] = useState<{ at: string; user_name: string; summary: string }[]>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { api.markHistory(markId).then(setRows, () => undefined); }, [markId, saveState]);
+  if (rows.length === 0) return null;
+  const shown = open ? rows : rows.slice(0, 5);
+  return (
+    <Card label={`History (${rows.length})`} right={rows.length > 5 ? <button className="btn secondary small" onClick={() => setOpen((v) => !v)}>{open ? 'Show less' : 'Show all'}</button> : undefined}>
+      <div style={{ display: 'grid', gap: 6 }}>
+        {shown.map((r, i) => (
+          <div key={i} style={{ fontSize: 12, borderLeft: '2px solid var(--border)', paddingLeft: 8 }}>
+            <div className="hint">{fmtDate(r.at.slice(0, 10))}{r.user_name ? ` · ${r.user_name}` : ''}</div>
+            <div>{r.summary}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
 }
 
 // Loads a case that isn't in the in-memory list yet (freshly created Madrid
@@ -117,8 +139,10 @@ function OpenMissingMark({ id, onLoaded, onMissing }: { id: string; onLoaded: (m
 
 // ---------------------------------------------------------------------------- list
 
-function MarkList({ marks, canEdit, onOpen, onCreated }: { marks: Mark[]; canEdit: boolean; onOpen: (id: string) => void; onCreated: (m: Mark) => void }) {
+function MarkList({ marks, canEdit, onOpen, onCreated, onReload }: { marks: Mark[]; canEdit: boolean; onOpen: (id: string) => void; onCreated: (m: Mark) => void; onReload: () => void }) {
   const [query, setQuery] = useState('');
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [fJur, setFJur] = useState('All jurisdictions');
   const [fStatus, setFStatus] = useState('All statuses');
   const [fCompany, setFCompany] = useState('All companies');
@@ -175,6 +199,26 @@ function MarkList({ marks, canEdit, onOpen, onCreated }: { marks: Mark[]; canEdi
     </th>
   );
 
+  const visible = filtered.slice(0, limit);
+  const allSel = visible.length > 0 && visible.every((m) => sel.has(m.id));
+  const toggle = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const applyBulk = async (patch: (m: Mark) => Partial<Mark>) => {
+    setBulkBusy(true);
+    try {
+      for (const id of sel) {
+        const full = marks.find((x) => x.id === id);
+        if (full) await api.saveMark({ ...full, ...patch(full) });
+      }
+      setSel(new Set());
+      onReload();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const bulkStatus = (status: string) => { if (status) applyBulk(() => ({ status })); };
+  const bulkAttorney = () => { const a = window.prompt('Set responsible attorney for the selected cases:'); if (a) applyBulk(() => ({ attorney: a })); };
+  const bulkTag = () => { const t = window.prompt('Add a tag to the selected cases:'); if (t) applyBulk((m) => ({ tags: [...new Set([...(m.tags || []), t.trim()])] })); };
+
   return (
     <>
       <div className="filters">
@@ -198,10 +242,24 @@ function MarkList({ marks, canEdit, onOpen, onCreated }: { marks: Mark[]; canEdi
           </button>
         )}
       </div>
+      {canEdit && sel.size > 0 && (
+        <div className="card" style={{ padding: '8px 12px', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <strong>{sel.size} selected</strong>
+          {bulkBusy && <span className="hint">Applying…</span>}
+          <select disabled={bulkBusy} value="" onChange={(e) => { bulkStatus(e.target.value); e.currentTarget.value = ''; }} style={{ width: 'auto' }}>
+            <option value="">Set status…</option>
+            {statusOptions().map((s) => <option key={s}>{s}</option>)}
+          </select>
+          <button className="btn secondary small" disabled={bulkBusy} onClick={bulkAttorney}>Set attorney</button>
+          <button className="btn secondary small" disabled={bulkBusy} onClick={bulkTag}>Add tag</button>
+          <button className="btn secondary small" style={{ marginLeft: 'auto' }} onClick={() => setSel(new Set())}>Clear</button>
+        </div>
+      )}
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="list">
           <thead>
             <tr>
+              {canEdit && <th style={{ width: 28 }}><input type="checkbox" checked={allSel} onChange={() => setSel(allSel ? new Set() : new Set(visible.map((m) => m.id)))} /></th>}
               <TH k="name">Trade mark</TH>
               <TH k="type">Type</TH>
               <TH k="jurisdiction">Jurisdiction</TH>
@@ -214,8 +272,9 @@ function MarkList({ marks, canEdit, onOpen, onCreated }: { marks: Mark[]; canEdi
             </tr>
           </thead>
           <tbody>
-            {filtered.slice(0, limit).map((m) => (
+            {visible.map((m) => (
               <tr key={m.id} className="click" onClick={() => onOpen(m.id)}>
+                {canEdit && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(m.id)} onChange={() => toggle(m.id)} /></td>}
                 <td style={{ fontWeight: 600, color: 'var(--heading)' }}>{m.name || '(untitled)'}</td>
                 <td>{m.type || '—'}</td>
                 <td>{m.jurisdiction}</td>
@@ -373,6 +432,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
 
   const schema = addrSchema(m.country || '');
   const ownerCompany = companies.find((c) => (c.name || '') === (m.owner || ''));
+  const attorneyNames = useMemo(() => [...new Set(allMarks.map((x) => x.attorney).filter(Boolean))].sort() as string[], [allMarks]);
 
   // Reminder rows: show only the next not-done reminder per deadline group.
   const visibleDates = useMemo(() => {
@@ -608,9 +668,21 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             </Field>
             <div className="grid3">
               <Field label="BrandU Legal file no."><input type="text" value={m.matter} onChange={(e) => update({ matter: e.target.value })} disabled={ro} /></Field>
-              <Field label="Associates file ref."><input type="text" value={m.associateRef || ''} onChange={(e) => update({ associateRef: e.target.value })} disabled={ro} /></Field>
               <Field label="Client ref."><input type="text" value={m.clientDocket} onChange={(e) => update({ clientDocket: e.target.value })} disabled={ro} /></Field>
+              <Field label="Responsible attorney">
+                <input type="text" list="attorney-names" value={m.attorney || ''} onChange={(e) => update({ attorney: e.target.value })} disabled={ro} />
+                <datalist id="attorney-names">{attorneyNames.map((n) => <option key={n} value={n} />)}</datalist>
+              </Field>
             </div>
+            <div className="grid3">
+              <Field label="Foreign associate / agent"><input type="text" value={m.associate || ''} onChange={(e) => update({ associate: e.target.value })} disabled={ro} /></Field>
+              <Field label="Associate’s file ref."><input type="text" value={m.associateRef || ''} onChange={(e) => update({ associateRef: e.target.value })} disabled={ro} /></Field>
+              <Field label="Renewal fee estimate ($)"><input type="number" value={m.renewalFee ?? ''} onChange={(e) => update({ renewalFee: e.target.value ? Number(e.target.value) : undefined })} disabled={ro} /></Field>
+            </div>
+            <Field label="Tags">
+              <input type="text" value={(m.tags || []).join(', ')} placeholder="e.g. key brand, watch"
+                onChange={(e) => update({ tags: e.target.value.split(/[;,]+/).map((t) => t.trim()).filter(Boolean) })} disabled={ro} />
+            </Field>
           </Card>
 
           <Card
@@ -800,6 +872,8 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
               </div>
             ))}
           </Card>
+
+          <MarkHistory markId={m.id} saveState={saveState} />
 
           <Card label="Madrid Protocol">
             {isDesignation && irCase && (

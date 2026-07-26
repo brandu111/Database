@@ -43,6 +43,22 @@ describe('csvRowToMark', () => {
     expect(ren?.pinned).toBe(true);
   });
 
+  it('maps the new practice-management fields (attorney, associate, tags, fee)', () => {
+    const m = csvRowToMark({
+      MarkName: 'ACME',
+      ResponsibleAttorney: 'Natalie Brandu',
+      Associate: 'Smith IP',
+      AssociateRef: 'SIP-1',
+      Tags: 'key brand; watch',
+      RenewalFee: '$450',
+    });
+    expect(m.attorney).toBe('Natalie Brandu');
+    expect(m.associate).toBe('Smith IP');
+    expect(m.associateRef).toBe('SIP-1');
+    expect(m.tags).toEqual(['key brand', 'watch']);
+    expect(m.renewalFee).toBe(450);
+  });
+
   it('throws when the mark name is missing', () => {
     expect(() => csvRowToMark({ Jurisdiction: 'Australia' })).toThrow(/MarkName/);
   });

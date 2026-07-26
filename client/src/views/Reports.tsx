@@ -49,6 +49,13 @@ export function Reports() {
   const [sort, setSort] = useState<{ key: string; dir: number }>({ key: 'name', dir: 1 });
   const [excluded, setExcluded] = useState<string[]>([]);
 
+  // Named saved report views (column set + order + filters), stored per browser.
+  type SavedView = { colsOn: Record<string, boolean>; dateCols: string[]; order: string[]; rCompany: string; rJur: string; rStatus: string };
+  const [views, setViews] = useState<Record<string, SavedView>>(() => { try { return JSON.parse(localStorage.getItem('brandu.reportViews') || '{}'); } catch { return {}; } });
+  const persistViews = (v: Record<string, SavedView>) => { setViews(v); try { localStorage.setItem('brandu.reportViews', JSON.stringify(v)); } catch { /* ignore */ } };
+  const saveView = () => { const name = window.prompt('Save this report layout as:'); if (!name) return; persistViews({ ...views, [name.trim()]: { colsOn, dateCols, order, rCompany, rJur, rStatus } }); };
+  const loadView = (name: string) => { const v = views[name]; if (!v) return; setColsOn(v.colsOn); setDateCols(v.dateCols || []); setOrder(v.order || []); setRCompany(v.rCompany || 'All companies'); setRJur(v.rJur || 'All jurisdictions'); setRStatus(v.rStatus || 'All statuses'); };
+
   // Persist the chosen layout (which columns, and their order) between visits.
   useEffect(() => {
     try {
@@ -180,6 +187,15 @@ export function Reports() {
           </select>
           {order.length > 0 && (
             <button className="btn secondary small" title="Restore the default column order" onClick={() => setOrder([])}>Reset order</button>
+          )}
+          <span style={{ marginLeft: 'auto' }} />
+          <select value="" onChange={(e) => { if (e.target.value) loadView(e.target.value); e.currentTarget.value = ''; }} style={{ width: 'auto' }}>
+            <option value="">Saved views…</option>
+            {Object.keys(views).sort().map((n) => <option key={n}>{n}</option>)}
+          </select>
+          <button className="btn secondary small" onClick={saveView}>Save view</button>
+          {Object.keys(views).length > 0 && (
+            <button className="btn danger-link" title="Delete a saved view" onClick={() => { const n = window.prompt('Delete which saved view? (type its exact name)'); if (n && views[n]) { const v = { ...views }; delete v[n]; persistViews(v); } }}>Delete view</button>
           )}
         </div>
         <div className="hint" style={{ marginBottom: 10 }}>Drag a column heading left or right to reorder. Click a heading to sort. Your layout is saved on this computer.</div>
