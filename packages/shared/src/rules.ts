@@ -8,7 +8,7 @@ import type { OppDateMaster, OppSchedule, Rule, RuleBook } from './types.js';
  * If any built-in rule changes, bump RULES_VERSION and let migrateRules()
  * refresh stored rulebooks (user rules flagged `custom: true` survive).
  */
-export const RULES_VERSION = 9;
+export const RULES_VERSION = 10;
 
 const T_REN =
   'Dear {{client}},\n\nRe: Trade mark {{mark}} ({{jurisdiction}})\n\nThis is a reminder that the renewal deadline for the above trade mark is {{deadline}}. Please confirm whether you would like us to attend to the renewal, and we will provide a cost estimate.\n\nKind regards\nBrandU Legal';
@@ -162,7 +162,22 @@ export function defaultRules(): RuleBook {
       ...renewalChain('Registration Date', 10),
     ],
     Mexico: [
-      r('Mexico DAU deadline (3 months from WIPO renewal notice)', 'WIPO Renewal Notice Received', 3, 'months', true, '', 2),
+      // Declaration of Use (Declaración de Uso). A registrant must declare actual
+      // and effective use within the 3 months FOLLOWING the 3rd anniversary of the
+      // Mexican registration. The window opens at +3 years and the deadline falls
+      // at +3 years +3 months; a further 3-month grace (with surcharge) follows.
+      //
+      // Anchor = the Mexican registration / grant-of-protection date. For a Madrid
+      // designation of Mexico this is the DESIGNATION's own Registration Date (the
+      // date IMPI grants protection), NOT the international registration date — so
+      // the 3-year declaration is standalone to the Mexican case, national or IR.
+      r('Mexico Declaration of Use window opens (3rd anniversary)', 'Registration Date', 3, 'years', false),
+      r('Mexico Declaration of Use deadline', 'Mexico Declaration of Use window opens (3rd anniversary)', 3, 'months', true, '', 2),
+      r('Mexico DoU grace period (with surcharge)', 'Mexico Declaration of Use deadline', 3, 'months', false),
+      // A declaration of use must also accompany each renewal. For a Madrid
+      // designation the renewal date is inherited from the parent IR, so this
+      // (anchored on Renewal Deadline) correctly follows the Madrid case.
+      r('Mexico Declaration of Use (with renewal)', 'Renewal Deadline', 0, 'days', true, '', 2),
       ...renewalChain('Registration Date', 10),
     ],
   };

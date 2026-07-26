@@ -54,6 +54,30 @@ describe('Philippines DAU is a designation obligation, not an IR one', () => {
   });
 });
 
+describe('Mexico Declaration of Use', () => {
+  it('deadline = Mexican registration + 3 years + 3 months', () => {
+    const m = blankMark({ jurisdiction: 'Mexico', country: 'Mexico' });
+    m.dates.push({ name: 'Registration Date', date: '2021-05-10', done: true });
+    ensureRuleRows(m, rules);
+    expect(dateOf(m, 'Mexico Declaration of Use window opens (3rd anniversary)')).toBe('2024-05-10');
+    expect(dateOf(m, 'Mexico Declaration of Use deadline')).toBe('2024-08-10');
+  });
+
+  it('a Madrid designation of Mexico runs its DoU from its own grant date, not the IR date', () => {
+    const ir = blankMark({ id: 'ir1', jurisdiction: 'Madrid Protocol (WIPO)' });
+    ir.dates.push({ name: 'Application Filed', date: '2019-04-04', done: true });
+    const des = blankMark({ id: 'des1', jurisdiction: 'Mexico', irId: 'ir1' });
+    des.dates.push({ name: 'Application Filed', date: '2019-04-04', done: true });
+    des.dates.push({ name: 'Registration Date', date: '2021-09-01', done: true }); // IMPI grant of protection
+    const all = [ir, des];
+    ensureRuleRows(ir, rules, all);
+    ensureRuleRows(des, rules, all);
+    // Anchored on the Mexican grant date (2021-09-01) → deadline 2024-12-01,
+    // not the IR date (2019-04-04) which would give 2022-07-04.
+    expect(dateOf(des, 'Mexico Declaration of Use deadline')).toBe('2024-12-01');
+  });
+});
+
 describe('every alerting deadline gets an automatic 1-week reminder', () => {
   it('the AU acceptance deadline has a −1 week reminder', () => {
     const m = blankMark({ jurisdiction: 'Australia' });
