@@ -91,18 +91,18 @@ export function defaultRules(): RuleBook {
       r('Statement of Use Due', 'Notice of Allowance', 6, 'months', true),
       r('Opposition period expires', 'Publication Date', 30, 'days', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
-      // §8 Declaration of Use — 5th–6th year window; grace to 6.5 years.
-      // First client reminder one year out, then six months, then the automatic
-      // 1-week reminder the engine adds.
-      r('§8 Declaration of Use (5th–6th year)', 'Registration Date', 6, 'years', true, T_REN),
-      r('§8 Declaration - 1 Year Reminder', '§8 Declaration of Use (5th–6th year)', -12, 'months', true, T_REN),
-      r('§8 Declaration - 6 Month Reminder', '§8 Declaration of Use (5th–6th year)', -6, 'months', true, T_REN),
-      r('6 Month §8 Grace Period', '§8 Declaration of Use (5th–6th year)', 6, 'months', false),
+      // §8 Declaration of Use — 5th–6th year window (grace to 6.5 years). First
+      // client reminder one year out, then six months, plus the automatic 1-week
+      // reminder the engine adds. (Names kept template-compatible.)
+      r('US Declaration of Use (5th-6th year)', 'Registration Date', 6, 'years', true, T_REN),
+      r('US Declaration of Use (5th-6th year) - 1 Year Reminder', 'US Declaration of Use (5th-6th year)', -12, 'months', true, T_REN),
+      r('US Declaration of Use (5th-6th year) - 6 Month Reminder', 'US Declaration of Use (5th-6th year)', -6, 'months', true, T_REN),
+      r('6 Month DOU Grace Period', 'US Declaration of Use (5th-6th year)', 6, 'months', false),
       // §8 & §9 combined Declaration + Renewal — 9th–10th year, then every 10 years.
-      // This is the US renewal; the standard renewal chain provides the ongoing
-      // 10-year cycle and its reminders, and we add the one-year lead reminder.
-      r('§8 & §9 Declaration + Renewal (9th–10th year)', 'Renewal Deadline', 0, 'days', true, T_REN),
-      r('Renewal Reminder - 1 Year', 'Renewal Deadline', -12, 'months', true, T_REN),
+      // First reminder one year out, then six months.
+      r('US Declaration of Use / Renewal (9th-10th year)', 'Registration Date', 10, 'years', true, T_REN),
+      r('US Declaration of Use / Renewal (9th-10th year) - 1 Year Reminder', 'US Declaration of Use / Renewal (9th-10th year)', -12, 'months', true, T_REN),
+      r('US Declaration of Use / Renewal (9th-10th year) - 6 Month Reminder', 'US Declaration of Use / Renewal (9th-10th year)', -6, 'months', true, T_REN),
       ...renewalChain('Registration Date', 10),
     ],
     'United Kingdom': [
@@ -232,8 +232,24 @@ export function defaultOppDatesMaster(): OppDateMaster[] {
  * Per-jurisdiction opposition timelines. Verified against the IP offices
  * (2025-26); keep the notes/citations attached to the generated rows.
  */
-export function oppSchedule(jurisdiction: string): OppSchedule | null {
+export function oppSchedule(jurisdiction: string, kind = ''): OppSchedule | null {
   const jur = (jurisdiction || '').toLowerCase();
+  // Australian non-use removal (s92): opposing the removal. Same offsets as a
+  // standard opposition, but reversed party roles and its own anchor. The
+  // registered owner opposes; the removal applicant defends.
+  if (jur.includes('australia') && /non.?use|removal|s92|92/i.test(kind))
+    return {
+      anchor: 'Non-use removal application advertised',
+      role: 'Non-use removal (s92) · opposing removal · from advertisement',
+      steps: [
+        { name: 'Notice of Intention to Oppose (removal) due', off: 2, unit: 'm', from: 'anchor', note: 'Registered owner · 2 months from advertisement of the removal application (reg 9.4, non-extendable)' },
+        { name: 'Statement of Grounds & Particulars due', off: 1, unit: 'm', from: 'Notice of Intention to Oppose (removal) due', note: '1 month after the notice of intention to oppose' },
+        { name: 'Notice of Intention to Defend (removal) due', off: 1, unit: 'm', from: 'Statement of Grounds & Particulars due', note: 'Removal applicant · 1 month from being given the SGP' },
+        { name: 'Evidence in Support due', off: 3, unit: 'm', from: 'Notice of Intention to Defend (removal) due', note: 'Registered owner (onus to show use) · 3 months from the NID' },
+        { name: 'Evidence in Answer due', off: 3, unit: 'm', from: 'Evidence in Support due', note: 'Removal applicant · 3 months' },
+        { name: 'Evidence in Reply due', off: 2, unit: 'm', from: 'Evidence in Answer due', note: 'Registered owner · 2 months' },
+      ],
+    };
   if (jur.includes('australia'))
     return {
       anchor: 'Acceptance advertised',
@@ -241,7 +257,7 @@ export function oppSchedule(jurisdiction: string): OppSchedule | null {
       steps: [
         { name: 'Notice of Intention to Oppose due', off: 2, unit: 'm', from: 'anchor', note: '2 months from advertisement (non-extendable)' },
         { name: 'Statement of Grounds & Particulars due', off: 1, unit: 'm', from: 'Notice of Intention to Oppose due', note: '1 month after NIO' },
-        { name: 'Notice of Intention to Defend due', off: 2, unit: 'm', from: 'Statement of Grounds & Particulars due', note: 'Applicant · 2 months from being given the SGP (reg 5.13; IRDA holder: 2 months from Registrar notifying the International Bureau, reg 17A.34H)' },
+        { name: 'Notice of Intention to Defend due', off: 1, unit: 'm', from: 'Statement of Grounds & Particulars due', note: 'Applicant · 1 month from being given the SGP (reg 5.13). Madrid/IRDA holder: 2 months (reg 17A.34H)' },
         { name: 'Evidence in Support due', off: 3, unit: 'm', from: 'Notice of Intention to Defend due', note: 'Opponent · 3 months from the day the opponent is given a copy of the NID' },
         { name: 'Evidence in Answer due', off: 3, unit: 'm', from: 'Evidence in Support due', note: 'Applicant · 3 months from being given the complete Evidence in Support (or notice that none was filed)' },
         { name: 'Evidence in Reply due', off: 2, unit: 'm', from: 'Evidence in Answer due', note: 'Opponent · 2 months from being given the Evidence in Answer' },
@@ -311,8 +327,10 @@ export function oppSchedule(jurisdiction: string): OppSchedule | null {
         { name: 'Statement of grounds due', off: 30, unit: 'd', from: 'Opposition due', note: 'Grounds within 30 days of opposition (foreign opponents: +60 days on request)' },
       ],
     };
-  // ---- Additional major jurisdictions (first-pass defaults — please verify the
-  // statutory periods for the specific matter; each generated row is editable).
+  // ---- Additional major jurisdictions. Initial opposition periods and the main
+  // subsequent steps were checked against the IP offices in 2026 (CIPO, CNIPA,
+  // IPOS, DPMA, India TMR, IMPI, KIPO, INPI). Extensions and case-managed evidence
+  // deadlines vary — each generated row remains editable per matter.
   if (jur.includes('canada'))
     return {
       anchor: 'Advertised in Trademarks Journal',
@@ -371,8 +389,8 @@ export function oppSchedule(jurisdiction: string): OppSchedule | null {
       anchor: 'Published in Official Gazette',
       role: 'IMPI · from publication',
       steps: [
-        { name: 'Opposition due', off: 1, unit: 'm', from: 'anchor', note: '1 month from publication' },
-        { name: 'Applicant response due', off: 1, unit: 'm', from: 'Opposition due', note: 'Applicant · 1 month' },
+        { name: 'Opposition due', off: 1, unit: 'm', from: 'anchor', note: '1 month from publication (non-extendable)' },
+        { name: 'Applicant response due', off: 2, unit: 'm', from: 'Opposition due', note: 'Applicant · 2 months, automatically extendable by a further 2 months' },
       ],
     };
   if (jur.includes('korea'))
@@ -380,8 +398,8 @@ export function oppSchedule(jurisdiction: string): OppSchedule | null {
       anchor: 'Published for opposition',
       role: 'KIPO · post-publication, pre-registration',
       steps: [
-        { name: 'Opposition due', off: 2, unit: 'm', from: 'anchor', note: '2 months from publication (non-extendable)' },
-        { name: 'Statement of grounds / evidence due', off: 30, unit: 'd', from: 'Opposition due', note: 'Grounds may be supplemented within 30 days' },
+        { name: 'Opposition due', off: 30, unit: 'd', from: 'anchor', note: '30 days from publication — reduced from 2 months, effective 22 July 2025 (non-extendable)' },
+        { name: 'Statement of grounds / evidence due', off: 30, unit: 'd', from: 'Opposition due', note: 'Opponent may supplement the grounds within a further 30 days' },
       ],
     };
   if (jur.includes('brazil'))

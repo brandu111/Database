@@ -153,7 +153,7 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
     [canEdit, doSave]
   );
 
-  const sched = oppSchedule(o.jurisdiction);
+  const sched = oppSchedule(o.jurisdiction, o.kind);
   const ro = !canEdit;
 
   const getFromTemplate = async () => {
@@ -207,8 +207,16 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
               <Field label="Client (client company)"><input type="text" value={o.client} disabled={ro} onChange={(e) => update({ client: e.target.value })} /></Field>
               <Field label="Opposition company"><input type="text" value={o.opponent} disabled={ro} onChange={(e) => update({ opponent: e.target.value })} /></Field>
             </div>
-            <div className="grid3">
+            <div className="grid2">
               <Field label="Proceeding no."><input type="text" value={o.proceeding} disabled={ro} onChange={(e) => update({ proceeding: e.target.value })} /></Field>
+              <Field label="Proceeding type">
+                <select value={o.kind || 'Opposition'} disabled={ro} onChange={(e) => update({ kind: e.target.value }, true)}>
+                  <option>Opposition</option>
+                  <option>Non-use removal</option>
+                </select>
+              </Field>
+            </div>
+            <div className="grid2">
               <Field label="Jurisdiction">
                 <input type="text" list="opp-jur" value={o.jurisdiction} disabled={ro} onChange={(e) => update({ jurisdiction: e.target.value })} />
                 <datalist id="opp-jur">{jurList().map((j) => <option key={j} value={j} />)}</datalist>

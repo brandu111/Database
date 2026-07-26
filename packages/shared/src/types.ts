@@ -204,6 +204,9 @@ export interface Opposition {
   opponent: string;
   proceeding: string;
   jurisdiction: string;
+  /** Proceeding type — 'Opposition' (default) or 'Non-use removal'. Selects which
+   * date template "Get dates from template" applies. */
+  kind?: string;
   status: string;
   /** true = client is Plaintiff (opposing), false = Defendant (defending). */
   clientIsPlaintiff: boolean;

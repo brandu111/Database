@@ -175,6 +175,14 @@ function fixTemplateMappings(db: DB): void {
     { id: 'au-28', from: '', to: 'Accepted - Awaiting Advertisement' },
     { id: 'au-29', from: 'Opposition period expires', to: 'Publication Date' },
     { id: 'au-32', from: 'Renewal Deadline', to: 'Registration Date' },
+    // AU examination uses a single "Acceptance Deadline", not "OA Response Due".
+    { id: 'au-10', from: 'OA Response Due', to: 'Acceptance Deadline' },
+    { id: 'au-12', from: 'OA Response Due', to: 'Acceptance Deadline' },
+    { id: 'au-14', from: 'OA Response Due', to: 'Acceptance Deadline' },
+    { id: 'au-76', from: 'OA Response Due', to: 'Acceptance Deadline' },
+    { id: 'au-30', from: 'Registration Fee Due', to: 'Opposition period expires' },
+    // US certificate of registration belongs on the registration date.
+    { id: 'us-6', from: 'US Declaration of Use (5th-6th year)', to: 'Registration Date' },
   ];
   for (const f of fixes) {
     const row = db.prepare('SELECT doc FROM email_templates WHERE id=?').get(f.id) as { doc: string } | undefined;
@@ -792,7 +800,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const o = getOpposition(db, req.params.id);
     if (!o) return res.status(404).json({ error: 'Not found' });
     o.dates = o.dates || [];
-    const sched = oppSchedule(o.jurisdiction);
+    const sched = oppSchedule(o.jurisdiction, o.kind);
     const anchorDate = req.body?.anchorDate ? String(req.body.anchorDate) : '';
     if (sched && anchorDate) {
       const resolved: Record<string, string> = {};

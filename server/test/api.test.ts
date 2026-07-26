@@ -218,10 +218,11 @@ describe('oppositions', () => {
     const byName = Object.fromEntries(o.dates.map((d: { name: string; date: string }) => [d.name, d.date]));
     expect(byName['Notice of Intention to Oppose due']).toBe('2025-03-10');
     expect(byName['Statement of Grounds & Particulars due']).toBe('2025-04-10');
-    expect(byName['Notice of Intention to Defend due']).toBe('2025-06-10');
-    expect(byName['Evidence in Support due']).toBe('2025-09-10');
-    expect(byName['Evidence in Answer due']).toBe('2025-12-10');
-    expect(byName['Evidence in Reply due']).toBe('2026-02-10');
+    // NID = SGP + 1 month (reg 5.13), then evidence rounds 3m / 3m / 2m.
+    expect(byName['Notice of Intention to Defend due']).toBe('2025-05-10');
+    expect(byName['Evidence in Support due']).toBe('2025-08-10');
+    expect(byName['Evidence in Answer due']).toBe('2025-11-10');
+    expect(byName['Evidence in Reply due']).toBe('2026-01-10');
     const nid = o.dates.find((d: { name: string }) => d.name === 'Notice of Intention to Defend due');
     expect(nid.note).toContain('reg 5.13');
   });

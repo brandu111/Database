@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyStage, ensureRuleRows, linkDesignationRenewal } from '../src/engine.js';
-import { defaultRules, migrateRules, RULES_VERSION } from '../src/rules.js';
+import { defaultRules, migrateRules, oppSchedule, RULES_VERSION } from '../src/rules.js';
 import type { Mark, RuleBook } from '../src/types.js';
 
 function blankMark(over: Partial<Mark> = {}): Mark {
@@ -51,6 +51,26 @@ describe('Philippines DAU is a designation obligation, not an IR one', () => {
     m.dates.push({ name: 'Application Filed', date: '2020-01-01', done: true });
     ensureRuleRows(m, rules);
     expect(dateOf(m, 'Philippines DAU deadline (3 years from filing)')).toBe('2023-01-01');
+  });
+});
+
+describe('opposition schedules', () => {
+  it('AU standard opposition: NIO 2m, SGP +1m, NID +1m, evidence 3/3/2', () => {
+    const s = oppSchedule('Australia')!;
+    expect(s.steps.find((x) => /Intention to Defend/i.test(x.name))!.off).toBe(1);
+    expect(s.steps.find((x) => /Intention to Oppose/i.test(x.name))!.off).toBe(2);
+  });
+  it('AU non-use removal uses its own anchor and roles', () => {
+    const s = oppSchedule('Australia', 'Non-use removal')!;
+    expect(s.anchor).toMatch(/non-use removal/i);
+    expect(s.steps.find((x) => /Intention to Oppose \(removal\)/i.test(x.name))!.off).toBe(2);
+    expect(s.steps.find((x) => /Intention to Defend \(removal\)/i.test(x.name))!.off).toBe(1);
+  });
+  it('South Korea opposition is 30 days from publication (2025 reform)', () => {
+    const s = oppSchedule('South Korea')!;
+    const opp = s.steps.find((x) => /Opposition due/i.test(x.name))!;
+    expect(opp.off).toBe(30);
+    expect(opp.unit).toBe('d');
   });
 });
 
@@ -192,7 +212,7 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     expect(dateOf(m, 'OA Response Due')).toBe('2018-07-15');
     expect(dateOf(m, 'Renewal Deadline')).toBe('2028-02-13');
     // §8 Declaration of Use falls in the 5th–6th year (6 years from registration).
-    expect(dateOf(m, '§8 Declaration of Use (5th–6th year)')).toBe('2024-02-13');
+    expect(dateOf(m, 'US Declaration of Use (5th-6th year)')).toBe('2024-02-13');
     // Engine adds an automatic 1-week reminder before the OA response deadline.
     expect(dateOf(m, 'OA Response Due — 1 Week Reminder')).toBe('2018-07-08');
   });
