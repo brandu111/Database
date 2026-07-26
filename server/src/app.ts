@@ -183,6 +183,10 @@ function fixTemplateMappings(db: DB): void {
     { id: 'au-30', from: 'Registration Fee Due', to: 'Opposition period expires' },
     // US certificate of registration belongs on the registration date.
     { id: 'us-6', from: 'US Declaration of Use (5th-6th year)', to: 'Registration Date' },
+    // AU opposition-stage emails must match the schedule's date names exactly
+    // (ampersand + title case) so the send button appears on those dates.
+    { id: 'au-55', from: 'Statement of Grounds and Particulars due', to: 'Statement of Grounds & Particulars due' },
+    { id: 'au-56', from: 'Notice of intention to defend due', to: 'Notice of Intention to Defend due' },
   ];
   for (const f of fixes) {
     const row = db.prepare('SELECT doc FROM email_templates WHERE id=?').get(f.id) as { doc: string } | undefined;

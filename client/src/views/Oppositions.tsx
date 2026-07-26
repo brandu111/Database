@@ -1,8 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fmtDate, jurList, oppSchedule, todayISO, type Opposition } from '@brandu/shared';
+import { fmtDate, jurList, oppSchedule, todayISO, type EmailTemplate, type FirmSettings, type Mark, type Opposition, type OppositionDate, type RuleBook } from '@brandu/shared';
 import type { Nav } from '../App';
 import { api } from '../api';
+import { buildDeadlineEmail, templateForDate, type ComposedEmail } from '../email';
+import { EmailComposeModal } from '../EmailComposeModal';
 import { Card, Field, StatusBadge, confirmDelete } from '../ui';
+
+/** Adapt an opposition into a mark-shaped object so it can reuse the email
+ * merge / template machinery. The mark at issue is the client's mark (falling
+ * back to the opponent's, then the opposition name). */
+function oppositionToMark(o: Opposition): Mark {
+  const cm = (o.clientMarks && o.clientMarks[0]) || (o.oppMarks && o.oppMarks[0]) || { name: '', application: '', registration: '' };
+  return {
+    name: cm.name || o.name || '',
+    application: cm.application || '',
+    registration: cm.registration || '',
+    jurisdiction: o.jurisdiction || '',
+    owner: o.client || '',
+    status: o.status || '',
+    matter: o.proceeding || '',
+    contacts: (o.contacts || []).map((c) => ({ name: c.name || '', company: c.company || '', position: c.position || c.role || '', phone: c.phone || '', email: c.email || '' })),
+    dates: (o.dates || []).map((d) => ({ name: d.name, date: d.date, done: d.done })),
+    image: null,
+    classes: '',
+  } as unknown as Mark;
+}
 
 const OPP_STATUSES = [
   'Opposition filed',
@@ -127,9 +149,34 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
   const [o, setO] = useState(initial);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [anchorDate, setAnchorDate] = useState('');
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [rules, setRules] = useState<RuleBook>({});
+  const [firm, setFirm] = useState<FirmSettings | null>(null);
+  const [mySignature, setMySignature] = useState('');
+  const [email, setEmail] = useState<(ComposedEmail & { title: string }) | null>(null);
+  const [sending, setSending] = useState('');
   const timer = useRef<number | null>(null);
   const latest = useRef(o);
   latest.current = o;
+
+  useEffect(() => {
+    api.templates().then(setTemplates, () => undefined);
+    api.rules().then((r) => setRules(r.rules), () => undefined);
+    api.settings().then(setFirm, () => undefined);
+    api.me().then((m) => { if (m.kind === 'staff') setMySignature(m.signature || ''); }, () => undefined);
+  }, []);
+
+  const oppMark = useMemo(() => oppositionToMark(o), [o]);
+  const emailForDate = (d: OppositionDate) => templateForDate(oppMark, d.name, undefined, templates, rules);
+  const sendDateEmail = async (d: OppositionDate) => {
+    setSending(d.name);
+    try {
+      const built = await buildDeadlineEmail({ mark: oppMark, dateName: d.name, date: d.date, templates, rules, firm, mySignature });
+      if (built) setEmail({ ...built, title: `${o.name || 'opposition'} — ${d.name}` });
+    } finally {
+      setSending('');
+    }
+  };
 
   const doSave = useCallback(async () => {
     setSaveState('saving');
@@ -258,7 +305,7 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
             {(o.dates || []).length === 0 && <div className="hint">No dates yet.</div>}
             {(o.dates || []).length > 0 && (
               <table className="list">
-                <thead><tr><th style={{ width: 28 }}>✓</th><th style={{ width: 140 }}>Date</th><th>Name</th><th>Note</th><th style={{ width: 80 }}>Suspend</th><th /></tr></thead>
+                <thead><tr><th style={{ width: 28 }}>✓</th><th style={{ width: 140 }}>Date</th><th>Name</th><th>Note</th><th style={{ width: 80 }}>Suspend</th><th /><th /></tr></thead>
                 <tbody>
                   {o.dates.map((d, i) => (
                     <tr key={i} style={{ opacity: d.suspend ? 0.55 : 1 }}>
@@ -270,6 +317,11 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
                         <input type="checkbox" checked={!!d.suspend} disabled={ro} title="Suspend (hidden from alerts)"
                           onChange={() => update({ dates: o.dates.map((x, j) => (j === i ? { ...x, suspend: !x.suspend } : x)) }, true)} />
                       </td>
+                      <td>{emailForDate(d) && (
+                        <button className="btn secondary small email-btn" title="Send the email linked to this stage" disabled={sending === d.name} onClick={() => sendDateEmail(d)}>
+                          {sending === d.name ? '…' : <span className="email-ico">✉</span>}
+                        </button>
+                      )}</td>
                       <td>{canEdit && <button className="btn danger-link" onClick={() => update({ dates: o.dates.filter((_, j) => j !== i) }, true)}>✕</button>}</td>
                     </tr>
                   ))}
@@ -311,6 +363,7 @@ function OppositionDetail({ initial, canEdit, onBack, onChanged, onDeleted }: {
           </Card>
         </div>
       </div>
+      {email && <EmailComposeModal email={email} title={email.title} onClose={() => setEmail(null)} />}
     </>
   );
 }

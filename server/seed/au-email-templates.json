@@ -329,7 +329,7 @@
       "jurisdiction": "Australia",
       "category": "Opposition proceedings",
       "stage": "Notice of intention to oppose filed",
-      "dateField": "Statement of Grounds and Particulars due",
+      "dateField": "Statement of Grounds & Particulars due",
       "subject": "[FileNumber] - [CompanyName] - [TrademarkName] - Notice of intention to oppose filed",
       "body": "Hi [FirstName],\n\nI refer to our email of [DATE] and confirm that I have today filed the Notice of Intention to Oppose Application No. [OPPOSED APPLICATION].\n\nWe now have until [statementofgroundsandparticulars] to file the Statement of Grounds and Particulars (SGP) to finalise the opposition process. I will prepare the SGP and forward this to you for your review and approval."
     },
@@ -339,7 +339,7 @@
       "jurisdiction": "Australia",
       "category": "Opposition proceedings",
       "stage": "Statement of grounds and particulars filed",
-      "dateField": "Notice of intention to defend due",
+      "dateField": "Notice of Intention to Defend due",
       "subject": "Statement of grounds and particulars",
       "body": "Hi [FirstName],\n\nI confirm that we have today filed the Statement of Grounds and Particulars in order to complete the filing of the Notice of Opposition to Application No. [OPPOSED APPLICATION].\n\nThe Applicant now has until [Noticeofintentiontodefend] to file its Notice of Intention to Defend. If the Applicant does not file this document by the due date, the opposition will be dismissed and the opposed application will lapse. I will keep you informed of the progress of this matter."
     },
