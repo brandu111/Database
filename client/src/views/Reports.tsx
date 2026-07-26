@@ -120,17 +120,19 @@ export function Reports() {
 
   const buildTableHtml = (images: Record<string, string>) => {
     const esc = (s: unknown) => String(s ?? '').split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
-    const cellStyle = 'border:1px solid #999;padding:5px 8px;font-family:Calibri,Arial,sans-serif;font-size:11pt';
+    const cellStyle = 'border:1px solid #999;padding:3px 5px;font-family:Calibri,Arial,sans-serif;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word';
     const th = activeCols.map((c) => `<th style="${cellStyle};background:#eee;text-align:left">${esc(c.label)}</th>`).join('');
     const cell = (c: { key: string; val: (m: Mark) => string }, m: Mark) => {
-      if (c.key === 'name' && images[m.id]) return `<img src="${images[m.id]}" style="max-height:44px;max-width:170px" />`;
+      if (c.key === 'name' && images[m.id]) return `<img src="${images[m.id]}" style="max-height:40px;max-width:140px" />`;
       return esc(c.val(m) || '');
     };
     const trs = sorted.map((m) => `<tr>${activeCols.map((c) => `<td style="${cellStyle}">${cell(c, m)}</td>`).join('')}</tr>`).join('');
-    const logo = settings?.logo ? `<img src="${settings.logo}" style="max-height:60px;margin-bottom:8px"><br>` : '';
-    const title = `<div style="font-family:Calibri,Arial,sans-serif;font-size:16pt;font-weight:bold;margin-bottom:2px">${esc(settings?.lawFirmName || 'BrandU Legal')} — Trade Marks Report</div>`;
-    const sub = `<div style="font-family:Calibri,Arial,sans-serif;font-size:10pt;color:#555;margin-bottom:10px">${esc(fmtDate(todayISO()))} · ${sorted.length} matters</div>`;
-    return `${logo}${title}${sub}<table style="border-collapse:collapse"><tr>${th}</tr>${trs}</table>`;
+    const logo = settings?.logo ? `<img src="${settings.logo}" style="max-height:56px;margin-bottom:8px"><br>` : '';
+    const title = `<div style="font-family:Calibri,Arial,sans-serif;font-size:15pt;font-weight:bold;margin-bottom:2px">${esc(settings?.lawFirmName || 'BrandU Legal')} — Trade Marks Report</div>`;
+    const sub = `<div style="font-family:Calibri,Arial,sans-serif;font-size:9pt;color:#555;margin-bottom:10px">${esc(fmtDate(todayISO()))} · ${sorted.length} matters</div>`;
+    // width:100% + table-layout:fixed makes the columns share the page width and
+    // wrap rather than run off the edge.
+    return `${logo}${title}${sub}<table style="border-collapse:collapse;width:100%;table-layout:fixed"><tr>${th}</tr>${trs}</table>`;
   };
 
   const download = async (mime: string, ext: string) => {
@@ -147,7 +149,15 @@ export function Reports() {
           })
       );
     }
-    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body>${buildTableHtml(images)}</body></html>`;
+    // MSO page setup: A4 landscape with a small (1cm) margin. Word honours the
+    // @page/Section1 rule; Excel ignores it and uses its own page setup.
+    const styles = `<style>
+      @page Section1 { size: 29.7cm 21.0cm; mso-page-orientation: landscape; margin: 1cm 1cm 1cm 1cm; }
+      div.Section1 { page: Section1; }
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      td, th { word-wrap: break-word; overflow-wrap: break-word; }
+    </style>`;
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">${styles}</head><body><div class="Section1">${buildTableHtml(images)}</div></body></html>`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([html], { type: mime }));
     a.download = `trade-marks-report.${ext}`;
