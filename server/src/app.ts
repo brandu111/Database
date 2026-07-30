@@ -577,20 +577,31 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.post('/api/marks/import', full, (req, res) => {
     const rows: Record<string, string>[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!rows.length) return res.status(400).json({ error: 'No rows to import.' });
+    // Build every case in memory and run the engine per row WITHOUT re-reading the
+    // portfolio each time (that made a large import O(n²) and time out). Imported
+    // cases are standalone (no Madrid family links until linked in-app), so the
+    // engine doesn't need the full set here. Persist in one transaction.
+    const rules = loadRules(db);
     const errors: { line: number; error: string }[] = [];
-    let imported = 0;
+    const built: Mark[] = [];
     rows.forEach((row, i) => {
       try {
-        const partial = csvRowToMark(row);
-        const m = blankMark(partial);
-        processMarkWrite(db, m, null);
-        recordHistory(db, m.id, 'Import', 'Case created (CSV import)');
-        imported++;
+        const m = blankMark(csvRowToMark(row));
+        ensureRuleRows(m, rules);
+        m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+        built.push(m);
       } catch (e) {
         errors.push({ line: i + 2, error: (e as Error).message }); // +2: header row + 1-indexed
       }
     });
-    res.json({ imported, errors, total: rows.length });
+    const tx = db.transaction(() => {
+      for (const m of built) {
+        saveMark(db, m);
+        recordHistory(db, m.id, 'Import', 'Case created (CSV import)');
+      }
+    });
+    tx();
+    res.json({ imported: built.length, errors, total: rows.length });
   });
 
   // Delete EVERY case (and, implicitly, their Madrid links). Full permissions,
