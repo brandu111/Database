@@ -180,7 +180,7 @@ export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
   const goods = gs
     .map((g) => (gClass(g) ? `Class ${gClass(g)}: ${gText(g)}` : gText(g)))
     .filter(Boolean)
-    .join('\n');
+    .join('\n\n'); // blank line between classes for readability
   const fromText = [...goods.matchAll(/\bclass(?:es)?\s*[:.]?\s*(\d{1,2})/gi)].map((mm) => mm[1]);
   const classes = [...new Set([...fromRows, ...fromTop, ...fromText])]
     .filter((c) => Number(c) >= 1 && Number(c) <= 45)

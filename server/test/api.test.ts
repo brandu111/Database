@@ -285,6 +285,25 @@ describe('bulk import & clear', () => {
     expect(alerts.some((a) => /priority/i.test(a.text) && a.date === soon)).toBe(true); // open priority kept
   });
 
+  it('auto-creates a contact for a new case owner not already listed', async () => {
+    const before = (await admin.get('/api/companies')).body as { name: string }[];
+    expect(before.some((c) => c.name === 'Brand New Owner Pty Ltd')).toBe(false);
+    const m = (await admin.post('/api/marks').send({ name: 'AUTOOWN', jurisdiction: 'Australia' }).expect(201)).body;
+    m.owner = 'Brand New Owner Pty Ltd';
+    m.city = 'Sydney';
+    await admin.put(`/api/marks/${m.id}`).send(m).expect(200);
+    const after = (await admin.get('/api/companies')).body as { name: string; contactType?: string; city?: string }[];
+    const created = after.find((c) => c.name === 'Brand New Owner Pty Ltd');
+    expect(created).toBeTruthy();
+    expect(created!.contactType).toBe('Owner');
+    expect(created!.city).toBe('Sydney');
+    // Saving another case for the same owner does not duplicate the contact.
+    const m2 = (await admin.post('/api/marks').send({ name: 'AUTOOWN2', jurisdiction: 'Australia', owner: 'Brand New Owner Pty Ltd' }).expect(201)).body;
+    expect(m2).toBeTruthy();
+    const finalCount = ((await admin.get('/api/companies')).body as { name: string }[]).filter((c) => c.name === 'Brand New Owner Pty Ltd').length;
+    expect(finalCount).toBe(1);
+  });
+
   it('bulk-delete is restricted to Natalie', async () => {
     const a = (await admin.post('/api/marks').send({ name: 'DEL A', jurisdiction: 'Australia' }).expect(201)).body;
     const b = (await admin.post('/api/marks').send({ name: 'DEL B', jurisdiction: 'Australia' }).expect(201)).body;

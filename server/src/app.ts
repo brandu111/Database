@@ -127,6 +127,7 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   const touched = all.filter((x) => x.id === m.id || x.irId === m.id);
   const tx = db.transaction(() => touched.forEach((x) => saveMark(db, x)));
   tx();
+  ensureOwnerCompany(db, m);
   // Notify the staff member attributed to any newly added, alert-flagged date
   // that action is required in the system. Only fires for genuinely new rows.
   if (mailerConfigured()) {
@@ -221,6 +222,41 @@ function fixTemplateMappings(db: DB): void {
       /* leave malformed rows alone */
     }
   }
+}
+
+/**
+ * When a case's owner isn't already a contact, create a company record for them
+ * so the case links to a contact and the owner appears under the Contacts tab.
+ * Matched case/space/punctuation-insensitively; carries across any address the
+ * case holds. Never creates duplicates and never overwrites an existing record.
+ */
+function ensureOwnerCompany(db: DB, m: Mark): void {
+  const owner = (m.owner || '').trim();
+  if (!owner) return;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const key = norm(owner);
+  if (!key) return;
+  if (listCompanies(db).some((c) => norm(c.name || '') === key)) return;
+  const abnAcn = [m.ownerAbn ? `ABN ${m.ownerAbn}` : '', m.ownerAcn ? `ACN ${m.ownerAcn}` : ''].filter(Boolean).join(' · ');
+  const company: Company = {
+    id: newId('c'),
+    type: m.ownerType === 'Individual' ? 'Individual' : 'Company',
+    contactType: 'Owner',
+    name: owner,
+    first: m.ownerFirst || '',
+    last: m.ownerLast || '',
+    address: m.address1 || '',
+    address2: m.address2 || '',
+    city: m.city || '',
+    state: m.state || '',
+    zip: m.zip || '',
+    country: m.country || '',
+    phone: m.phone || '',
+    email: '',
+    notes: abnAcn,
+    contacts: [],
+  } as Company;
+  saveCompany(db, company);
 }
 
 function recordHistory(db: DB, markId: string, userName: string, summary: string): void {
@@ -525,6 +561,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.post('/api/marks', edit, (req, res) => {
     const m = blankMark(req.body || {});
     saveMark(db, m);
+    ensureOwnerCompany(db, m);
     const s = readSession(db, req);
     recordHistory(db, m.id, s?.kind === 'staff' ? s.name : '', 'Case created');
     res.status(201).json(m);

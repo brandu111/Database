@@ -104,19 +104,13 @@ export function Trademarks({ nav, go, canEdit }: Props) {
 // saved (saveState flips back to 'saved').
 function MarkHistory({ markId, saveState }: { markId: string; saveState: string }) {
   const [rows, setRows] = useState<{ at: string; user_name: string; summary: string }[]>([]);
-  const [open, setOpen] = useState(false);
   useEffect(() => { api.markHistory(markId).then(setRows, () => undefined); }, [markId, saveState]);
   if (rows.length === 0) return null;
-  const shown = open ? rows : rows.slice(0, 5);
+  const last = rows[0]; // history is returned most-recent first
   return (
-    <Card label={`History (${rows.length})`} right={rows.length > 5 ? <button className="btn secondary small" onClick={() => setOpen((v) => !v)}>{open ? 'Show less' : 'Show all'}</button> : undefined}>
-      <div style={{ display: 'grid', gap: 6 }}>
-        {shown.map((r, i) => (
-          <div key={i} style={{ fontSize: 12, borderLeft: '2px solid var(--border)', paddingLeft: 8 }}>
-            <div className="hint">{fmtDate(r.at.slice(0, 10))}{r.user_name ? ` · ${r.user_name}` : ''}</div>
-            <div>{r.summary}</div>
-          </div>
-        ))}
+    <Card label="History">
+      <div className="hint">
+        Last updated by <strong>{last.user_name || 'system'}</strong> on {fmtDate(last.at.slice(0, 10))}.
       </div>
     </Card>
   );
@@ -704,19 +698,13 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 </select>
               </Field>
             </div>
-            <div className="grid3">
-              <Field label="Foreign associate / agent">
-                <input type="text" list="associate-contacts" value={m.associate || ''} onChange={(e) => update({ associate: e.target.value })} disabled={ro}
-                  placeholder="Start typing to pull from Contacts…" />
-                <datalist id="associate-contacts">{companies.map((c) => <option key={c.id} value={c.name} />)}</datalist>
-              </Field>
-              <Field label="Associate’s file ref."><input type="text" value={m.associateRef || ''} onChange={(e) => update({ associateRef: e.target.value })} disabled={ro} /></Field>
+            <div className="grid2">
               <Field label="Renewal fee estimate ($)"><input type="number" value={m.renewalFee ?? ''} onChange={(e) => update({ renewalFee: e.target.value ? Number(e.target.value) : undefined })} disabled={ro} /></Field>
+              <Field label="Tags">
+                <input type="text" value={(m.tags || []).join(', ')} placeholder="e.g. key brand, watch"
+                  onChange={(e) => update({ tags: e.target.value.split(/[;,]+/).map((t) => t.trim()).filter(Boolean) })} disabled={ro} />
+              </Field>
             </div>
-            <Field label="Tags">
-              <input type="text" value={(m.tags || []).join(', ')} placeholder="e.g. key brand, watch"
-                onChange={(e) => update({ tags: e.target.value.split(/[;,]+/).map((t) => t.trim()).filter(Boolean) })} disabled={ro} />
-            </Field>
           </Card>
 
           <Card
@@ -766,6 +754,49 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
               </Field>
               <Field label="Phone"><input type="text" value={m.phone} onChange={(e) => update({ phone: e.target.value })} disabled={ro} /></Field>
             </div>
+          </Card>
+
+          <Card label="Case contacts" right={canEdit ? (
+            <div className="row">
+              {ownerCompany?.contacts?.length ? <button className="btn secondary small" onClick={importOwnerContacts}>Import from owner</button> : null}
+              <button className="btn small" onClick={() => update({ contacts: [...(m.contacts || []), { name: '', company: m.owner, position: '', phone: '', email: '' }] }, true)}>+ Add contact</button>
+            </div>
+          ) : undefined}>
+            <div className="grid2">
+              <Field label="Foreign associate / agent">
+                <input type="text" list="associate-contacts" value={m.associate || ''} onChange={(e) => update({ associate: e.target.value })} disabled={ro}
+                  placeholder="Start typing to pull from Contacts…" />
+                <datalist id="associate-contacts">{companies.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+              </Field>
+              <Field label="Associate’s file ref."><input type="text" value={m.associateRef || ''} onChange={(e) => update({ associateRef: e.target.value })} disabled={ro} /></Field>
+            </div>
+            {(m.contacts || []).length === 0 && (
+              <div className="hint" style={{ marginTop: 4 }}>No contacts on this case{ownerCompany?.contacts?.length ? ' — import them from the owner record.' : '. Add one, or set an owner with contacts.'}</div>
+            )}
+            {(m.contacts || []).length > 0 && (
+              <table className="list" style={{ marginTop: 6 }}>
+                <thead><tr><th>Name</th><th>Company</th><th>Position</th><th>Phone</th><th>Email</th><th /></tr></thead>
+                <tbody>
+                  {m.contacts.map((c, i) => (
+                    <tr key={i}>
+                      {(['name', 'company', 'position', 'phone', 'email'] as const).map((k) => (
+                        <td key={k}>
+                          {k === 'name' ? (
+                            <input type="text" value={c.name || ''} disabled={ro} list="case-contact-names" autoComplete="off"
+                              onChange={(e) => setContactName(i, e.target.value)} />
+                          ) : (
+                            <input type="text" value={c[k] || ''} disabled={ro}
+                              onChange={(e) => update({ contacts: m.contacts.map((x, j) => (j === i ? { ...x, [k]: e.target.value } : x)) })} />
+                          )}
+                        </td>
+                      ))}
+                      <td>{canEdit && <button className="btn danger-link" onClick={() => update({ contacts: m.contacts.filter((_, j) => j !== i) }, true)}>✕</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <datalist id="case-contact-names">{contactNames.map((n) => <option key={n} value={n} />)}</datalist>
           </Card>
 
           <Card label="Disclaimers">
@@ -853,41 +884,6 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 </button>
               </div>
             )}
-          </Card>
-
-          <Card label="Contacts" right={canEdit ? (
-            <div className="row">
-              {ownerCompany?.contacts?.length ? <button className="btn secondary small" onClick={importOwnerContacts}>Import from owner</button> : null}
-              <button className="btn small" onClick={() => update({ contacts: [...(m.contacts || []), { name: '', company: m.owner, position: '', phone: '', email: '' }] }, true)}>+ Add</button>
-            </div>
-          ) : undefined}>
-            {(m.contacts || []).length === 0 && (
-              <div className="hint">No contacts on this case{ownerCompany?.contacts?.length ? ' — import them from the owner record.' : '. Add one, or set an owner with contacts.'}</div>
-            )}
-            {(m.contacts || []).length > 0 && (
-              <table className="list">
-                <thead><tr><th>Name</th><th>Company</th><th>Position</th><th>Phone</th><th>Email</th><th /></tr></thead>
-                <tbody>
-                  {m.contacts.map((c, i) => (
-                    <tr key={i}>
-                      {(['name', 'company', 'position', 'phone', 'email'] as const).map((k) => (
-                        <td key={k}>
-                          {k === 'name' ? (
-                            <input type="text" value={c.name || ''} disabled={ro} list="case-contact-names" autoComplete="off"
-                              onChange={(e) => setContactName(i, e.target.value)} />
-                          ) : (
-                            <input type="text" value={c[k] || ''} disabled={ro}
-                              onChange={(e) => update({ contacts: m.contacts.map((x, j) => (j === i ? { ...x, [k]: e.target.value } : x)) })} />
-                          )}
-                        </td>
-                      ))}
-                      <td>{canEdit && <button className="btn danger-link" onClick={() => update({ contacts: m.contacts.filter((_, j) => j !== i) }, true)}>✕</button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            <datalist id="case-contact-names">{contactNames.map((n) => <option key={n} value={n} />)}</datalist>
           </Card>
 
           <Card label="Trade mark actions" right={canEdit ? <button className="btn small" onClick={() => update({ actions: [...(m.actions || []), { date: todayISO(), text: '', done: false, createdBy: myName }] }, true)}>+ Add action</button> : undefined}>

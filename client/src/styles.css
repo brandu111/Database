@@ -31,14 +31,15 @@ body {
   background: var(--page);
   color: var(--body);
   font-family: 'Instrument Sans', -apple-system, sans-serif;
-  font-size: 14.5px;
+  font-size: 15.5px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3 { color: var(--heading); }
 
-input, select, textarea, button { font-family: inherit; font-size: 14px; color: var(--body); }
+input, select, textarea, button { font-family: inherit; font-size: 15px; color: var(--body); }
 
 input[type='text'], input[type='date'], input[type='password'], input[type='email'], input[type='number'], select, textarea {
   border: 1px solid var(--border-2);
@@ -77,10 +78,10 @@ textarea { resize: vertical; min-height: 64px; }
 
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
 .section-label {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--heading); margin-bottom: 10px;
 }
-.hint { font-size: 12.5px; color: var(--muted); }
+.hint { font-size: 13px; color: var(--muted); }
 
 .btn {
   background: var(--accent); color: #fff; border: none; border-radius: 7px;
@@ -94,15 +95,15 @@ textarea { resize: vertical; min-height: 64px; }
 .btn:disabled { opacity: 0.5; cursor: default; }
 
 .field { margin-bottom: 10px; }
-.field > label { display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
+.field > label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--heading); margin-bottom: 4px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 14px; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 table.list { width: 100%; border-collapse: collapse; }
 table.list th {
-  text-align: left; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
-  color: var(--muted); padding: 9px 10px; border-bottom: 1px solid var(--border); background: var(--panel);
+  text-align: left; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--heading); padding: 9px 10px; border-bottom: 1px solid var(--border); background: var(--panel);
   cursor: pointer; user-select: none; white-space: nowrap;
 }
 table.list td { padding: 8px 10px; border-bottom: 1px solid var(--border-3); font-size: 13px; vertical-align: middle; }
