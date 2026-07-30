@@ -848,6 +848,33 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ updated: changed.length });
   });
 
+  // Attach already-uploaded logo files to cases, matching each file's name (minus
+  // extension) against a case's application no. / registration no. / our ref.
+  // A ref that identifies a family attaches to every case in it. Fill-empty
+  // unless overwrite is set.
+  app.post('/api/marks/logos/attach', full, (req, res) => {
+    const files: { name: string; url: string }[] = Array.isArray(req.body?.files) ? req.body.files : [];
+    const overwrite = !!(req.body || {}).overwrite;
+    if (!files.length) return res.status(400).json({ error: 'No files provided.' });
+    const key = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const idx = new Map<string, Mark[]>();
+    const add = (k: string, m: Mark) => { if (!k) return; const a = idx.get(k) || []; a.push(m); idx.set(k, a); };
+    for (const m of listMarks(db)) { add(key(m.application), m); add(key(m.registration), m); add(key(m.matter), m); }
+    const changed = new Set<Mark>();
+    const unmatched: string[] = [];
+    let filesMatched = 0;
+    for (const f of files) {
+      const k = key((f.name || '').replace(/\.[^.]+$/, ''));
+      const matches = idx.get(k) || [];
+      if (!matches.length) { unmatched.push(f.name); continue; }
+      filesMatched++;
+      for (const m of matches) { if (!m.image || overwrite) { m.image = f.url; changed.add(m); } }
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ filesMatched, marksUpdated: changed.size, unmatched, totalFiles: files.length });
+  });
+
   app.get('/api/marks/:id/correspondence', view, (req, res) => {
     res.json(db.prepare(`SELECT * FROM correspondence WHERE mark_id=? ORDER BY sent_at DESC`).all(req.params.id));
   });

@@ -55,6 +55,7 @@ export const api = {
   recomputeAll: () => req<{ recomputed: number; failed: { id: string; name: string; error: string }[] }>('POST', '/api/marks/recompute-all', {}),
   fetchAuLogos: (offset: number, limit = 12) => req<{ processed: number; updated: number; offset: number; total: number; errors: { name: string; error: string }[] }>('POST', '/api/marks/logos/fetch-au', { offset, limit }),
   propagateLogos: () => req<{ updated: number }>('POST', '/api/marks/logos/propagate', {}),
+  attachLogos: (files: { name: string; url: string }[], overwrite: boolean) => req<{ filesMatched: number; marksUpdated: number; unmatched: string[]; totalFiles: number }>('POST', '/api/marks/logos/attach', { files, overwrite }),
 
   oppositions: () => req<Opposition[]>('GET', '/api/oppositions'),
   createOpposition: (partial: Partial<Opposition>) => req<Opposition>('POST', '/api/oppositions', partial),

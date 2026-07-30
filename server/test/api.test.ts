@@ -256,6 +256,19 @@ describe('bulk import & clear', () => {
     await viewer.post('/api/marks/logos/propagate').expect(403);
   });
 
+  it('attaches uploaded logo files to cases by application no. / our ref', async () => {
+    const m = (await admin.post('/api/marks').send({ name: 'FILELOGO', jurisdiction: 'USA', type: 'Logo', application: '98765432' }).expect(201)).body;
+    const r = (await admin.post('/api/marks/logos/attach').send({
+      files: [{ name: '98765432.png', url: '/files/x.png' }, { name: 'unknown-9999.png', url: '/files/y.png' }],
+      overwrite: false,
+    }).expect(200)).body;
+    expect(r.marksUpdated).toBe(1);
+    expect(r.unmatched).toEqual(['unknown-9999.png']);
+    const got = (await admin.get(`/api/marks/${m.id}`)).body;
+    expect(got.image).toBe('/files/x.png');
+    await viewer.post('/api/marks/logos/attach').send({ files: [] }).expect(403);
+  });
+
   it('recomputes all cases without nesting transactions (no 500)', async () => {
     await admin.post('/api/marks').send({ name: 'RECOMPUTE A', jurisdiction: 'Australia' }).expect(201);
     const b = (await admin.post('/api/marks').send({ name: 'RECOMPUTE B', jurisdiction: 'USA' }).expect(201)).body;

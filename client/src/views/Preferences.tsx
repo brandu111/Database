@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { COMPANY_IMPORT_COLUMNS, COMPANY_IMPORT_EXAMPLE_ROW, fmtDate, IMPORT_COLUMN_NOTES, IMPORT_COLUMNS, IMPORT_EXAMPLE_ROW, jurList, MERGE_FIELDS, mergeTemplate, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
-import { api, type Me } from '../api';
+import { api, uploadFile, type Me } from '../api';
 import { parseCsv, toCsv } from '../csv';
 import { SignatureEditor } from '../SignatureEditor';
 import { Card, Field, confirmDelete } from '../ui';
@@ -585,6 +585,39 @@ function DataImport() {
   const [cresult, setCresult] = useState<{ created: number; merged: number; contacts: number; skipped: number; total: number } | null>(null);
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoMsg, setLogoMsg] = useState('');
+  const [logoOverwrite, setLogoOverwrite] = useState(false);
+
+  const importLogoFiles = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    setLogoBusy(true);
+    try {
+      // Pre-match filenames against case app/reg/our-ref so we only upload files
+      // that will attach (same normalisation as the server).
+      const key = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const marks = await api.marks();
+      const known = new Set<string>();
+      marks.forEach((m) => { [m.application, m.registration, m.matter].forEach((v) => { if (v) known.add(key(v)); }); });
+      const list: { name: string; url: string }[] = [];
+      const skippedNames: string[] = [];
+      let i = 0;
+      for (const f of Array.from(files)) {
+        i++;
+        const base = f.name.replace(/\.[^.]+$/, '');
+        if (!known.has(key(base))) { skippedNames.push(f.name); continue; }
+        setLogoMsg(`Uploading logo files… ${i} of ${files.length}`);
+        const up = await uploadFile(f);
+        list.push({ name: f.name, url: up.url });
+      }
+      if (!list.length) { setLogoMsg(`None of the ${files.length} files matched a case by application no. / registration no. / our ref. Check the filenames.`); return; }
+      const r = await api.attachLogos(list, logoOverwrite);
+      const extra = skippedNames.length ? ` ${skippedNames.length} file(s) didn’t match any case.` : '';
+      setLogoMsg(`Attached logos to ${r.marksUpdated} case${r.marksUpdated === 1 ? '' : 's'} from ${r.filesMatched} file(s).${extra}`);
+    } catch (e) {
+      setLogoMsg(e instanceof Error ? e.message : 'Logo file import failed.');
+    } finally {
+      setLogoBusy(false);
+    }
+  };
 
   const fetchAuLogos = async () => {
     setLogoBusy(true);
@@ -803,6 +836,20 @@ function DataImport() {
           <div className="row" style={{ gap: 8 }}>
             <button className="btn secondary small" disabled={logoBusy} onClick={fetchAuLogos}>{logoBusy ? 'Working…' : '1. Fetch Australian logos'}</button>
             <button className="btn secondary small" disabled={logoBusy} onClick={propagateLogos}>2. Copy logos to related cases</button>
+          </div>
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+            <div className="hint" style={{ marginBottom: 6 }}>
+              <strong>3. Import logo files</strong> — for anything the steps above can’t fill (e.g. overseas marks with no Australian equivalent). Name each image file by the case’s <strong>application no.</strong>, <strong>registration no.</strong>, or <strong>our ref</strong> (e.g. <code>2345678.png</code> or <code>TM-1001.jpg</code>), then select them all here. A ref shared by a family attaches to every case in it.
+            </div>
+            <label className="row" style={{ gap: 6, marginBottom: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={logoOverwrite} onChange={(e) => setLogoOverwrite(e.target.checked)} />
+              <span className="hint">Overwrite existing logos (otherwise only fills cases that have none)</span>
+            </label>
+            <label className="btn secondary small" style={{ cursor: logoBusy ? 'default' : 'pointer', display: 'inline-block' }}>
+              ⬆ Choose logo files
+              <input type="file" accept="image/*" multiple disabled={logoBusy} style={{ display: 'none' }}
+                onChange={(e) => { importLogoFiles(e.target.files); e.currentTarget.value = ''; }} />
+            </label>
           </div>
           {logoMsg && <div className="hint" style={{ marginTop: 8 }}>{logoMsg}</div>}
         </Card>
