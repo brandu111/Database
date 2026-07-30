@@ -539,23 +539,36 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   // reminders, jurisdiction dates) backfill onto existing cases. Madrid families
   // are recomputed with the full set so designation renewals re-link correctly.
   app.post('/api/marks/recompute-all', full, (_req, res) => {
-    // Each processMarkWrite runs its own transaction, so we must NOT wrap the
-    // loop in another one (SQLite can't nest BEGIN). Recompute case by case and
-    // report any that fail rather than aborting the whole run.
+    // Load the whole portfolio ONCE and recompute in memory against that shared
+    // array, then persist in a single transaction. (Calling processMarkWrite per
+    // case re-reads every mark each time — O(n²) — which times out on large
+    // portfolios.) The engine takes the shared array so Madrid designation
+    // renewals still re-link to their IR.
+    const rules = loadRules(db);
     const all = listMarks(db);
     let recomputed = 0;
     const failed: { id: string; name: string; error: string }[] = [];
     for (const m of all) {
       try {
-        const fresh = getMark(db, m.id);
-        if (fresh) {
-          processMarkWrite(db, fresh, fresh);
-          recomputed++;
-        }
+        ensureRuleRows(m, rules, all);
+        m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+        recomputed++;
       } catch (e) {
         failed.push({ id: m.id, name: m.name || '(untitled)', error: e instanceof Error ? e.message : String(e) });
       }
     }
+    // Keep the Madrid family in sync (IR number + logo/audio down to designations).
+    for (const ir of all.filter((x) => x.jurisdiction === 'Madrid Protocol (WIPO)')) {
+      for (const x of all) {
+        if (x.irId === ir.id) {
+          x.irNumber = ir.irNumber || '';
+          if (ir.image && !x.image) x.image = ir.image;
+          if (ir.audioUrl && !x.audioUrl) x.audioUrl = ir.audioUrl;
+        }
+      }
+    }
+    const tx = db.transaction(() => { for (const m of all) saveMark(db, m); });
+    tx();
     res.json({ recomputed, failed });
   });
 
