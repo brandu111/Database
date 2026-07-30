@@ -421,16 +421,20 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
       return;
     }
     const hasContent = m.name || m.classes || m.goods || m.owner;
-    if (hasContent && !window.confirm('Fetch details from IP Australia and overwrite this case’s mark name, classes, goods/services, owner and key dates?')) return;
+    if (hasContent && !window.confirm('Fetch details from IP Australia? This updates the mark name, classes, goods/services and owner, and fills in any MISSING dates. It will NOT change dates you already have — renewal deadlines are never touched.')) return;
     setLookupBusy(true);
     setLookupMsg('');
     try {
-      const fields = await api.lookupIpAustralia(number);
-      // Merge fetched dates with any manual rows the user already added.
-      const fetched = fields.dates || [];
-      const keep = (m.dates || []).filter((d) => !fetched.some((f) => f.name === d.name));
-      update({ ...fields, dates: [...fetched, ...keep] }, true);
-      setLookupMsg(`Loaded from IP Australia (${number}).`);
+      const { dates: fetchedDates = [], ...rest } = await api.lookupIpAustralia(number);
+      // SAFETY: a lookup must never move an existing deadline. Only ADD anchor
+      // dates the case is missing; never overwrite a date it already has, and
+      // never introduce/alter renewal rows (those are engine-computed/pinned).
+      const existing = m.dates || [];
+      const additions = fetchedDates.filter(
+        (f) => !/renewal/i.test(f.name) && !existing.some((d) => d.name === f.name && d.date)
+      );
+      update({ ...rest, dates: [...existing, ...additions] }, true);
+      setLookupMsg(`Loaded from IP Australia (${number})${additions.length ? '' : ' — no missing dates to add'}.`);
     } catch (e) {
       setLookupMsg(e instanceof Error ? e.message : 'Lookup failed.');
     } finally {
