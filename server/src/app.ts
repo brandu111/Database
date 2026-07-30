@@ -604,6 +604,26 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ imported: built.length, errors, total: rows.length });
   });
 
+  // Bulk-delete selected cases. Restricted to the principal (Natalie) — a
+  // deliberately high bar for a destructive, multi-case action. Enforced here on
+  // the server, not just hidden in the UI.
+  app.post('/api/marks/bulk-delete', edit, (req, res) => {
+    const s = readSession(db, req);
+    if (!(s?.kind === 'staff' && /^natalie$/i.test(s.name || ''))) {
+      return res.status(403).json({ error: 'Only Natalie can bulk-delete cases.' });
+    }
+    const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+    if (!ids.length) return res.status(400).json({ error: 'No cases selected.' });
+    let deleted = 0;
+    const tx = db.transaction(() => {
+      for (const id of ids) {
+        if (getMark(db, id)) { deleteMark(db, id); db.prepare('DELETE FROM mark_history WHERE mark_id=?').run(id); deleted++; }
+      }
+    });
+    tx();
+    res.json({ deleted });
+  });
+
   // Delete EVERY case (and, implicitly, their Madrid links). Full permissions,
   // guarded by an explicit confirm token so it can't fire by accident.
   app.delete('/api/marks', full, (req, res) => {

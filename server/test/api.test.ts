@@ -20,6 +20,7 @@ beforeAll(() => {
   db = openDb(':memory:');
   db.prepare(`INSERT INTO staff_users(id,name,level,password_hash) VALUES(?,?,?,?)`).run(newId('u'), 'Admin', 'Full Permissions', hashPassword('pw'));
   db.prepare(`INSERT INTO staff_users(id,name,level,password_hash) VALUES(?,?,?,?)`).run(newId('u'), 'Fiona', 'View and Print Only', hashPassword('pw'));
+  db.prepare(`INSERT INTO staff_users(id,name,level,password_hash) VALUES(?,?,?,?)`).run(newId('u'), 'Natalie', 'Full Permissions', hashPassword('pw'));
   app = createApp(db, { uploadsDir: `${process.env.TMPDIR || '/tmp'}/brandu-test-uploads` });
   admin = request.agent(app);
   viewer = request.agent(app);
@@ -267,6 +268,19 @@ describe('bulk import & clear', () => {
     const got = (await admin.get(`/api/marks/${m.id}`)).body;
     expect(got.image).toBe('/files/x.png');
     await viewer.post('/api/marks/logos/attach').send({ files: [] }).expect(403);
+  });
+
+  it('bulk-delete is restricted to Natalie', async () => {
+    const a = (await admin.post('/api/marks').send({ name: 'DEL A', jurisdiction: 'Australia' }).expect(201)).body;
+    const b = (await admin.post('/api/marks').send({ name: 'DEL B', jurisdiction: 'Australia' }).expect(201)).body;
+    // Admin (not Natalie) is refused even with full permissions.
+    await admin.post('/api/marks/bulk-delete').send({ ids: [a.id] }).expect(403);
+    // Natalie can.
+    const natalie = request.agent(app);
+    await natalie.post('/api/auth/login').send({ username: 'Natalie', password: 'pw' }).expect(200);
+    const r = (await natalie.post('/api/marks/bulk-delete').send({ ids: [a.id, b.id] }).expect(200)).body;
+    expect(r.deleted).toBe(2);
+    await admin.get(`/api/marks/${a.id}`).expect(404);
   });
 
   it('clears alerts before a cut-off by marking past items done', async () => {

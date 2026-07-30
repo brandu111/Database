@@ -97,7 +97,7 @@ export function Trademarks({ nav, go, canEdit }: Props) {
     );
   }
 
-  return <MarkList marks={marks} canEdit={canEdit} onReload={reload} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
+  return <MarkList marks={marks} canEdit={canEdit} canDelete={/^natalie$/i.test(myName)} onReload={reload} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
 }
 
 // Case history / audit trail — who changed what, when. Reloads when the case is
@@ -139,7 +139,7 @@ function OpenMissingMark({ id, onLoaded, onMissing }: { id: string; onLoaded: (m
 
 // ---------------------------------------------------------------------------- list
 
-function MarkList({ marks, canEdit, onOpen, onCreated, onReload }: { marks: Mark[]; canEdit: boolean; onOpen: (id: string) => void; onCreated: (m: Mark) => void; onReload: () => void }) {
+function MarkList({ marks, canEdit, canDelete, onOpen, onCreated, onReload }: { marks: Mark[]; canEdit: boolean; canDelete?: boolean; onOpen: (id: string) => void; onCreated: (m: Mark) => void; onReload: () => void }) {
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -218,6 +218,19 @@ function MarkList({ marks, canEdit, onOpen, onCreated, onReload }: { marks: Mark
   const bulkStatus = (status: string) => { if (status) applyBulk(() => ({ status })); };
   const bulkAttorney = () => { const a = window.prompt('Set responsible attorney for the selected cases:'); if (a) applyBulk(() => ({ attorney: a })); };
   const bulkTag = () => { const t = window.prompt('Add a tag to the selected cases:'); if (t) applyBulk((m) => ({ tags: [...new Set([...(m.tags || []), t.trim()])] })); };
+  const bulkDelete = async () => {
+    if (!window.confirm(`Permanently delete ${sel.size} selected case${sel.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    try {
+      await api.bulkDeleteMarks([...sel]);
+      setSel(new Set());
+      onReload();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Delete failed.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   return (
     <>
@@ -252,6 +265,12 @@ function MarkList({ marks, canEdit, onOpen, onCreated, onReload }: { marks: Mark
           </select>
           <button className="btn secondary small" disabled={bulkBusy} onClick={bulkAttorney}>Set attorney</button>
           <button className="btn secondary small" disabled={bulkBusy} onClick={bulkTag}>Add tag</button>
+          {canDelete && (
+            <button className="btn danger-link" disabled={bulkBusy} onClick={bulkDelete}
+              style={{ border: '1px solid var(--danger)', borderRadius: 8, padding: '5px 10px', color: 'var(--danger)' }}>
+              Delete selected
+            </button>
+          )}
           <button className="btn secondary small" style={{ marginLeft: 'auto' }} onClick={() => setSel(new Set())}>Clear</button>
         </div>
       )}
