@@ -220,6 +220,26 @@ describe('bulk import & clear', () => {
     expect((await admin.get('/api/marks')).body).toHaveLength(0);
   });
 
+  it('bulk-imports contacts, grouping rows into companies with contacts', async () => {
+    const rows = [
+      { CompanyName: 'Acme Pty Ltd', City: 'Sydney', Country: 'Australia', ContactName: 'Smith, Jane', ContactTitle: 'Director', ContactEmail: 'jane@acme.test' },
+      { CompanyName: 'Acme Pty Ltd', ContactFirstName: 'Bob', ContactLastName: 'Jones', ContactEmail: 'bob@acme.test' },
+      { CompanyName: 'Beta LLC', Country: 'USA', ContactName: 'Pat Lee', ContactEmail: 'pat@beta.test' },
+      { CompanyName: '' }, // skipped — no company
+    ];
+    const r = (await admin.post('/api/companies/import').send({ rows }).expect(200)).body;
+    expect(r.created).toBe(2);
+    expect(r.contacts).toBe(3);
+    expect(r.skipped).toBe(1);
+    const companies = (await admin.get('/api/companies')).body as { name: string; city: string; contacts: { name: string; email: string }[] }[];
+    const acme = companies.find((c) => c.name === 'Acme Pty Ltd')!;
+    expect(acme.city).toBe('Sydney');
+    expect(acme.contacts).toHaveLength(2);
+    expect(acme.contacts[0].name).toBe('Jane Smith'); // "Last, First" tidied
+    // Non-full users may not import.
+    await viewer.post('/api/companies/import').send({ rows }).expect(403);
+  });
+
   it('recomputes all cases without nesting transactions (no 500)', async () => {
     await admin.post('/api/marks').send({ name: 'RECOMPUTE A', jurisdiction: 'Australia' }).expect(201);
     const b = (await admin.post('/api/marks').send({ name: 'RECOMPUTE B', jurisdiction: 'USA' }).expect(201)).body;

@@ -23,6 +23,48 @@ export const IMPORT_EXAMPLE_ROW: string[] = [
   'Imported from legacy system',
 ];
 
+/**
+ * Canonical CSV columns for bulk contact/company import. One row per CONTACT;
+ * rows are grouped into companies by CompanyName on the server (so a company
+ * with several contacts is several rows sharing the same CompanyName).
+ */
+export const COMPANY_IMPORT_COLUMNS: string[] = [
+  'CompanyName', 'Type', 'ContactType', 'AddressOne', 'AddressTwo', 'City', 'State', 'Postcode', 'Country',
+  'CompanyPhone', 'CompanyEmail', 'Website',
+  'ContactName', 'ContactFirstName', 'ContactLastName', 'ContactTitle', 'ContactEmail', 'ContactPhone', 'ContactMobile',
+  'Notes',
+];
+
+export const COMPANY_IMPORT_EXAMPLE_ROW: string[] = [
+  'BrandU Pty Ltd', 'Company', 'Owner', '1 Legal St', '', 'Sydney', 'NSW', '2000', 'Australia',
+  '+61 2 9000 0000', 'info@brandu.legal', 'brandu.legal',
+  'Jane Client', 'Jane', 'Client', 'Director', 'jane@example.com', '+61 400 000 000', '',
+  'Key client',
+];
+
+export const COMPANY_IMPORT_COLUMN_NOTES: Record<string, string> = {
+  CompanyName: 'Required. Rows sharing a CompanyName are merged into one company with multiple contacts.',
+  Type: 'Company, Individual or Partnership. Defaults to Company.',
+  ContactType: 'Applicant, Owner, Associate, Opponent, etc. (optional).',
+  AddressOne: 'Company street address line 1.',
+  AddressTwo: 'Company street address line 2.',
+  City: 'Company suburb/city.',
+  State: 'Company state/province.',
+  Postcode: 'Company postcode/ZIP.',
+  Country: 'Company country.',
+  CompanyPhone: 'Main company phone.',
+  CompanyEmail: 'General company email.',
+  Website: 'Company website.',
+  ContactName: 'Contact full name (or use First/Last).',
+  ContactFirstName: 'Contact first name.',
+  ContactLastName: 'Contact surname.',
+  ContactTitle: 'Contact position/title.',
+  ContactEmail: 'Contact email (used for client emails).',
+  ContactPhone: 'Contact direct phone.',
+  ContactMobile: 'Contact mobile.',
+  Notes: 'Free-text notes on the company.',
+};
+
 /** Short human notes on how each column is used, for the reference panel. */
 export const IMPORT_COLUMN_NOTES: Record<string, string> = {
   MarkName: 'Required. The trade mark name/word.',

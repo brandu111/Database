@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fmtDate, IMPORT_COLUMN_NOTES, IMPORT_COLUMNS, IMPORT_EXAMPLE_ROW, jurList, MERGE_FIELDS, mergeTemplate, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
+import { COMPANY_IMPORT_COLUMNS, COMPANY_IMPORT_EXAMPLE_ROW, fmtDate, IMPORT_COLUMN_NOTES, IMPORT_COLUMNS, IMPORT_EXAMPLE_ROW, jurList, MERGE_FIELDS, mergeTemplate, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
 import { api, type Me } from '../api';
 import { parseCsv, toCsv } from '../csv';
 import { SignatureEditor } from '../SignatureEditor';
@@ -579,6 +579,10 @@ function DataImport() {
   const [result, setResult] = useState<{ imported: number; total: number; errors: { line: number; error: string }[] } | null>(null);
   const [delText, setDelText] = useState('');
   const [delMsg, setDelMsg] = useState('');
+  const [crows, setCrows] = useState<Record<string, string>[] | null>(null);
+  const [cfileName, setCfileName] = useState('');
+  const [cbusy, setCbusy] = useState(false);
+  const [cresult, setCresult] = useState<{ created: number; merged: number; contacts: number; skipped: number; total: number } | null>(null);
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
@@ -612,6 +616,29 @@ function DataImport() {
     a.click();
   };
 
+  const downloadCompanyTemplate = () => {
+    const csv = toCsv(COMPANY_IMPORT_COLUMNS, [COMPANY_IMPORT_EXAMPLE_ROW]);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'brandu-contacts-template.csv';
+    a.click();
+  };
+
+  const onCompanyFile = async (f: File | undefined) => {
+    if (!f) return;
+    setCresult(null);
+    setCfileName(f.name);
+    try { setCrows(parseCsv(await f.text())); } catch { setCrows([]); }
+  };
+
+  const doCompanyImport = async () => {
+    if (!crows?.length) return;
+    setCbusy(true);
+    try { setCresult(await api.importCompanies(crows)); }
+    catch (e) { window.alert(e instanceof Error ? e.message : 'Import failed.'); }
+    finally { setCbusy(false); }
+  };
+
   const deleteAll = async () => {
     if (delText !== 'DELETE') return;
     if (!window.confirm('This permanently deletes EVERY case in the portal. This cannot be undone. Continue?')) return;
@@ -633,6 +660,33 @@ function DataImport() {
   return (
     <div className="detail-cols">
       <div>
+        <Card label="Import contacts / companies from CSV">
+          <div className="hint" style={{ marginBottom: 10 }}>
+            One row per contact; rows sharing a <code>CompanyName</code> are merged into a single company with multiple contacts. Best done <strong>before</strong> importing cases, so each case’s owner links to its contact record. Re-importing is safe — an existing company gains any new contacts rather than being duplicated.
+          </div>
+          <div className="row" style={{ marginBottom: 10 }}>
+            <button className="btn secondary" onClick={downloadCompanyTemplate}>⬇ Download contacts template</button>
+            <label className="btn" style={{ cursor: 'pointer' }}>
+              ⬆ Choose CSV file
+              <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { onCompanyFile(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+            </label>
+          </div>
+          {crows && (
+            <>
+              <div className="hint" style={{ marginBottom: 6 }}><strong>{cfileName}</strong> — {crows.length} contact row{crows.length === 1 ? '' : 's'} found.</div>
+              {crows.length > 0
+                ? <button className="btn" disabled={cbusy} onClick={doCompanyImport}>{cbusy ? 'Importing…' : `Import ${crows.length} contact row${crows.length === 1 ? '' : 's'}`}</button>
+                : <div className="hint" style={{ color: 'var(--danger)' }}>No rows found — check the file has a header row.</div>}
+            </>
+          )}
+          {cresult && (
+            <div style={{ marginTop: 12, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+              <strong>{cresult.created} companies created, {cresult.merged} updated, {cresult.contacts} contacts added.</strong>
+              {cresult.skipped > 0 && <div className="hint" style={{ marginTop: 4 }}>{cresult.skipped} row(s) skipped (no company name).</div>}
+            </div>
+          )}
+        </Card>
+
         <Card label="Import cases from CSV">
           <div className="hint" style={{ marginBottom: 10 }}>
             One row per case. Download the template, fill it in (or map your export to the same column names), then upload it here. Dates can be <code>dd/mm/yyyy</code>. Renewal dates and reminders are calculated automatically from the filing/registration dates — you only need <code>RenewalDate</code> if a case renews on a non-standard date.

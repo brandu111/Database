@@ -44,6 +44,7 @@ import {
 } from './db.js';
 import { IpAuError, ipAuConfigured, lookupTradeMark } from './ipaustralia.js';
 import { csvRowToMark } from './import-marks.js';
+import { groupCompanies } from './import-companies.js';
 import { mailerConfigured, sendMail } from './mailer.js';
 import {
   checkPassword,
@@ -886,6 +887,45 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.delete('/api/companies/:id', edit, (req, res) => {
     deleteCompany(db, req.params.id);
     res.json({ ok: true });
+  });
+
+  // Bulk import contacts/companies. Flat rows (one per contact) are grouped into
+  // companies by name; an existing company of the same name gains the new
+  // contacts rather than being duplicated.
+  app.post('/api/companies/import', full, (req, res) => {
+    const rows: Record<string, string>[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) return res.status(400).json({ error: 'No rows to import.' });
+    const { companies, skipped } = groupCompanies(rows);
+    const existing = new Map(listCompanies(db).map((c) => [(c.name || '').toLowerCase().replace(/[^a-z0-9]/g, ''), c]));
+    let created = 0;
+    let merged = 0;
+    let contacts = 0;
+    const tx = db.transaction(() => {
+      for (const g of companies) {
+        const key = (g.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const prior = existing.get(key);
+        if (prior) {
+          const have = new Set((prior.contacts || []).map((c) => (c.email || c.name || '').toLowerCase()));
+          for (const c of g.contacts || []) {
+            const id = (c.email || c.name || '').toLowerCase();
+            if (id && !have.has(id)) { prior.contacts = [...(prior.contacts || []), c]; have.add(id); contacts++; }
+          }
+          saveCompany(db, prior);
+          merged++;
+        } else {
+          const c: Company = {
+            id: newId('c'), type: 'Company', name: '', address: '', address2: '', city: '', state: '', zip: '',
+            country: '', phone: '', email: '', notes: '', contacts: [], ...g,
+          } as Company;
+          saveCompany(db, c);
+          existing.set(key, c);
+          created++;
+          contacts += (c.contacts || []).length;
+        }
+      }
+    });
+    tx();
+    res.json({ created, merged, contacts, skipped, total: rows.length });
   });
 
   // ---- alerts ---------------------------------------------------------------
