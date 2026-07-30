@@ -270,6 +270,21 @@ describe('bulk import & clear', () => {
     await viewer.post('/api/marks/logos/attach').send({ files: [] }).expect(403);
   });
 
+  it('suppresses non-use vulnerability and expired convention-priority alerts', async () => {
+    const m = (await admin.post('/api/marks').send({ name: 'ALERTFILTER', jurisdiction: 'Australia' }).expect(201)).body;
+    const soon = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10); // ~60 days out (within window)
+    m.dates = [
+      { name: 'Non-use vulnerability date', date: soon, done: false },
+      { name: 'Convention Priority Deadline', date: '2020-01-01', done: false }, // expired
+      { name: 'Convention Priority Deadline', date: soon, done: false }, // still open — kept
+    ];
+    await admin.put(`/api/marks/${m.id}`).send(m).expect(200);
+    const alerts = (await admin.get('/api/alerts?days=365')).body as { text: string; date: string }[];
+    expect(alerts.some((a) => /vulnerab/i.test(a.text))).toBe(false); // non-use never
+    expect(alerts.some((a) => /priority/i.test(a.text) && a.date === '2020-01-01')).toBe(false); // expired priority gone
+    expect(alerts.some((a) => /priority/i.test(a.text) && a.date === soon)).toBe(true); // open priority kept
+  });
+
   it('bulk-delete is restricted to Natalie', async () => {
     const a = (await admin.post('/api/marks').send({ name: 'DEL A', jurisdiction: 'Australia' }).expect(201)).body;
     const b = (await admin.post('/api/marks').send({ name: 'DEL B', jurisdiction: 'Australia' }).expect(201)).body;

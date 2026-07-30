@@ -146,6 +146,18 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
 
 const escHtml = (s: unknown) => String(s ?? '').split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
 
+/**
+ * Alert/digest suppression: some rows should never nag on the Alerts list.
+ * Non-use vulnerability dates are informational, not deadlines — never alerted.
+ * Convention Priority deadlines (and their reminders) are only relevant while
+ * the 6-month window is open — once expired (date in the past) they're dropped.
+ */
+function alertSuppressed(name: string, date: string, today: string): boolean {
+  if (/non-use vulnerability/i.test(name)) return true;
+  if (/convention priority/i.test(name) && date < today) return true;
+  return false;
+}
+
 /** Human-readable summary of what changed between two versions of a mark. */
 function diffMarkSummary(prev: Mark | null, next: Mark): string {
   const parts: string[] = [];
@@ -287,6 +299,7 @@ export function buildDigests(db: DB, today: string): DigestBucket[] {
   for (const m of listMarks(db)) {
     for (const d of m.dates || []) {
       if (d.done || !due(d.date)) continue;
+      if (alertSuppressed(d.name, d.date, today)) continue;
       add(d.createdBy, { date: d.date, name: d.name, mark: m.name || '(untitled)', jur: m.jurisdiction || '', overdue: d.date < today });
     }
     for (const a of m.actions || []) {
@@ -356,6 +369,7 @@ function computeAlerts(db: DB, alertDays: number, forCompany?: string): AlertRow
     });
     (m.dates || []).forEach((d) => {
       if (d.done || !d.date) return;
+      if (alertSuppressed(d.name, d.date, nowIso)) return;
       if (win(d.date))
         rows.push({
           date: d.date,
