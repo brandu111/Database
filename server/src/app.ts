@@ -918,6 +918,13 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
         const key = (g.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const prior = existing.get(key);
         if (prior) {
+          // Fill any company-level fields the existing (e.g. seed-derived) record
+          // is missing — never overwrite data that's already there.
+          const pri = prior as unknown as Record<string, unknown>;
+          const gg = g as unknown as Record<string, unknown>;
+          for (const f of ['contactType', 'address', 'address2', 'city', 'state', 'zip', 'country', 'phone', 'email', 'notes']) {
+            if (gg[f] && !pri[f]) pri[f] = gg[f];
+          }
           const have = new Set((prior.contacts || []).map((c) => (c.email || c.name || '').toLowerCase()));
           for (const c of g.contacts || []) {
             const id = (c.email || c.name || '').toLowerCase();
