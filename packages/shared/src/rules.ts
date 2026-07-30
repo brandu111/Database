@@ -14,6 +14,48 @@ const T_REN =
   'Dear {{client}},\n\nRe: Trade mark {{mark}} ({{jurisdiction}})\n\nThis is a reminder that the renewal deadline for the above trade mark is {{deadline}}. Please confirm whether you would like us to attend to the renewal, and we will provide a cost estimate.\n\nKind regards\nBrandU Legal';
 const T_OA =
   'Dear {{client}},\n\nRe: Trade mark {{mark}} ({{jurisdiction}})\n\nAn examination report has issued for the above application. A response is due by {{deadline}}. We will review the report and revert with our recommendations.\n\nKind regards\nBrandU Legal';
+const T_DES =
+  'Dear {{client}},\n\nRe: Registered design {{mark}} ({{jurisdiction}})\n\nThis is a reminder that the above registered design is due for renewal by {{deadline}}. Please confirm whether you would like us to attend to the renewal, and we will provide a cost estimate.\n\nKind regards\nBrandU Legal';
+
+/** True when a case is a registered design rather than a trade mark. */
+export function isDesign(type: string | undefined): boolean {
+  return /design/i.test(type || '');
+}
+
+/**
+ * Registered-design date rules (separate from the trade-mark rulebook). Designs
+ * renew on a 5-year cycle up to a jurisdiction-specific maximum term, after
+ * which they expire and cannot be renewed:
+ *   Australia 5 + 5 (max 10y) · New Zealand 5/5/5 (max 15y) ·
+ *   UK / EU registered designs 5-yearly to 25y · USA design patents 15y, no renewal.
+ * The renewal row is named "Renewal Deadline" so it pins on import and appears
+ * in the renewals dashboard just like a trade mark; the engine caps the
+ * roll-forward at "Design Maximum Term Ends".
+ */
+export function designRulesFor(jurisdiction: string): Rule[] {
+  const j = (jurisdiction || '').toLowerCase();
+  const reminders: Rule[] = [
+    r('Renewal Reminder', 'Renewal Deadline', -3, 'months', true, T_DES),
+    r('Renewal Reminder - Final', 'Renewal Deadline', -1, 'months', true, T_DES),
+  ];
+  const renew = (maxYears: number): Rule[] => [
+    r('Renewal Deadline', 'Application Filed', 5, 'years', true, T_DES),
+    ...reminders,
+    r('Design Maximum Term Ends', 'Application Filed', maxYears, 'years', true),
+  ];
+  if (j.includes('australia')) return renew(10);
+  if (j.includes('new zealand')) return renew(15);
+  if (j.includes('united kingdom') || j === 'uk' || j.includes('european union') || j.includes('eutm')) return renew(25);
+  if (j.includes('usa') || j.includes('united states')) {
+    // US design patents: single 15-year term from grant, no renewal.
+    return [r('Design Term Ends (no renewal)', 'Registration Date', 15, 'years', true)];
+  }
+  // Generic registered design — 5-year renewable; verify the local maximum term.
+  return [
+    r('Renewal Deadline', 'Application Filed', 5, 'years', true, T_DES),
+    ...reminders,
+  ];
+}
 
 const r = (
   name: string,

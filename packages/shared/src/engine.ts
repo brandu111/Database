@@ -1,4 +1,5 @@
 import { fmtDate, shift } from './dates.js';
+import { designRulesFor, isDesign } from './rules.js';
 import type { Mark, MarkDate, Rule, RuleBook } from './types.js';
 
 /**
@@ -130,7 +131,9 @@ const POST_REGISTRATION = /renewal|non-use|declaration of use|dependency|\bdau\b
  */
 export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): void {
   if (!m) return;
-  const list = rulesFor(rules, m.jurisdiction);
+  // Registered designs use their own renewal cycle / maximum-term rules rather
+  // than the trade-mark rulebook.
+  const list = isDesign(m.type) ? designRulesFor(m.jurisdiction) : rulesFor(rules, m.jurisdiction);
   const val = (n: string) => {
     const row = (m.dates || []).find((x) => x.name === n);
     return row && row.date;
@@ -185,10 +188,20 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
  * International Registration, so they are left for `linkDesignationRenewal`.
  */
 function rollCompletedRenewals(m: Mark): void {
+  const design = isDesign(m.type);
+  const maxTerm = design ? (m.dates || []).find((d) => d.name === 'Design Maximum Term Ends')?.date : '';
   // Only the single canonical active row rolls; archived rows have other names.
   for (const ren of (m.dates || []).filter((d) => d.name === 'Renewal Deadline' && !d.linkedToIR)) {
     if (!ren.done || !ren.date) continue;
     const oldDate = ren.date;
+    const step = ren.auOff || (design ? 5 : 10);
+    // Registered designs stop at their maximum registration term — once the next
+    // period would reach/exceed that, the completed renewal is the last one.
+    const nextDate = shift(oldDate, step, ren.auUnit || 'years');
+    if (design && maxTerm && nextDate >= maxTerm) {
+      ren.note = 'Final renewal — maximum registration term reached';
+      continue;
+    }
     // Preserve the completed renewal as a frozen, ticked history row.
     const archName = `Renewal Deadline — ${fmtDate(oldDate)} (completed)`;
     if (!(m.dates || []).some((x) => x.name === archName)) {
@@ -199,7 +212,7 @@ function rollCompletedRenewals(m: Mark): void {
     ren.done = false;
     ren.note = 'Next renewal deadline';
     // A pinned renewal isn't recomputed by auRecompute, so advance it here.
-    if (ren.pinned || !ren.auBase) ren.date = shift(oldDate, ren.auOff || 10, ren.auUnit || 'years');
+    if (ren.pinned || !ren.auBase) ren.date = nextDate;
     // Reopen the reminder / grace rows for the new cycle.
     (m.dates || []).forEach((r) => {
       if (r === ren) return;
@@ -262,14 +275,18 @@ export function linkDesignationRenewal(m: Mark, allMarks: Mark[]): void {
 export function applyStage(m: Mark, rules: RuleBook, status: string): void {
   const cfg = stageConfig()[status];
   if (!cfg) return;
+  // Designs draw from their own rulebook, not the trade-mark rules.
+  const design = isDesign(m.type);
+  const list = design ? designRulesFor(m.jurisdiction) : rulesFor(rules, m.jurisdiction);
+  const byName = (n: string) => list.find((r) => r.name === n);
   (cfg.inputs || []).forEach((n) => ensureRow(m, n, { auInput: true }));
   (cfg.activate || []).forEach((n) => {
     if (n === 'Convention Priority Deadline' && (!['Australia', 'New Zealand'].includes(m.jurisdiction) || m.irId)) return;
-    const r = ruleByName(rules, m.jurisdiction, n);
+    const r = byName(n);
     if (r) ensureRow(m, n, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts });
   });
   if (cfg.activateTrigger) {
-    rulesFor(rules, m.jurisdiction)
+    list
       .filter((r) => r.trigger === cfg.activateTrigger && r.name)
       .forEach((r) => ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts }));
   }

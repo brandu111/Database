@@ -54,6 +54,45 @@ describe('Philippines DAU is a designation obligation, not an IR one', () => {
   });
 });
 
+describe('registered design renewal logic', () => {
+  it('AU design renews at filing + 5 years with a 10-year maximum term', () => {
+    const m = blankMark({ jurisdiction: 'Australia', type: 'Registered Design' });
+    m.dates.push({ name: 'Application Filed', date: '2020-06-01', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2020-09-01', done: true });
+    ensureRuleRows(m, rules);
+    expect(dateOf(m, 'Renewal Deadline')).toBe('2025-06-01');
+    expect(dateOf(m, 'Design Maximum Term Ends')).toBe('2030-06-01');
+    // No trade-mark non-use row on a design.
+    expect(m.dates.some((d) => /non-use/i.test(d.name))).toBe(false);
+  });
+
+  it('completing the AU design renewal does not roll past the 10-year max term', () => {
+    const m = blankMark({ jurisdiction: 'Australia', type: 'Registered Design' });
+    m.dates.push({ name: 'Application Filed', date: '2020-06-01', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2020-09-01', done: true });
+    ensureRuleRows(m, rules);
+    m.dates.find((d) => d.name === 'Renewal Deadline')!.done = true;
+    ensureRuleRows(m, rules);
+    const ren = m.dates.find((d) => d.name === 'Renewal Deadline')!;
+    // Stays at the completed date (no roll to 2030), flagged final.
+    expect(ren.date).toBe('2025-06-01');
+    expect(ren.done).toBe(true);
+    expect(ren.note).toMatch(/maximum registration term/i);
+  });
+
+  it('NZ design allows a second renewal (max term 15 years)', () => {
+    const m = blankMark({ jurisdiction: 'New Zealand', type: 'Registered Design' });
+    m.dates.push({ name: 'Application Filed', date: '2020-06-01', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2020-09-01', done: true });
+    ensureRuleRows(m, rules);
+    expect(dateOf(m, 'Design Maximum Term Ends')).toBe('2035-06-01');
+    m.dates.find((d) => d.name === 'Renewal Deadline')!.done = true;
+    ensureRuleRows(m, rules);
+    // Rolls to the 10-year renewal (2030), still below the 15-year cap.
+    expect(dateOf(m, 'Renewal Deadline')).toBe('2030-06-01');
+  });
+});
+
 describe('opposition schedules', () => {
   it('AU standard opposition: NIO 2m, SGP +1m, NID +1m, evidence 3/3/2', () => {
     const s = oppSchedule('Australia')!;
