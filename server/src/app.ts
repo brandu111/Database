@@ -952,38 +952,73 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   // and set a common madridId + irNumber, pointing each designation at the
   // Madrid Protocol (WIPO) case. Fields are set directly (no engine run) so the
   // imported/pinned dates are preserved.
+  const IR_RE = /\bIR\s*No\.?\s*0*(\d{4,})/i;
   const extractIr = (m: Mark): string => {
     for (const s of [m.irNumber, m.application, m.registration]) {
-      const mm = /\bIR\s*No\.?\s*0*(\d{4,})/i.exec(s || '');
+      const mm = IR_RE.exec(s || '');
       if (mm) return mm[1];
     }
     return '';
   };
+  // Strip the "IR No.<n>" prefix (and a following Reg/App-No label) to leave just
+  // the national number(s), e.g. "IR No.1683883/Reg No. 2554746(29)" → "2554746(29)".
+  const tidyNational = (s: string): string => {
+    if (!s || !/\bIR\s*No/i.test(s)) return s;
+    let out = s.replace(/\bIR\s*No\.?\s*0*\d+/gi, ' '); // drop the IR token wherever it sits
+    out = out.replace(/\b(?:Reg(?:istration)?\s*No\.?|App(?:lication)?\s*No\.?|Serial\s*No\.?|SN\.?)/gi, ' '); // drop labels
+    out = out.replace(/\s*\/\s*/g, ' / ').replace(/(?:\/\s*){2,}/g, '/ ').replace(/\s{2,}/g, ' ');
+    return out.replace(/^[\s/,;·:.-]+|[\s/,;·:.-]+$/g, '').trim();
+  };
+  const nOwner = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const nName = (s?: string) => (s || '').toLowerCase().replace(/\b(logo|device|stylised|stylized|word|series|and logo)\b/g, '').replace(/[^a-z0-9]/g, '');
+
   app.post('/api/marks/link-madrid', full, (_req, res) => {
     const all = listMarks(db);
+    const changed = new Set<Mark>();
     const groups = new Map<string, Mark[]>();
+    // Pass 1: set irNumber, tidy the number fields, and group by IR number.
     for (const m of all) {
       const ir = extractIr(m);
-      if (ir) { const a = groups.get(ir) || []; a.push(m); groups.set(ir, a); }
+      if (!ir) continue;
+      if ((m.irNumber || '') !== ir) { m.irNumber = ir; changed.add(m); }
+      const app = tidyNational(m.application);
+      const reg = tidyNational(m.registration);
+      if (app !== m.application) { m.application = app; changed.add(m); }
+      if (reg !== m.registration) { m.registration = reg; changed.add(m); }
+      const a = groups.get(ir) || []; a.push(m); groups.set(ir, a);
+    }
+    // Index of potential AU/NZ basic cases (no IR number of their own).
+    const basics = new Map<string, Mark>();
+    for (const m of all) {
+      if (extractIr(m)) continue;
+      if (!['Australia', 'Australia TTMF', 'New Zealand'].includes(m.jurisdiction)) continue;
+      const k = `${nOwner(m.owner)}|${nName(m.name)}`;
+      if (k !== '|' && !basics.has(k)) basics.set(k, m);
     }
     let families = 0;
-    const changed = new Set<Mark>();
+    let auLinked = 0;
     for (const [ir, members] of groups) {
       if (members.length < 2) continue;
       families++;
       const famId = `mfam-${ir}`;
       const irCase = members.find((x) => x.jurisdiction === 'Madrid Protocol (WIPO)');
       for (const x of members) {
-        let ch = false;
-        if (x.madridId !== famId) { x.madridId = famId; ch = true; }
-        if ((x.irNumber || '') !== ir) { x.irNumber = ir; ch = true; }
-        if (irCase && x.id !== irCase.id && x.irId !== irCase.id) { x.irId = irCase.id; ch = true; }
-        if (ch) changed.add(x);
+        if (x.madridId !== famId) { x.madridId = famId; changed.add(x); }
+        if (irCase && x.id !== irCase.id && x.irId !== irCase.id) { x.irId = irCase.id; changed.add(x); }
+      }
+      // Attach the originating AU/NZ basic (same owner + mark name), if any.
+      const anchor = irCase || members[0];
+      const basic = basics.get(`${nOwner(anchor.owner)}|${nName(anchor.name)}`);
+      if (basic && basic.madridId !== famId && !basic.irId) {
+        basic.madridId = famId;
+        if (irCase && !irCase.basicId) { irCase.basicId = basic.id; changed.add(irCase); }
+        changed.add(basic);
+        auLinked++;
       }
     }
     const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
     tx();
-    res.json({ families, linked: changed.size });
+    res.json({ families, linked: changed.size, auBasicsLinked: auLinked });
   });
 
   // Tidy up historical alerts: mark every not-done deadline / reminder / flagged

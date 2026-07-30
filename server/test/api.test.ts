@@ -304,21 +304,25 @@ describe('bulk import & clear', () => {
     expect(finalCount).toBe(1);
   });
 
-  it('links Madrid families by the IR number embedded in the number fields', async () => {
-    const ir = (await admin.post('/api/marks').send({ name: 'HAELEN', jurisdiction: 'Madrid Protocol (WIPO)', registration: 'IR No.1683883' }).expect(201)).body;
-    const uk = (await admin.post('/api/marks').send({ name: 'HAELEN', jurisdiction: 'United Kingdom', registration: 'IR No.1683883' }).expect(201)).body;
-    const us = (await admin.post('/api/marks').send({ name: 'HAELEN', jurisdiction: 'USA', registration: 'IR No.1683883/Reg No. 7410669' }).expect(201)).body;
+  it('links Madrid families (IR + designations + AU basic), tidies numbers', async () => {
+    const ir = (await admin.post('/api/marks').send({ name: 'HAELEN STAMP', jurisdiction: 'Madrid Protocol (WIPO)', registration: 'IR No.1683883', owner: 'Haelen Pty Ltd' }).expect(201)).body;
+    const uk = (await admin.post('/api/marks').send({ name: 'HAELEN STAMP', jurisdiction: 'United Kingdom', registration: 'IR No.1683883', owner: 'Haelen Pty Ltd' }).expect(201)).body;
+    const mx = (await admin.post('/api/marks').send({ name: 'HAELEN STAMP', jurisdiction: 'Mexico', registration: 'IR No.1683883/Reg No. 2554746(29) / 2554747(40)', owner: 'Haelen Pty Ltd' }).expect(201)).body;
+    const au = (await admin.post('/api/marks').send({ name: 'HAELEN STAMP', jurisdiction: 'Australia', application: '2100100', registration: '2100100', owner: 'Haelen Pty Ltd' }).expect(201)).body;
     const r = (await admin.post('/api/marks/link-madrid').expect(200)).body;
     expect(r.families).toBeGreaterThanOrEqual(1);
-    const marks = (await admin.get('/api/marks')).body as { id: string; madridId?: string; irId?: string; irNumber?: string; jurisdiction: string }[];
+    expect(r.auBasicsLinked).toBeGreaterThanOrEqual(1);
+    const marks = (await admin.get('/api/marks')).body as { id: string; madridId?: string; irId?: string; irNumber?: string; registration: string }[];
     const gIr = marks.find((m) => m.id === ir.id)!;
     const gUk = marks.find((m) => m.id === uk.id)!;
-    const gUs = marks.find((m) => m.id === us.id)!;
-    expect(gIr.madridId).toBeTruthy();
-    expect(gUk.madridId).toBe(gIr.madridId); // same family
-    expect(gUs.madridId).toBe(gIr.madridId);
-    expect(gUk.irId).toBe(gIr.id); // designations point at the IR case
-    expect(gUk.irNumber).toBe('1683883');
+    const gMx = marks.find((m) => m.id === mx.id)!;
+    const gAu = marks.find((m) => m.id === au.id)!;
+    expect(gUk.madridId).toBe(gIr.madridId);
+    expect(gUk.irId).toBe(gIr.id);
+    expect(gAu.madridId).toBe(gIr.madridId); // AU basic joined the family
+    expect(gMx.irNumber).toBe('1683883');
+    expect(gMx.registration).toBe('2554746(29) / 2554747(40)'); // IR prefix stripped, national kept
+    expect(gIr.registration).toBe(''); // IR-only row: national number cleared
     await viewer.post('/api/marks/link-madrid').expect(403);
   });
 

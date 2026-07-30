@@ -872,13 +872,13 @@ function DataImport() {
 
         <Card label="Link Madrid families">
           <div className="hint" style={{ marginBottom: 8 }}>
-            Groups imported cases into their Madrid families using the international registration number embedded in the application / registration fields (e.g. <code>IR No.1683883</code>), so the International Registration and all its designations show as related cases. Preserves the imported dates. Safe to run again.
+            Groups imported cases into their Madrid families using the international registration number embedded in the application / registration fields (e.g. <code>IR No.1683883</code>), so the International Registration, its designations <strong>and the originating AU/NZ basic case</strong> show as related. Also moves the IR number into its own field and tidies the application/registration numbers (leaving the national number). Preserves the imported dates. Safe to run again.
           </div>
           <button className="btn secondary small" disabled={busy} onClick={async () => {
             setBusy(true);
             try {
               const r = await api.linkMadrid();
-              window.alert(`Linked ${r.linked} case(s) into ${r.families} Madrid famil${r.families === 1 ? 'y' : 'ies'}.`);
+              window.alert(`Linked ${r.linked} case(s) into ${r.families} Madrid famil${r.families === 1 ? 'y' : 'ies'} (incl. ${r.auBasicsLinked} AU/NZ basic case(s)). IR numbers moved to their own field and the number fields tidied.`);
             } catch (e) {
               window.alert(e instanceof Error ? e.message : 'Linking failed.');
             } finally {
