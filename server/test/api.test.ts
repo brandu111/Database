@@ -269,6 +269,23 @@ describe('bulk import & clear', () => {
     await viewer.post('/api/marks/logos/attach').send({ files: [] }).expect(403);
   });
 
+  it('clears alerts before a cut-off by marking past items done', async () => {
+    const m = (await admin.post('/api/marks').send({ name: 'OLDALERTS', jurisdiction: 'Australia' }).expect(201)).body;
+    m.dates = [
+      { name: 'Old Deadline', date: '2020-01-01', done: false },
+      { name: 'Future Deadline', date: '2030-01-01', done: false },
+    ];
+    await admin.put(`/api/marks/${m.id}`).send(m).expect(200);
+    const r = (await admin.post('/api/marks/clear-old-alerts').send({ before: '2026-06-01' }).expect(200)).body;
+    expect(r.markDates).toBeGreaterThanOrEqual(1);
+    const got = (await admin.get(`/api/marks/${m.id}`)).body;
+    const byName = Object.fromEntries(got.dates.map((d: { name: string; done: boolean }) => [d.name, d.done]));
+    expect(byName['Old Deadline']).toBe(true);   // past → marked done
+    expect(byName['Future Deadline']).toBe(false); // future → untouched
+    await admin.post('/api/marks/clear-old-alerts').send({ before: 'nope' }).expect(400);
+    await viewer.post('/api/marks/clear-old-alerts').send({ before: '2026-06-01' }).expect(403);
+  });
+
   it('recomputes all cases without nesting transactions (no 500)', async () => {
     await admin.post('/api/marks').send({ name: 'RECOMPUTE A', jurisdiction: 'Australia' }).expect(201);
     const b = (await admin.post('/api/marks').send({ name: 'RECOMPUTE B', jurisdiction: 'USA' }).expect(201)).body;

@@ -875,6 +875,46 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ filesMatched, marksUpdated: changed.size, unmatched, totalFiles: files.length });
   });
 
+  // Tidy up historical alerts: mark every not-done deadline / reminder / flagged
+  // action (and opposition date) dated before `before` (YYYY-MM-DD) as done, so
+  // it drops out of the Alerts list. Rows stay on the case as ticked history;
+  // deleting them wouldn't stick because the engine recomputes rule rows.
+  app.post('/api/marks/clear-old-alerts', full, (req, res) => {
+    const before = String((req.body || {}).before || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(before)) return res.status(400).json({ error: 'Provide a cut-off date as YYYY-MM-DD.' });
+    const marks = listMarks(db);
+    let markDates = 0;
+    let actions = 0;
+    const changedMarks = new Set<Mark>();
+    for (const m of marks) {
+      let ch = false;
+      for (const d of m.dates || []) {
+        if (d.date && !d.done && d.date < before) { d.done = true; markDates++; ch = true; }
+      }
+      for (const a of m.actions || []) {
+        const when = a.alertDate || a.date;
+        if (a.alert && !a.done && when && when < before) { a.done = true; actions++; ch = true; }
+      }
+      if (ch) changedMarks.add(m);
+    }
+    const opps = listOppositions(db);
+    let oppDates = 0;
+    const changedOpps = new Set<Opposition>();
+    for (const o of opps) {
+      let ch = false;
+      for (const d of o.dates || []) {
+        if (d.date && !d.done && d.date < before) { d.done = true; oppDates++; ch = true; }
+      }
+      if (ch) changedOpps.add(o);
+    }
+    const tx = db.transaction(() => {
+      for (const m of changedMarks) saveMark(db, m);
+      for (const o of changedOpps) saveOpposition(db, o);
+    });
+    tx();
+    res.json({ before, markDates, actions, oppDates });
+  });
+
   app.get('/api/marks/:id/correspondence', view, (req, res) => {
     res.json(db.prepare(`SELECT * FROM correspondence WHERE mark_id=? ORDER BY sent_at DESC`).all(req.params.id));
   });

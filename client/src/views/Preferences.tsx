@@ -586,6 +586,22 @@ function DataImport() {
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoMsg, setLogoMsg] = useState('');
   const [logoOverwrite, setLogoOverwrite] = useState(false);
+  const [alertCutoff, setAlertCutoff] = useState('2026-06-01');
+  const [alertMsg, setAlertMsg] = useState('');
+  const [alertBusy, setAlertBusy] = useState(false);
+
+  const clearOldAlerts = async () => {
+    if (!window.confirm(`Mark every outstanding deadline, reminder and flagged action dated before ${alertCutoff} as done? They'll be cleared from Alerts but kept on each case as history.`)) return;
+    setAlertBusy(true);
+    try {
+      const r = await api.clearOldAlerts(alertCutoff);
+      setAlertMsg(`Cleared ${r.markDates + r.actions + r.oppDates} item(s) before ${r.before} (${r.markDates} case dates, ${r.actions} actions, ${r.oppDates} opposition dates).`);
+    } catch (e) {
+      setAlertMsg(e instanceof Error ? e.message : 'Failed.');
+    } finally {
+      setAlertBusy(false);
+    }
+  };
 
   const importLogoFiles = async (files: FileList | null) => {
     if (!files || !files.length) return;
@@ -852,6 +868,18 @@ function DataImport() {
             </label>
           </div>
           {logoMsg && <div className="hint" style={{ marginTop: 8 }}>{logoMsg}</div>}
+        </Card>
+
+        <Card label="Tidy up old alerts">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Marks every outstanding deadline, reminder and flagged action dated <strong>before</strong> the date below as done, so historical items stop cluttering the Alerts list and the overdue count. They stay on each case as ticked history. Future deadlines are untouched.
+          </div>
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <span className="hint">Clear items before</span>
+            <input type="date" value={alertCutoff} onChange={(e) => setAlertCutoff(e.target.value)} style={{ width: 150 }} />
+            <button className="btn secondary small" disabled={alertBusy || !alertCutoff} onClick={clearOldAlerts}>{alertBusy ? 'Working…' : 'Clear old alerts'}</button>
+          </div>
+          {alertMsg && <div className="hint" style={{ marginTop: 8 }}>{alertMsg}</div>}
         </Card>
 
         <Card label="⚠ Danger zone — delete all cases">
