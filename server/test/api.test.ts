@@ -240,6 +240,22 @@ describe('bulk import & clear', () => {
     await viewer.post('/api/companies/import').send({ rows }).expect(403);
   });
 
+  it('propagates a logo to related cases by owner + mark name (fill-empty only)', async () => {
+    const au = (await admin.post('/api/marks').send({ name: 'LOGOTEST Logo', jurisdiction: 'Australia', type: 'Logo', owner: 'LogoTest Holdings Pty Ltd' }).expect(201)).body;
+    au.image = '/files/logotest-logo.png';
+    await admin.put(`/api/marks/${au.id}`).send(au).expect(200);
+    // Overseas filing of the same mark, no image yet.
+    const nz = (await admin.post('/api/marks').send({ name: 'LOGOTEST logo', jurisdiction: 'New Zealand', type: 'Logo', owner: 'LogoTest Holdings Pty Ltd' }).expect(201)).body;
+    // Unrelated mark keeps its (absent) image.
+    const other = (await admin.post('/api/marks').send({ name: 'ZEDMARK', jurisdiction: 'New Zealand', type: 'Word', owner: 'Zed Holdings Pty Ltd' }).expect(201)).body;
+    const r = (await admin.post('/api/marks/logos/propagate').expect(200)).body;
+    expect(r.updated).toBeGreaterThanOrEqual(1);
+    const marks = (await admin.get('/api/marks')).body as { id: string; image: string | null }[];
+    expect(marks.find((m) => m.id === nz.id)!.image).toBe('/files/logotest-logo.png');
+    expect(marks.find((m) => m.id === other.id)!.image).toBeFalsy();
+    await viewer.post('/api/marks/logos/propagate').expect(403);
+  });
+
   it('recomputes all cases without nesting transactions (no 500)', async () => {
     await admin.post('/api/marks').send({ name: 'RECOMPUTE A', jurisdiction: 'Australia' }).expect(201);
     const b = (await admin.post('/api/marks').send({ name: 'RECOMPUTE B', jurisdiction: 'USA' }).expect(201)).body;

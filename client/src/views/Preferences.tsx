@@ -583,6 +583,37 @@ function DataImport() {
   const [cfileName, setCfileName] = useState('');
   const [cbusy, setCbusy] = useState(false);
   const [cresult, setCresult] = useState<{ created: number; merged: number; contacts: number; skipped: number; total: number } | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoMsg, setLogoMsg] = useState('');
+
+  const fetchAuLogos = async () => {
+    setLogoBusy(true);
+    let offset = 0, total = 0, updated = 0;
+    try {
+      do {
+        const r = await api.fetchAuLogos(offset);
+        offset = r.offset; total = r.total; updated += r.updated;
+        setLogoMsg(`Fetching Australian logos… ${Math.min(offset, total)} of ${total} checked, ${updated} logos added.`);
+      } while (offset < total);
+      setLogoMsg(`Done — ${updated} Australian logo${updated === 1 ? '' : 's'} added from the register. Now click "Copy logos to related cases" to fill Madrid and overseas filings.`);
+    } catch (e) {
+      setLogoMsg(e instanceof Error ? e.message : 'Logo fetch failed.');
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+
+  const propagateLogos = async () => {
+    setLogoBusy(true);
+    try {
+      const r = await api.propagateLogos();
+      setLogoMsg(`Copied logos onto ${r.updated} related case${r.updated === 1 ? '' : 's'} (Madrid + overseas filings that share an owner and mark name with a case that has a logo).`);
+    } catch (e) {
+      setLogoMsg(e instanceof Error ? e.message : 'Copy failed.');
+    } finally {
+      setLogoBusy(false);
+    }
+  };
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
@@ -759,6 +790,21 @@ function DataImport() {
               setBusy(false);
             }
           }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
+        </Card>
+
+        <Card label="Logos — fetch &amp; copy">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Imported cases have no logos (the data export contained none). Word marks don’t need one. For logo / combined / stylised marks:
+            <ol style={{ margin: '6px 0 0 18px' }}>
+              <li><strong>Fetch Australian logos</strong> — pulls the graphic from the IP Australia register for every Australian logo case.</li>
+              <li><strong>Copy logos to related cases</strong> — copies each logo onto Madrid and overseas filings of the same mark (matched by owner + mark name). Fill-empty only; never overwrites.</li>
+            </ol>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn secondary small" disabled={logoBusy} onClick={fetchAuLogos}>{logoBusy ? 'Working…' : '1. Fetch Australian logos'}</button>
+            <button className="btn secondary small" disabled={logoBusy} onClick={propagateLogos}>2. Copy logos to related cases</button>
+          </div>
+          {logoMsg && <div className="hint" style={{ marginTop: 8 }}>{logoMsg}</div>}
         </Card>
 
         <Card label="⚠ Danger zone — delete all cases">

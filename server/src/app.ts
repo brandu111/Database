@@ -785,6 +785,69 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
 
   app.get('/api/lookup/ip-australia', view, (_req, res) => res.json({ configured: ipAuConfigured() }));
 
+  // ---- bulk logo tools ------------------------------------------------------
+  const normOwner = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normName = (s?: string) => (s || '').toLowerCase().replace(/\b(logo|device|stylised|stylized|word|series)\b/g, '').replace(/[^a-z0-9]/g, '');
+  const isGraphic = (t?: string) => /logo|combined|stylis|device|figurative/i.test(t || '');
+  const isLive = (s?: string) => /^(registered|pending|accepted)/i.test(s || '');
+  const saveLogo = (buffer: Buffer, contentType: string) => {
+    const ext = contentType.includes('png') ? '.png' : contentType.includes('gif') ? '.gif' : contentType.includes('svg') ? '.svg' : '.jpg';
+    const name = `${randomBytes(8).toString('hex')}${ext}`;
+    fs.writeFileSync(path.join(uploadsDir, name), buffer);
+    return `/files/${name}`;
+  };
+
+  // Fetch logos for Australian graphic cases from the IP Australia register, in
+  // batches (the client loops with the returned offset) so it never times out.
+  app.post('/api/marks/logos/fetch-au', full, async (req, res) => {
+    if (!ipAuConfigured()) return res.status(400).json({ error: 'IP Australia lookup is not configured on this server.' });
+    const offset = Math.max(0, Math.trunc(Number((req.body || {}).offset)) || 0);
+    const limit = Math.min(30, Math.max(1, Math.trunc(Number((req.body || {}).limit)) || 12));
+    const candidates = listMarks(db)
+      .filter((m) => ['Australia', 'Australia TTMF'].includes(m.jurisdiction) && isGraphic(m.type) && isLive(m.status))
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    const batch = candidates.slice(offset, offset + limit);
+    let updated = 0;
+    const errors: { name: string; error: string }[] = [];
+    for (const m of batch) {
+      if (m.image) continue;
+      const num = m.application || m.registration;
+      if (!num) continue;
+      try {
+        const fields = await lookupTradeMark(num, { saveImage: saveLogo });
+        if (fields.image) {
+          const fresh = getMark(db, m.id);
+          if (fresh && !fresh.image) { fresh.image = fields.image; saveMark(db, fresh); updated++; }
+        }
+      } catch (e) {
+        errors.push({ name: m.name || num, error: (e as Error).message });
+      }
+    }
+    res.json({ processed: batch.length, updated, offset: offset + batch.length, total: candidates.length, errors });
+  });
+
+  // Copy each case's logo onto related cases that lack one — matched by owner +
+  // normalised mark name, so a Madrid IR / designation / other-jurisdiction
+  // filing inherits the Australian basic's logo. Fill-empty only; never overwrites.
+  app.post('/api/marks/logos/propagate', full, (_req, res) => {
+    const all = listMarks(db);
+    const src = new Map<string, string>();
+    for (const m of all) {
+      if (!m.image) continue;
+      const key = `${normOwner(m.owner)}|${normName(m.name)}`;
+      if (['Australia', 'Australia TTMF'].includes(m.jurisdiction) || !src.has(key)) src.set(key, m.image);
+    }
+    const changed: Mark[] = [];
+    for (const m of all) {
+      if (m.image) continue;
+      const img = src.get(`${normOwner(m.owner)}|${normName(m.name)}`);
+      if (img) { m.image = img; changed.push(m); }
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ updated: changed.length });
+  });
+
   app.get('/api/marks/:id/correspondence', view, (req, res) => {
     res.json(db.prepare(`SELECT * FROM correspondence WHERE mark_id=? ORDER BY sent_at DESC`).all(req.params.id));
   });
