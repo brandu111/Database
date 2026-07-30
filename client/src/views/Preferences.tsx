@@ -870,6 +870,23 @@ function DataImport() {
           {logoMsg && <div className="hint" style={{ marginTop: 8 }}>{logoMsg}</div>}
         </Card>
 
+        <Card label="Link Madrid families">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Groups imported cases into their Madrid families using the international registration number embedded in the application / registration fields (e.g. <code>IR No.1683883</code>), so the International Registration and all its designations show as related cases. Preserves the imported dates. Safe to run again.
+          </div>
+          <button className="btn secondary small" disabled={busy} onClick={async () => {
+            setBusy(true);
+            try {
+              const r = await api.linkMadrid();
+              window.alert(`Linked ${r.linked} case(s) into ${r.families} Madrid famil${r.families === 1 ? 'y' : 'ies'}.`);
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : 'Linking failed.');
+            } finally {
+              setBusy(false);
+            }
+          }}>{busy ? 'Working…' : 'Link Madrid families'}</button>
+        </Card>
+
         <Card label="Tidy up old alerts">
           <div className="hint" style={{ marginBottom: 8 }}>
             Marks every outstanding deadline, reminder and flagged action dated <strong>before</strong> the date below as done, so historical items stop cluttering the Alerts list and the overdue count. They stay on each case as ticked history. Future deadlines are untouched.

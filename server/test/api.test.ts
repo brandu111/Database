@@ -304,6 +304,24 @@ describe('bulk import & clear', () => {
     expect(finalCount).toBe(1);
   });
 
+  it('links Madrid families by the IR number embedded in the number fields', async () => {
+    const ir = (await admin.post('/api/marks').send({ name: 'HAELEN', jurisdiction: 'Madrid Protocol (WIPO)', registration: 'IR No.1683883' }).expect(201)).body;
+    const uk = (await admin.post('/api/marks').send({ name: 'HAELEN', jurisdiction: 'United Kingdom', registration: 'IR No.1683883' }).expect(201)).body;
+    const us = (await admin.post('/api/marks').send({ name: 'HAELEN', jurisdiction: 'USA', registration: 'IR No.1683883/Reg No. 7410669' }).expect(201)).body;
+    const r = (await admin.post('/api/marks/link-madrid').expect(200)).body;
+    expect(r.families).toBeGreaterThanOrEqual(1);
+    const marks = (await admin.get('/api/marks')).body as { id: string; madridId?: string; irId?: string; irNumber?: string; jurisdiction: string }[];
+    const gIr = marks.find((m) => m.id === ir.id)!;
+    const gUk = marks.find((m) => m.id === uk.id)!;
+    const gUs = marks.find((m) => m.id === us.id)!;
+    expect(gIr.madridId).toBeTruthy();
+    expect(gUk.madridId).toBe(gIr.madridId); // same family
+    expect(gUs.madridId).toBe(gIr.madridId);
+    expect(gUk.irId).toBe(gIr.id); // designations point at the IR case
+    expect(gUk.irNumber).toBe('1683883');
+    await viewer.post('/api/marks/link-madrid').expect(403);
+  });
+
   it('bulk-delete is restricted to Natalie', async () => {
     const a = (await admin.post('/api/marks').send({ name: 'DEL A', jurisdiction: 'Australia' }).expect(201)).body;
     const b = (await admin.post('/api/marks').send({ name: 'DEL B', jurisdiction: 'Australia' }).expect(201)).body;

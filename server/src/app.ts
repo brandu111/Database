@@ -946,6 +946,46 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ filesMatched, marksUpdated: changed.size, unmatched, totalFiles: files.length });
   });
 
+  // Link Madrid families across the portfolio. The international registration
+  // number is embedded in the legacy application/registration fields (e.g.
+  // "IR No.1683883/Reg No. 7410669"); parse it, group every case that shares it,
+  // and set a common madridId + irNumber, pointing each designation at the
+  // Madrid Protocol (WIPO) case. Fields are set directly (no engine run) so the
+  // imported/pinned dates are preserved.
+  const extractIr = (m: Mark): string => {
+    for (const s of [m.irNumber, m.application, m.registration]) {
+      const mm = /\bIR\s*No\.?\s*0*(\d{4,})/i.exec(s || '');
+      if (mm) return mm[1];
+    }
+    return '';
+  };
+  app.post('/api/marks/link-madrid', full, (_req, res) => {
+    const all = listMarks(db);
+    const groups = new Map<string, Mark[]>();
+    for (const m of all) {
+      const ir = extractIr(m);
+      if (ir) { const a = groups.get(ir) || []; a.push(m); groups.set(ir, a); }
+    }
+    let families = 0;
+    const changed = new Set<Mark>();
+    for (const [ir, members] of groups) {
+      if (members.length < 2) continue;
+      families++;
+      const famId = `mfam-${ir}`;
+      const irCase = members.find((x) => x.jurisdiction === 'Madrid Protocol (WIPO)');
+      for (const x of members) {
+        let ch = false;
+        if (x.madridId !== famId) { x.madridId = famId; ch = true; }
+        if ((x.irNumber || '') !== ir) { x.irNumber = ir; ch = true; }
+        if (irCase && x.id !== irCase.id && x.irId !== irCase.id) { x.irId = irCase.id; ch = true; }
+        if (ch) changed.add(x);
+      }
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ families, linked: changed.size });
+  });
+
   // Tidy up historical alerts: mark every not-done deadline / reminder / flagged
   // action (and opposition date) dated before `before` (YYYY-MM-DD) as done, so
   // it drops out of the Alerts list. Rows stay on the case as ticked history;

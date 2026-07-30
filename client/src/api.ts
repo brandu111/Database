@@ -58,6 +58,7 @@ export const api = {
   attachLogos: (files: { name: string; url: string }[], overwrite: boolean) => req<{ filesMatched: number; marksUpdated: number; unmatched: string[]; totalFiles: number }>('POST', '/api/marks/logos/attach', { files, overwrite }),
   clearOldAlerts: (before: string) => req<{ before: string; markDates: number; actions: number; oppDates: number }>('POST', '/api/marks/clear-old-alerts', { before }),
   bulkDeleteMarks: (ids: string[]) => req<{ deleted: number }>('POST', '/api/marks/bulk-delete', { ids }),
+  linkMadrid: () => req<{ families: number; linked: number }>('POST', '/api/marks/link-madrid', {}),
 
   oppositions: () => req<Opposition[]>('GET', '/api/oppositions'),
   createOpposition: (partial: Partial<Opposition>) => req<Opposition>('POST', '/api/oppositions', partial),
