@@ -54,6 +54,26 @@ describe('Philippines DAU is a designation obligation, not an IR one', () => {
   });
 });
 
+describe('user-deleted date rows stay deleted', () => {
+  it('does not recreate a rule row the user suppressed, and re-creates it once un-suppressed', () => {
+    const m = blankMark({ jurisdiction: 'Australia' });
+    m.dates.push({ name: 'Application Filed', date: '2020-01-01', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2021-01-01', done: true });
+    ensureRuleRows(m, rules);
+    // The engine created a Renewal Deadline.
+    expect(m.dates.some((d) => d.name === 'Renewal Deadline')).toBe(true);
+    // User deletes it and it is recorded as suppressed → recompute must not bring it back.
+    m.dates = m.dates.filter((d) => d.name !== 'Renewal Deadline');
+    m.suppressedRules = ['Renewal Deadline'];
+    ensureRuleRows(m, rules);
+    expect(m.dates.some((d) => d.name === 'Renewal Deadline')).toBe(false);
+    // Clearing the suppression lets the engine manage it again.
+    m.suppressedRules = [];
+    ensureRuleRows(m, rules);
+    expect(m.dates.some((d) => d.name === 'Renewal Deadline')).toBe(true);
+  });
+});
+
 describe('registered design renewal logic', () => {
   it('AU design renews at filing + 5 years with a 10-year maximum term', () => {
     const m = blankMark({ jurisdiction: 'Australia', type: 'Registered Design' });

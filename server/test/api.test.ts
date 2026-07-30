@@ -368,6 +368,37 @@ describe('bulk import & clear', () => {
     await viewer.post('/api/marks/recompute-all').expect(403);
   });
 
+  it('locks all renewal dates so recompute can never shift them', async () => {
+    const m = (await admin.post('/api/marks').send({ name: 'PINME', jurisdiction: 'Australia', owner: 'Pin Holdings Pty Ltd' }).expect(201)).body;
+    m.dates = [
+      { name: 'Application Filed', date: '2015-01-01', done: true },
+      { name: 'Registration Date', date: '2016-01-01', done: true },
+    ];
+    // Saving computes the renewal from filing + 10y = 2025-01-01 (still un-pinned).
+    const saved = (await admin.put(`/api/marks/${m.id}`).send(m).expect(200)).body;
+    const before = saved.dates.find((d: { name: string }) => d.name === 'Renewal Deadline');
+    expect(before.date).toBe('2025-01-01');
+    expect(before.pinned).toBeFalsy();
+
+    // Lock every current renewal date as the source of truth.
+    const r = (await admin.post('/api/marks/pin-all-dates').expect(200)).body;
+    expect(r.pinned).toBeGreaterThanOrEqual(1);
+    const after = (await admin.get(`/api/marks/${m.id}`)).body;
+    const ren = after.dates.find((d: { name: string }) => d.name === 'Renewal Deadline');
+    expect(ren.pinned).toBe(true);
+    expect(ren.date).toBe('2025-01-01'); // frozen exactly as it stood — pin does not recompute
+
+    // Now move the filing date and recompute-all: an un-pinned renewal would jump to
+    // 2020-01-01, but the pin must hold it at 2025-01-01.
+    after.dates.find((d: { name: string }) => d.name === 'Application Filed').date = '2010-01-01';
+    await admin.put(`/api/marks/${after.id}`).send(after).expect(200);
+    await admin.post('/api/marks/recompute-all').expect(200);
+    const after2 = (await admin.get(`/api/marks/${m.id}`)).body;
+    expect(after2.dates.find((d: { name: string }) => d.name === 'Renewal Deadline').date).toBe('2025-01-01');
+
+    await viewer.post('/api/marks/pin-all-dates').expect(403);
+  });
+
   it('verifies the database against the source-of-truth CSV (read-only)', async () => {
     // A case whose source-of-truth dates we will check.
     const m = (await admin.post('/api/marks').send({ name: 'VERIFYME', jurisdiction: 'Australia', owner: 'Verify Holdings Pty Ltd' }).expect(201)).body;

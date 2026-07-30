@@ -53,6 +53,7 @@ export const api = {
   logCorrespondence: (id: string, entry: { to: string; subject: string; body: string }) => req<{ ok: true }>('POST', `/api/marks/${id}/correspondence`, entry),
   markHistory: (id: string) => req<{ at: string; user_name: string; summary: string }[]>('GET', `/api/marks/${id}/history`),
   recomputeAll: () => req<{ recomputed: number; failed: { id: string; name: string; error: string }[] }>('POST', '/api/marks/recompute-all', {}),
+  pinAllDates: () => req<{ pinned: number; casesChanged: number; casesTotal: number }>('POST', '/api/marks/pin-all-dates', {}),
   fetchAuLogos: (offset: number, limit = 12) => req<{ processed: number; updated: number; offset: number; total: number; errors: { name: string; error: string }[] }>('POST', '/api/marks/logos/fetch-au', { offset, limit }),
   propagateLogos: () => req<{ updated: number }>('POST', '/api/marks/logos/propagate', {}),
   attachLogos: (files: { name: string; url: string }[], overwrite: boolean) => req<{ filesMatched: number; marksUpdated: number; unmatched: string[]; totalFiles: number }>('POST', '/api/marks/logos/attach', { files, overwrite }),

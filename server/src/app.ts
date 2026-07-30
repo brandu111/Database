@@ -586,6 +586,34 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ ok: true });
   });
 
+  // Pin every current renewal deadline exactly as it stands now, so the date
+  // engine can never silently recompute or shift it. This freezes the live
+  // values as the source of truth WITHOUT recomputing anything first (running the
+  // engine could itself move a non-pinned date), so whatever is on screen today
+  // is exactly what gets locked. Reminders still recompute off the pinned date.
+  // One transaction, O(n) — safe on large portfolios.
+  app.post('/api/marks/pin-all-dates', full, (_req, res) => {
+    const all = listMarks(db);
+    let pinned = 0;
+    const changed: Mark[] = [];
+    for (const m of all) {
+      let ch = false;
+      for (const d of m.dates || []) {
+        // The only engine-computed hard date is the active "Renewal Deadline".
+        // Archived renewals are already done+pinned; reminders/grace are derived.
+        if (/^renewal deadline$/i.test(d.name) && d.date && !d.linkedToIR && !d.pinned) {
+          d.pinned = true;
+          pinned++;
+          ch = true;
+        }
+      }
+      if (ch) changed.push(m);
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ pinned, casesChanged: changed.length, casesTotal: all.length });
+  });
+
   // Re-run the deadline engine over every case, so rulebook changes (new
   // reminders, jurisdiction dates) backfill onto existing cases. Madrid families
   // are recomputed with the full set so designation renewals re-link correctly.

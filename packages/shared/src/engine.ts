@@ -148,8 +148,11 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
   // never to a Madrid International Registration or its designations (an IR is
   // never AU/NZ; a designation carries an irId).
   const conventionAllowed = ['Australia', 'New Zealand'].includes(m.jurisdiction) && !m.irId;
+  // Rows the user deleted by hand stay deleted — the engine must not recreate them.
+  const suppressed = new Set(m.suppressedRules || []);
   list.forEach((r) => {
     if (!r.name || !r.trigger) return;
+    if (suppressed.has(r.name)) return;
     if (/convention priority/i.test(r.name) && !conventionAllowed) return;
     // Post-registration gate, except deadlines driven by a specific manual event
     // date rather than a registration date: the Philippines DAU (from the filing /

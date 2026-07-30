@@ -589,6 +589,7 @@ function DataImport() {
   const [alertCutoff, setAlertCutoff] = useState('2026-06-01');
   const [alertMsg, setAlertMsg] = useState('');
   const [alertBusy, setAlertBusy] = useState(false);
+  const [pinBusy, setPinBusy] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ checked: number; matched: number; unmatched: number; mismatchCount: number; mismatches: { name: string; jur: string; field: string; source: string; current: string }[] } | null>(null);
 
@@ -856,6 +857,24 @@ function DataImport() {
               setBusy(false);
             }
           }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
+        </Card>
+
+        <Card label="Lock renewal dates (source of truth)">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Pins every renewal deadline currently in the database <strong>exactly as it stands now</strong>, so the date engine can never silently recompute or shift it — not on a lookup, not on “Recompute all”, not on a save. It does <strong>not</strong> recompute first, so today’s values are frozen as-is. You can still change any date by hand on the case, and reminders keep counting back from the locked date. Run this once, after you’ve confirmed the data is correct.
+          </div>
+          <button className="btn secondary small" disabled={pinBusy} onClick={async () => {
+            if (!window.confirm('Lock every current renewal deadline as the source of truth? The system will no longer recompute them; you can still edit any date manually on the case.')) return;
+            setPinBusy(true);
+            try {
+              const r = await api.pinAllDates();
+              window.alert(`Locked ${r.pinned} renewal date${r.pinned === 1 ? '' : 's'} across ${r.casesChanged} of ${r.casesTotal} cases. These are now immune to automatic recomputation.`);
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : 'Lock failed.');
+            } finally {
+              setPinBusy(false);
+            }
+          }}>{pinBusy ? 'Working…' : '🔒 Lock all renewal dates'}</button>
         </Card>
 
         <Card label="Logos — fetch &amp; copy">

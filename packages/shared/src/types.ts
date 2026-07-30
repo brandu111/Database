@@ -137,6 +137,12 @@ export interface Mark {
   comments: string;
   disclaimers: string;
   dates: MarkDate[];
+  /**
+   * Names of rule-driven date rows the user has explicitly deleted. The engine
+   * will not recreate a row whose name appears here, so a manual delete sticks.
+   * Re-adding a date with the same name clears it from this list.
+   */
+  suppressedRules?: string[];
   actions: MarkAction[];
   contacts: MarkContact[];
   docs: MarkDoc[];

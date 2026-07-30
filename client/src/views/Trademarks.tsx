@@ -871,7 +871,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
                         {sendEmail && <button className="btn danger-link email-btn" title="Send client email" onClick={sendEmail}><span className="email-ico">✉</span></button>}
-                        {canEdit && <button className="btn danger-link" onClick={() => update({ dates: m.dates.filter((_, j) => j !== i) }, true)}>✕</button>}
+                        {canEdit && <button className="btn danger-link" title="Remove this date" onClick={() => update({ dates: m.dates.filter((_, j) => j !== i), suppressedRules: Array.from(new Set([...(m.suppressedRules || []), d.name])) }, true)}>✕</button>}
                       </td>
                     </tr>
                   );
@@ -884,7 +884,10 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 <datalist id="date-names">{jurNames.map((n) => <option key={n} value={n} />)}</datalist>
                 <DateInput value={addDateDate} onChange={setAddDateDate} style={{ width: 150 }} />
                 <button className="btn small" disabled={!addDateName} onClick={() => {
-                  update({ dates: [...m.dates, { name: addDateName, date: addDateDate || todayISO(), done: false, createdBy: myName, notify: true }] }, true);
+                  update({
+                    dates: [...m.dates, { name: addDateName, date: addDateDate || todayISO(), done: false, createdBy: myName, notify: true }],
+                    suppressedRules: (m.suppressedRules || []).filter((n) => n !== addDateName),
+                  }, true);
                   setAddDateName('');
                   setAddDateDate('');
                 }}>
