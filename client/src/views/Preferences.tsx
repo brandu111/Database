@@ -589,6 +589,23 @@ function DataImport() {
   const [alertCutoff, setAlertCutoff] = useState('2026-06-01');
   const [alertMsg, setAlertMsg] = useState('');
   const [alertBusy, setAlertBusy] = useState(false);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{ checked: number; matched: number; unmatched: number; mismatchCount: number; mismatches: { name: string; jur: string; field: string; source: string; current: string }[] } | null>(null);
+
+  const verifyAgainstFile = async (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    setVerifyBusy(true);
+    setVerifyResult(null);
+    try {
+      const rows = parseCsv(await f.text());
+      setVerifyResult(await api.verifyImport(rows));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Verify failed.');
+    } finally {
+      setVerifyBusy(false);
+    }
+  };
 
   const clearOldAlerts = async () => {
     if (!window.confirm(`Mark every outstanding deadline, reminder and flagged action dated before ${alertCutoff} as done? They'll be cleared from Alerts but kept on each case as history.`)) return;
@@ -868,6 +885,35 @@ function DataImport() {
             </label>
           </div>
           {logoMsg && <div className="hint" style={{ marginTop: 8 }}>{logoMsg}</div>}
+        </Card>
+
+        <Card label="Verify against source-of-truth file">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Read-only check. Upload your authoritative cases CSV and this compares each case's <strong>renewal, registration and filing dates</strong> in the live database against the file, listing anything that differs. Nothing is changed. A clean result (0 differences) confirms the database matches your source of truth.
+          </div>
+          <label className="btn secondary small" style={{ cursor: verifyBusy ? 'default' : 'pointer', display: 'inline-block' }}>
+            {verifyBusy ? 'Checking…' : '⬆ Choose CSV to verify against'}
+            <input type="file" accept=".csv,text/csv" disabled={verifyBusy} style={{ display: 'none' }}
+              onChange={(e) => { verifyAgainstFile(e.target.files); e.currentTarget.value = ''; }} />
+          </label>
+          {verifyResult && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontWeight: 700, color: verifyResult.mismatchCount ? 'var(--danger)' : 'var(--success)' }}>
+                {verifyResult.matched} of {verifyResult.checked} cases matched · {verifyResult.mismatchCount} date difference{verifyResult.mismatchCount === 1 ? '' : 's'}{verifyResult.unmatched ? ` · ${verifyResult.unmatched} file rows not matched` : ''}.
+              </div>
+              {verifyResult.mismatchCount > 0 && (
+                <table className="list" style={{ marginTop: 8 }}>
+                  <thead><tr><th>Mark</th><th>Jurisdiction</th><th>Date</th><th>Source of truth</th><th>In database</th></tr></thead>
+                  <tbody>
+                    {verifyResult.mismatches.slice(0, 100).map((mm, i) => (
+                      <tr key={i}><td>{mm.name}</td><td>{mm.jur}</td><td>{mm.field}</td><td className="mono">{mm.source}</td><td className="mono" style={{ color: 'var(--danger)' }}>{mm.current}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {verifyResult.mismatchCount > 100 && <div className="hint" style={{ marginTop: 6 }}>…and {verifyResult.mismatchCount - 100} more.</div>}
+            </div>
+          )}
         </Card>
 
         <Card label="Link Madrid families">

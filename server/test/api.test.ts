@@ -367,6 +367,40 @@ describe('bulk import & clear', () => {
     // Non-full users may not run it.
     await viewer.post('/api/marks/recompute-all').expect(403);
   });
+
+  it('verifies the database against the source-of-truth CSV (read-only)', async () => {
+    // A case whose source-of-truth dates we will check.
+    const m = (await admin.post('/api/marks').send({ name: 'VERIFYME', jurisdiction: 'Australia', owner: 'Verify Holdings Pty Ltd' }).expect(201)).body;
+    m.dates = [
+      { name: 'Application Filed', date: '2018-03-15', done: true },
+      { name: 'Registration Date', date: '2019-01-10', done: true },
+      { name: 'Renewal Deadline', date: '2028-03-15', done: false, pinned: true },
+    ];
+    await admin.put(`/api/marks/${m.id}`).send(m).expect(200);
+
+    const rows = [
+      // Matches by jurisdiction+name+owner+filed; all dates agree → no mismatch.
+      { Jurisdiction: 'Australia', MarkName: 'VERIFYME', OwnerName: 'Verify Holdings Pty Ltd', FiledDate: '15/03/2018', RegistrationDate: '10/01/2019', RenewalDate: '15/03/2028' },
+      // Same case but a DIFFERENT renewal date → one mismatch reported.
+      { Jurisdiction: 'Australia', MarkName: 'VERIFYME', OwnerName: 'Verify Holdings Pty Ltd', FiledDate: '15/03/2018', RenewalDate: '15/03/2029' },
+      // A row that matches nothing in the DB → counted as unmatched, not a mismatch.
+      { Jurisdiction: 'Australia', MarkName: 'NOSUCHMARK', OwnerName: 'Nobody Pty Ltd', FiledDate: '01/01/2020', RenewalDate: '01/01/2030' },
+    ];
+    const r = (await admin.post('/api/marks/verify-import').send({ rows }).expect(200)).body;
+    expect(r.checked).toBe(3);
+    expect(r.matched).toBe(2);
+    expect(r.unmatched).toBe(1);
+    expect(r.mismatchCount).toBe(1);
+    expect(r.mismatches[0].field).toBe('Renewal Deadline');
+    expect(r.mismatches[0].source).toBe('2029-03-15');
+    expect(r.mismatches[0].current).toBe('2028-03-15');
+    // Verification must not mutate anything.
+    const after = (await admin.get(`/api/marks/${m.id}`)).body;
+    expect(after.dates.find((d: { name: string }) => d.name === 'Renewal Deadline').date).toBe('2028-03-15');
+    // Empty payload rejected; viewers are allowed to run a read-only check? No — gated to full.
+    await admin.post('/api/marks/verify-import').send({ rows: [] }).expect(400);
+    await viewer.post('/api/marks/verify-import').send({ rows }).expect(403);
+  });
 });
 
 describe('oppositions', () => {

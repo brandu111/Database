@@ -59,6 +59,7 @@ export const api = {
   clearOldAlerts: (before: string) => req<{ before: string; markDates: number; actions: number; oppDates: number }>('POST', '/api/marks/clear-old-alerts', { before }),
   bulkDeleteMarks: (ids: string[]) => req<{ deleted: number }>('POST', '/api/marks/bulk-delete', { ids }),
   linkMadrid: () => req<{ families: number; linked: number; auBasicsLinked: number }>('POST', '/api/marks/link-madrid', {}),
+  verifyImport: (rows: Record<string, string>[]) => req<{ checked: number; matched: number; unmatched: number; mismatchCount: number; mismatches: { id: string; name: string; jur: string; field: string; source: string; current: string }[] }>('POST', '/api/marks/verify-import', { rows }),
 
   oppositions: () => req<Opposition[]>('GET', '/api/oppositions'),
   createOpposition: (partial: Partial<Opposition>) => req<Opposition>('POST', '/api/oppositions', partial),

@@ -43,7 +43,7 @@ import {
   type DB,
 } from './db.js';
 import { IpAuError, ipAuConfigured, lookupTradeMark } from './ipaustralia.js';
-import { csvRowToMark } from './import-marks.js';
+import { csvRowToMark, parseImportDate } from './import-marks.js';
 import { groupCompanies } from './import-companies.js';
 import { mailerConfigured, sendMail } from './mailer.js';
 import {
@@ -1026,6 +1026,46 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
     tx();
     res.json({ families, linked: changed.size, auBasicsLinked: auLinked });
+  });
+
+  // Verify the live database against the authoritative import CSV. Read-only:
+  // matches each CSV row to a case (jurisdiction + mark name + owner + filing
+  // date) and reports any where the key dates differ from the source of truth.
+  app.post('/api/marks/verify-import', full, (req, res) => {
+    const rows: Record<string, string>[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) return res.status(400).json({ error: 'No rows to verify.' });
+    const nName = (s?: string) => (s || '').toLowerCase().replace(/\b(logo|device|stylised|stylized|word|series|and logo)\b/g, '').replace(/[^a-z0-9]/g, '');
+    const nOwner = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const nJur = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const dateOf = (m: Mark, n: string) => (m.dates || []).find((d) => d.name === n)?.date || '';
+    const keyOf = (jur: string, name: string, owner: string, filed: string) => `${nJur(jur)}|${nName(name)}|${nOwner(owner)}|${filed}`;
+    const index = new Map<string, Mark>();
+    for (const m of listMarks(db)) {
+      const k = keyOf(m.jurisdiction, m.name, m.owner, dateOf(m, 'Application Filed'));
+      if (!index.has(k)) index.set(k, m);
+    }
+    const fields: { csv: string; row: string }[] = [
+      { csv: 'RenewalDate', row: 'Renewal Deadline' },
+      { csv: 'RegistrationDate', row: 'Registration Date' },
+      { csv: 'FiledDate', row: 'Application Filed' },
+    ];
+    let matched = 0;
+    let unmatched = 0;
+    const mismatches: { id: string; name: string; jur: string; field: string; source: string; current: string }[] = [];
+    for (const r of rows) {
+      const filed = parseImportDate(r.FiledDate || '');
+      const m = index.get(keyOf(r.Jurisdiction || '', r.MarkName || '', r.OwnerName || '', filed));
+      if (!m) { unmatched++; continue; }
+      matched++;
+      for (const f of fields) {
+        const source = parseImportDate(r[f.csv] || '');
+        const current = dateOf(m, f.row);
+        if (source && source !== current) {
+          mismatches.push({ id: m.id, name: m.name || '(untitled)', jur: m.jurisdiction, field: f.row, source, current: current || '(none)' });
+        }
+      }
+    }
+    res.json({ checked: rows.length, matched, unmatched, mismatches: mismatches.slice(0, 500), mismatchCount: mismatches.length });
   });
 
   // Tidy up historical alerts: mark every not-done deadline / reminder / flagged
