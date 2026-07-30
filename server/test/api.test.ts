@@ -318,7 +318,7 @@ describe('bulk import & clear', () => {
     const gMx = marks.find((m) => m.id === mx.id)!;
     const gAu = marks.find((m) => m.id === au.id)!;
     expect(gUk.madridId).toBe(gIr.madridId);
-    expect(gUk.irId).toBe(gIr.id);
+    expect(gUk.irId).toBeFalsy(); // related for navigation, but NOT a locked designation
     expect(gAu.madridId).toBe(gIr.madridId); // AU basic joined the family
     expect(gMx.irNumber).toBe('1683883');
     expect(gMx.registration).toBe('2554746(29) / 2554747(40)'); // IR prefix stripped, national kept

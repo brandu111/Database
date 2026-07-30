@@ -573,7 +573,11 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   const inFamily = relatedList.length > 1;
   const filedOf = (r: Mark) => (r.dates || []).find((x) => x.name === 'Application Filed')?.date || '';
   const familyLabel = (r: Mark) =>
-    r.irId ? `Designation — ${r.jurisdiction}` : r.jurisdiction === 'Madrid Protocol (WIPO)' ? 'International Registration' : `Basic case — ${r.jurisdiction}`;
+    r.jurisdiction === 'Madrid Protocol (WIPO)'
+      ? 'International Registration'
+      : r.irId || (r.irNumber && r.jurisdiction !== 'Australia' && r.jurisdiction !== 'New Zealand')
+        ? `Designation — ${r.jurisdiction}`
+        : `Basic case — ${r.jurisdiction}`;
 
   return (
     <>

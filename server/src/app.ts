@@ -998,20 +998,27 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     let families = 0;
     let auLinked = 0;
     for (const [ir, members] of groups) {
-      if (members.length < 2) continue;
+      // Never hijack a family created in-app via the Madrid feature (madridId
+      // "fam-…" / has a basicId) — only manage imported/standalone cases.
+      const managed = members.filter((x) => !(x.madridId || '').startsWith('fam-') && !x.basicId);
+      if (managed.length < 2) continue;
       families++;
       const famId = `mfam-${ir}`;
-      const irCase = members.find((x) => x.jurisdiction === 'Madrid Protocol (WIPO)');
-      for (const x of members) {
+      const irCase = managed.find((x) => x.jurisdiction === 'Madrid Protocol (WIPO)');
+      for (const x of managed) {
         if (x.madridId !== famId) { x.madridId = famId; changed.add(x); }
-        if (irCase && x.id !== irCase.id && x.irId !== irCase.id) { x.irId = irCase.id; changed.add(x); }
+        // Keep each case INDEPENDENT: relate for navigation, but never turn it
+        // into a locked designation (which would inherit/hide its renewal and
+        // override the imported source-of-truth date). Clear any prior irId /
+        // inherited-renewal lock left by an earlier run.
+        if (x.irId) { x.irId = undefined; changed.add(x); }
+        for (const d of x.dates || []) { if (d.linkedToIR) { d.linkedToIR = false; delete d.auBase; changed.add(x); } }
       }
-      // Attach the originating AU/NZ basic (same owner + mark name), if any.
-      const anchor = irCase || members[0];
+      // Relate the originating AU/NZ basic too (navigation only, no irId).
+      const anchor = irCase || managed[0];
       const basic = basics.get(`${nOwner(anchor.owner)}|${nName(anchor.name)}`);
       if (basic && basic.madridId !== famId && !basic.irId) {
         basic.madridId = famId;
-        if (irCase && !irCase.basicId) { irCase.basicId = basic.id; changed.add(irCase); }
         changed.add(basic);
         auLinked++;
       }
