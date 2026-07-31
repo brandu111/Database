@@ -311,6 +311,8 @@ export interface FirmSettings {
   logo: string;
   /** Signature block appended to client emails via the [Signature] merge field. */
   emailSignature?: string;
+  /** Months after Application Filed that the automatic "Case update" task falls due (default 3). */
+  caseUpdateMonths?: number;
 }
 
 export interface AlertRow {

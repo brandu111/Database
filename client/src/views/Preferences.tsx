@@ -536,7 +536,14 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
             <Field label="Law firm name"><input type="text" value={fs.lawFirmName} disabled={ro} onChange={(e) => saveSettings({ ...fs, lawFirmName: e.target.value })} /></Field>
             <Field label="Firm contact email"><input type="text" value={fs.firmContactEmail} disabled={ro} onChange={(e) => saveSettings({ ...fs, firmContactEmail: e.target.value })} /></Field>
           </div>
-          <Field label="Documents folder"><input type="text" value={fs.documentsFolder} disabled={ro} onChange={(e) => saveSettings({ ...fs, documentsFolder: e.target.value })} /></Field>
+          <div className="grid2">
+            <Field label="Documents folder"><input type="text" value={fs.documentsFolder} disabled={ro} onChange={(e) => saveSettings({ ...fs, documentsFolder: e.target.value })} /></Field>
+            <Field label="“Case update” task — months after filing">
+              <input type="number" min={1} max={60} value={fs.caseUpdateMonths ?? 3} disabled={ro}
+                onChange={(e) => saveSettings({ ...fs, caseUpdateMonths: Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 3)) })} />
+              <div className="hint" style={{ marginTop: 2 }}>The automatic Case update task falls this many months after each application is filed. Changes apply to new filings; run “Recompute all” to update existing cases.</div>
+            </Field>
+          </div>
           <Field label="Default firm sign-off (fallback for staff without their own)">
             <textarea rows={4} value={fs.emailSignature || ''} disabled={ro} onChange={(e) => saveSettings({ ...fs, emailSignature: e.target.value })}
               placeholder={'Kind regards,\n\nBrandU Legal\nTrade Mark Attorneys'} />

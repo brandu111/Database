@@ -290,6 +290,7 @@ export function getFirmSettings(db: DB): FirmSettings {
     firmContactEmail: '',
     documentsFolder: '',
     logo: '',
+    caseUpdateMonths: 3,
   }));
 }
 

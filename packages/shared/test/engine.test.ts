@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyStage, ensureRuleRows, linkDesignationRenewal } from '../src/engine.js';
+import { shift } from '../src/dates.js';
 import { defaultRules, migrateRules, oppSchedule, RULES_VERSION } from '../src/rules.js';
 import type { Mark, RuleBook } from '../src/types.js';
 
@@ -90,6 +91,13 @@ describe('universal Case update task (filing + 3 months)', () => {
     const cu = m.dates.find((d) => d.name === 'Case update');
     expect(cu).toBeTruthy();
     expect(cu!.date > today).toBe(true); // three months out, i.e. upcoming
+  });
+  it('honours a custom interval from firm settings', () => {
+    const m = blankMark({ jurisdiction: 'Fiji' });
+    m.dates.push({ name: 'Application Filed', date: today, done: false });
+    ensureRuleRows(m, rules, undefined, 6);
+    const cu = m.dates.find((d) => d.name === 'Case update')!;
+    expect(cu.date).toBe(shift(today, 6, 'months'));
   });
   it('does not retroactively add a Case update to a long-filed case', () => {
     const m = blankMark({ jurisdiction: 'Australia' });

@@ -129,7 +129,7 @@ const POST_REGISTRATION = /renewal|non-use|declaration of use|dependency|\bdau\b
  * `allMarks` supplies Madrid family members so a designation's renewal can be
  * linked to (and re-propagated from) its parent International Registration.
  */
-export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): void {
+export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[], caseUpdateMonths = 3): void {
   if (!m) return;
   // Registered designs use their own renewal cycle / maximum-term rules rather
   // than the trade-mark rulebook.
@@ -185,8 +185,9 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
   // sync with the filing date unless pinned/edited, and not recreated once the
   // user deletes it.
   const filedForUpdate = val('Application Filed');
+  const cuMonths = Number.isFinite(caseUpdateMonths) && caseUpdateMonths > 0 ? caseUpdateMonths : 3;
   if (filedForUpdate && !suppressed.has('Case update')) {
-    const due = shift(filedForUpdate, 3, 'months');
+    const due = shift(filedForUpdate, cuMonths, 'months');
     const existing = (m.dates || []).find((d) => d.name === 'Case update');
     if (existing) {
       if (!existing.pinned) existing.date = due;

@@ -116,7 +116,7 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   const m = incoming;
   all.push(m);
   if (previous && previous.status !== m.status) applyStage(m, rules, m.status);
-  ensureRuleRows(m, rules, all);
+  ensureRuleRows(m, rules, all, getFirmSettings(db).caseUpdateMonths);
   m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
   // Keep the International Registration number in sync across the Madrid family:
   // it is entered once on the IR case and copied down to every designation
@@ -753,11 +753,12 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     // renewals still re-link to their IR.
     const rules = loadRules(db);
     const all = listMarks(db);
+    const cuMonths = getFirmSettings(db).caseUpdateMonths;
     let recomputed = 0;
     const failed: { id: string; name: string; error: string }[] = [];
     for (const m of all) {
       try {
-        ensureRuleRows(m, rules, all);
+        ensureRuleRows(m, rules, all, cuMonths);
         m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
         recomputed++;
       } catch (e) {
@@ -789,12 +790,13 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     // cases are standalone (no Madrid family links until linked in-app), so the
     // engine doesn't need the full set here. Persist in one transaction.
     const rules = loadRules(db);
+    const cuMonths = getFirmSettings(db).caseUpdateMonths;
     const errors: { line: number; error: string }[] = [];
     const built: Mark[] = [];
     rows.forEach((row, i) => {
       try {
         const m = blankMark(csvRowToMark(row));
-        ensureRuleRows(m, rules);
+        ensureRuleRows(m, rules, undefined, cuMonths);
         m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
         built.push(m);
       } catch (e) {
