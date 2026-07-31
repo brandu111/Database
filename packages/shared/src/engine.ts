@@ -179,6 +179,10 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[], case
   if (!conventionAllowed) {
     m.dates = (m.dates || []).filter((d) => !(/convention priority/i.test(d.name) && (d.auBase || d.auGen)));
   }
+  // "Opposition period expires" is no longer tracked: if no opposition is filed
+  // the matter just proceeds to registration. Remove any auto-generated rows
+  // (and their reminders) so they clear from every case on recompute/save.
+  m.dates = (m.dates || []).filter((d) => !(/opposition period expires/i.test(d.name) && (d.auBase || d.auGen)));
   // Universal "OA Issued?" prompt: a set number of months after an application is
   // filed (default 3), on every matter regardless of jurisdiction — a nudge to
   // check whether an office action has issued. Created only while still upcoming

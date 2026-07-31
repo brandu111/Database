@@ -8,7 +8,7 @@ import type { OppDateMaster, OppSchedule, Rule, RuleBook } from './types.js';
  * If any built-in rule changes, bump RULES_VERSION and let migrateRules()
  * refresh stored rulebooks (user rules flagged `custom: true` survive).
  */
-export const RULES_VERSION = 11;
+export const RULES_VERSION = 12;
 
 const T_REN =
   'Dear {{client}},\n\nRe: Trade mark {{mark}} ({{jurisdiction}})\n\nThis is a reminder that the renewal deadline for the above trade mark is {{deadline}}. Please confirm whether you would like us to attend to the renewal, and we will provide a cost estimate.\n\nKind regards\nBrandU Legal';
@@ -111,7 +111,6 @@ export function defaultRules(): RuleBook {
       // (plus the automatic 1-week reminder the engine adds).
       r('Acceptance Deadline - Instructions Reminder', 'Acceptance Deadline', -3, 'months', true, T_OA),
       r('Acceptance Deadline - Final Reminder', 'Acceptance Deadline', -1, 'months', true, T_OA),
-      r('Opposition period expires', 'Publication Date', 2, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
       r('Renewal Deadline', 'Application Filed', 10, 'years', true, T_REN),
       r('Renewal Reminder', 'Renewal Deadline', -6, 'months', true, T_REN),
@@ -131,7 +130,6 @@ export function defaultRules(): RuleBook {
     'New Zealand': [
       r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
       r('Compliance Deadline', 'OA Issued', 12, 'months', true, T_OA),
-      r('Opposition period expires', 'Publication Date', 3, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
       ...renewalChain('Application Filed', 10),
     ],
@@ -140,7 +138,6 @@ export function defaultRules(): RuleBook {
       r('OA Response Due', 'OA Issued', 6, 'months', true, T_OA),
       r('OA Response - Instructions Reminder', 'OA Response Due', -2, 'months', true, T_OA),
       r('Statement of Use Due', 'Notice of Allowance', 6, 'months', true),
-      r('Opposition period expires', 'Publication Date', 30, 'days', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
       // §8 Declaration of Use — 5th–6th year window (grace to 6.5 years). First
       // client reminder one year out, then six months, plus the automatic 1-week
@@ -159,14 +156,12 @@ export function defaultRules(): RuleBook {
     'United Kingdom': [
       r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
       r('OA Response Due', 'OA Issued', 2, 'months', true, T_OA),
-      r('Opposition period expires', 'Publication Date', 2, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 5, 'years', true),
       ...renewalChain('Application Filed', 10),
     ],
     'European Union (EUTM)': [
       r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
       r('OA Response Due', 'OA Issued', 2, 'months', true, T_OA),
-      r('Opposition period expires', 'Publication Date', 3, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 5, 'years', true),
       ...renewalChain('Application Filed', 10),
     ],
@@ -184,25 +179,21 @@ export function defaultRules(): RuleBook {
     ],
     Canada: [
       r('OA Response Due', 'OA Issued', 6, 'months', true, T_OA),
-      r('Opposition period expires', 'Publication Date', 2, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
       ...renewalChain('Registration Date', 10),
     ],
     China: [
       r('Review of Refusal Deadline', 'OA Issued', 15, 'days', true, T_OA),
-      r('Opposition period expires', 'Publication Date', 3, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
       ...renewalChain('Registration Date', 10),
     ],
     Japan: [
       r('OA Response Due', 'OA Issued', 3, 'months', true, T_OA),
-      r('Opposition period expires', 'Publication Date', 2, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
       ...renewalChain('Registration Date', 10),
     ],
     Singapore: [
       r('OA Response Due', 'OA Issued', 4, 'months', true, T_OA),
-      r('Opposition period expires', 'Publication Date', 2, 'months', true),
       r('Non-use vulnerability date', 'Registration Date', 5, 'years', true),
       ...renewalChain('Application Filed', 10),
     ],

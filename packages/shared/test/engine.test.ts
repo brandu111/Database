@@ -345,11 +345,11 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     expect(dateOf(m, 'OA Response Due — 1 Week Reminder')).toBe('2018-07-08');
   });
 
-  it('AU opposition period runs 2 months from the advertisement/publication date', () => {
+  it('no longer generates an "Opposition period expires" date', () => {
     const m = blankMark();
     m.dates.push({ name: 'Publication Date', date: '2024-05-20', done: true });
     ensureRuleRows(m, rules);
-    expect(dateOf(m, 'Opposition period expires')).toBe('2024-07-20');
+    expect(m.dates.some((d) => d.name === 'Opposition period expires')).toBe(false);
   });
 
   it('generates monthly countdown reminders for rules with rem set', () => {

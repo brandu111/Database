@@ -173,9 +173,13 @@ const escHtml = (s: unknown) => String(s ?? '').split('&').join('&amp;').split('
  * Convention Priority deadlines (and their reminders) are only relevant while
  * the 6-month window is open — once expired (date in the past) they're dropped.
  */
-function alertSuppressed(name: string, date: string, today: string): boolean {
+function alertSuppressed(name: string, date: string, today: string, status?: string): boolean {
   if (/non-use vulnerability/i.test(name)) return true;
   if (/convention priority/i.test(name) && date < today) return true;
+  // Dead/closed matters: nothing should alert once the matter is lapsed,
+  // withdrawn, abandoned, refused, removed, ceased or otherwise closed (renewal
+  // reminders included — a lapsed case isn't being renewed).
+  if (status && /lapse|dead|withdraw|abandon|refus|remov|ceas|not renewed|expired|closed|finalis|finaliz/i.test(status)) return true;
   return false;
 }
 
@@ -355,7 +359,7 @@ export function buildDigests(db: DB, today: string): DigestBucket[] {
   for (const m of listMarks(db)) {
     for (const d of m.dates || []) {
       if (d.done || !due(d.date)) continue;
-      if (alertSuppressed(d.name, d.date, today)) continue;
+      if (alertSuppressed(d.name, d.date, today, m.status)) continue;
       add(d.createdBy, { date: d.date, name: d.name, mark: m.name || '(untitled)', jur: m.jurisdiction || '', overdue: d.date < today });
     }
     for (const a of m.actions || []) {
@@ -425,7 +429,7 @@ function computeAlerts(db: DB, alertDays: number, forCompany?: string): AlertRow
     });
     (m.dates || []).forEach((d) => {
       if (d.done || !d.date) return;
-      if (alertSuppressed(d.name, d.date, nowIso)) return;
+      if (alertSuppressed(d.name, d.date, nowIso, m.status)) return;
       if (win(d.date))
         rows.push({
           date: d.date,
