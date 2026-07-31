@@ -691,27 +691,9 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 {lookupMsg && <span className="hint" style={{ color: lookupMsg.startsWith('Loaded') ? 'var(--success)' : 'var(--danger)' }}>{lookupMsg}</span>}
               </div>
             )}
-            <Field label="Goods / services">
-              <textarea value={m.goods} onChange={(e) => update({ goods: e.target.value })} disabled={ro} />
-            </Field>
-            <div className="grid3">
+            <div className="grid2">
               <Field label="BrandU Legal file no."><input type="text" value={m.matter} onChange={(e) => update({ matter: e.target.value })} disabled={ro} /></Field>
               <Field label="Client ref."><input type="text" value={m.clientDocket} onChange={(e) => update({ clientDocket: e.target.value })} disabled={ro} /></Field>
-              <Field label="Responsible attorney (staff member)">
-                <select value={m.attorney || ''} onChange={(e) => update({ attorney: e.target.value })} disabled={ro}>
-                  <option value="">— Unassigned —</option>
-                  {[...new Set([...staff.map((s) => s.name), ...(m.attorney ? [m.attorney] : [])])].map((n) => (
-                    <option key={n} value={n}>{n}{staff.find((s) => s.name === n)?.title ? ` — ${staff.find((s) => s.name === n)!.title}` : ''}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <div className="grid2">
-              <Field label="Renewal fee estimate ($)"><input type="number" value={m.renewalFee ?? ''} onChange={(e) => update({ renewalFee: e.target.value ? Number(e.target.value) : undefined })} disabled={ro} /></Field>
-              <Field label="Tags">
-                <input type="text" value={(m.tags || []).join(', ')} placeholder="e.g. key brand, watch"
-                  onChange={(e) => update({ tags: e.target.value.split(/[;,]+/).map((t) => t.trim()).filter(Boolean) })} disabled={ro} />
-              </Field>
             </div>
           </Card>
 
@@ -771,11 +753,21 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             </div>
           ) : undefined}>
             <div className="grid2">
+              <Field label="Responsible attorney (BrandU staff)">
+                <select value={m.attorney || ''} onChange={(e) => update({ attorney: e.target.value })} disabled={ro}>
+                  <option value="">— Unassigned —</option>
+                  {[...new Set([...staff.map((s) => s.name), ...(m.attorney ? [m.attorney] : [])])].map((n) => (
+                    <option key={n} value={n}>{n}{staff.find((s) => s.name === n)?.title ? ` — ${staff.find((s) => s.name === n)!.title}` : ''}</option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Foreign associate / agent">
                 <input type="text" list="associate-contacts" value={m.associate || ''} onChange={(e) => update({ associate: e.target.value })} disabled={ro}
                   placeholder="Start typing to pull from Contacts…" />
                 <datalist id="associate-contacts">{companies.map((c) => <option key={c.id} value={c.name} />)}</datalist>
               </Field>
+            </div>
+            <div className="grid2">
               <Field label="Associate’s file ref."><input type="text" value={m.associateRef || ''} onChange={(e) => update({ associateRef: e.target.value })} disabled={ro} /></Field>
             </div>
             {(m.contacts || []).length === 0 && (
@@ -807,40 +799,6 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             <datalist id="case-contact-names">{contactNames.map((n) => <option key={n} value={n} />)}</datalist>
           </Card>
 
-          <Card label="Disclaimers">
-            <textarea value={m.disclaimers} onChange={(e) => update({ disclaimers: e.target.value })} disabled={ro} />
-          </Card>
-          <Card label="Comments">
-            <textarea value={m.comments} onChange={(e) => update({ comments: e.target.value })} disabled={ro} />
-          </Card>
-
-          <Card label="Documents" right={canEdit ? <button className="btn small" onClick={() => update({ docs: [...(m.docs || []), { desc: '', link: '' }] }, true)}>+ Add document</button> : undefined}>
-            {(m.docs || []).length === 0 && <div className="hint">No documents.</div>}
-            {(m.docs || []).map((d, i) => (
-              <div key={i} className="row" style={{ marginBottom: 6 }}>
-                <input type="text" placeholder="Description" style={{ flex: 2 }} value={d.desc} disabled={ro}
-                  onChange={(e) => update({ docs: m.docs.map((x, j) => (j === i ? { ...x, desc: e.target.value } : x)) })} />
-                <input type="text" placeholder="Link" style={{ flex: 2 }} value={d.link} disabled={ro}
-                  onChange={(e) => update({ docs: m.docs.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)) })} />
-                {d.fileUrl ? (
-                  <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)', fontSize: 12.5 }}>{d.fileName || 'file'}</a>
-                ) : (
-                  canEdit && (
-                    <label className="btn secondary small" style={{ cursor: 'pointer' }}>
-                      ⬆ Upload
-                      <input type="file" style={{ display: 'none' }} onChange={async (e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        const up = await uploadFile(f);
-                        update({ docs: m.docs.map((x, j) => (j === i ? { ...x, fileUrl: up.url, fileName: up.fileName, desc: x.desc || up.fileName } : x)) }, true);
-                      }} />
-                    </label>
-                  )
-                )}
-                {canEdit && <button className="btn danger-link" onClick={() => update({ docs: m.docs.filter((_, j) => j !== i) }, true)}>✕</button>}
-              </div>
-            ))}
-          </Card>
         </div>
 
         <div>
@@ -897,28 +855,82 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             )}
           </Card>
 
-          <Card label="Trade mark actions" right={canEdit ? <button className="btn small" onClick={() => update({ actions: [...(m.actions || []), { date: todayISO(), text: '', done: false, createdBy: myName }] }, true)}>+ Add action</button> : undefined}>
-            {(m.actions || []).length === 0 && <div className="hint">No actions.</div>}
-            {(m.actions || []).map((a, i) => (
+        </div>
+      </div>
+
+      <Card label="Goods / services">
+        <textarea value={m.goods} onChange={(e) => update({ goods: e.target.value })} disabled={ro} rows={5} />
+      </Card>
+
+      <Card label="Trade mark actions" right={canEdit ? <button className="btn small" onClick={() => update({ actions: [...(m.actions || []), { date: todayISO(), text: '', done: false, createdBy: myName }] }, true)}>+ Add action</button> : undefined}>
+        {(m.actions || []).length === 0 && <div className="hint">No actions.</div>}
+        {(m.actions || []).length > 0 && (
+          <table className="list">
+            <thead>
+              <tr><th style={{ width: 30 }}>✓</th><th style={{ width: 150 }}>Date</th><th>Trade mark action</th><th style={{ width: 170 }}>Assigned to</th><th style={{ width: 60 }}>Alert</th><th style={{ width: 40 }} /></tr>
+            </thead>
+            <tbody>
+              {m.actions.map((a, i) => (
+                <tr key={i}>
+                  <td><input type="checkbox" checked={!!a.done} disabled={ro} onChange={() => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) }, true)} /></td>
+                  <td><DateInput value={a.date} disabled={ro} onChange={(iso) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, date: iso } : x)) }, true)} /></td>
+                  <td><input type="text" style={{ width: '100%' }} className={a.done ? 'done' : ''} value={a.text} disabled={ro} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)) })} /></td>
+                  <td>
+                    <select value={a.assignee || ''} disabled={ro} title="Assign to a staff member — the alert is forwarded to them and shows under their dashboard" style={{ width: '100%' }}
+                      onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, assignee: e.target.value } : x)) }, true)}>
+                      <option value="">Assign to…</option>
+                      {[...new Set([...staff.map((s) => s.name), ...(a.assignee ? [a.assignee] : [])])].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button className="btn danger-link" title={a.alert ? 'Alert on — shows in Alerts tab' : 'Alert off'} disabled={ro}
+                      style={{ color: a.alert ? 'var(--accent)' : '#c8c7c2' }}
+                      onClick={() => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, alert: !x.alert, alertDate: x.alertDate || x.date || todayISO() } : x)) }, true)}>🔔</button>
+                  </td>
+                  <td>{canEdit && <button className="btn danger-link" onClick={() => update({ actions: m.actions.filter((_, j) => j !== i) }, true)}>✕</button>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <div className="detail-cols">
+        <div>
+          <Card label="Disclaimers">
+            <textarea value={m.disclaimers} onChange={(e) => update({ disclaimers: e.target.value })} disabled={ro} />
+          </Card>
+
+          <Card label="Documents" right={canEdit ? <button className="btn small" onClick={() => update({ docs: [...(m.docs || []), { desc: '', link: '' }] }, true)}>+ Add document</button> : undefined}>
+            {(m.docs || []).length === 0 && <div className="hint">No documents.</div>}
+            {(m.docs || []).map((d, i) => (
               <div key={i} className="row" style={{ marginBottom: 6 }}>
-                <input type="checkbox" checked={!!a.done} disabled={ro} onChange={() => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) }, true)} />
-                <DateInput value={a.date} disabled={ro} style={{ width: 140 }} onChange={(iso) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, date: iso } : x)) }, true)} />
-                <input type="text" style={{ flex: 1 }} className={a.done ? 'done' : ''} value={a.text} disabled={ro} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)) })} />
-                <select value={a.assignee || ''} disabled={ro} title="Assign to a staff member — the alert is forwarded to them and shows under their dashboard"
-                  style={{ width: 150 }} onChange={(e) => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, assignee: e.target.value } : x)) }, true)}>
-                  <option value="">Assign to…</option>
-                  {[...new Set([...staff.map((s) => s.name), ...(a.assignee ? [a.assignee] : [])])].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-                <button className="btn danger-link" title={a.alert ? 'Alert on — shows in Alerts tab' : 'Alert off'} disabled={ro}
-                  style={{ color: a.alert ? 'var(--accent)' : '#c8c7c2' }}
-                  onClick={() => update({ actions: m.actions.map((x, j) => (j === i ? { ...x, alert: !x.alert, alertDate: x.alertDate || x.date || todayISO() } : x)) }, true)}>
-                  🔔
-                </button>
-                {canEdit && <button className="btn danger-link" onClick={() => update({ actions: m.actions.filter((_, j) => j !== i) }, true)}>✕</button>}
+                <input type="text" placeholder="Description" style={{ flex: 2 }} value={d.desc} disabled={ro}
+                  onChange={(e) => update({ docs: m.docs.map((x, j) => (j === i ? { ...x, desc: e.target.value } : x)) })} />
+                <input type="text" placeholder="Link" style={{ flex: 2 }} value={d.link} disabled={ro}
+                  onChange={(e) => update({ docs: m.docs.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)) })} />
+                {d.fileUrl ? (
+                  <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)', fontSize: 12.5 }}>{d.fileName || 'file'}</a>
+                ) : (
+                  canEdit && (
+                    <label className="btn secondary small" style={{ cursor: 'pointer' }}>
+                      ⬆ Upload
+                      <input type="file" style={{ display: 'none' }} onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        const up = await uploadFile(f);
+                        update({ docs: m.docs.map((x, j) => (j === i ? { ...x, fileUrl: up.url, fileName: up.fileName, desc: x.desc || up.fileName } : x)) }, true);
+                      }} />
+                    </label>
+                  )
+                )}
+                {canEdit && <button className="btn danger-link" onClick={() => update({ docs: m.docs.filter((_, j) => j !== i) }, true)}>✕</button>}
               </div>
             ))}
           </Card>
+        </div>
 
+        <div>
           <MarkHistory markId={m.id} saveState={saveState} />
 
           <Card label="Madrid Protocol">
