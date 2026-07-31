@@ -409,6 +409,40 @@ describe('bulk import & clear', () => {
     await viewer.get('/api/backup/download').expect(403);
   });
 
+  it('imports legacy free-text actions, matching by number and skipping standard dates', async () => {
+    const a = (await admin.post('/api/marks').send({ name: 'ACTIONMATCH', jurisdiction: 'Australia', application: '2655445', owner: 'Act Pty Ltd' }).expect(201)).body;
+    const b = (await admin.post('/api/marks').send({ name: 'IRMATCH', jurisdiction: 'Canada', registration: 'IR No. 1744851', owner: 'Act Pty Ltd' }).expect(201)).body;
+    const rows = [
+      // free-text action, matched by application number
+      { Trademark: 'DOCKIT', Jurisdiction: 'Australia', Application: '2655445', Registration: '', DateName: 'has app no. 2440395 lapsed?', Date: '2026-07-20' },
+      // free-text action, matched by IR number embedded in "IR No. 1744851"
+      { Trademark: 'Vision INVEST Logo', Jurisdiction: 'Canada', Application: 'IR No. 1744851', Registration: '', DateName: 'AMJ - Accepted/Registered? update the case', Date: '2026-07-13' },
+      // standard jurisdiction date → skipped, not imported
+      { Trademark: 'DOCKIT', Jurisdiction: 'Australia', Application: '2655445', Registration: '', DateName: 'Renewal Reminder', Date: '2026-07-20' },
+      // no matching case → unmatched
+      { Trademark: 'NOBODY', Jurisdiction: 'Australia', Application: '9999999', Registration: '', DateName: 'chase the client', Date: '2026-07-20' },
+    ];
+    const r = (await admin.post('/api/marks/import-actions').send({ rows }).expect(200)).body;
+    expect(r.imported).toBe(2);
+    expect(r.unmatched).toBe(1);
+    expect(r.skipped).toBeGreaterThanOrEqual(1); // the Renewal Reminder standard date
+
+    const ga = (await admin.get(`/api/marks/${a.id}`)).body;
+    const act = ga.actions.find((x: { text: string }) => /2440395 lapsed/.test(x.text));
+    expect(act).toBeTruthy();
+    expect(act.alert).toBe(true);
+    expect(act.done).toBe(false);
+    expect(act.date).toBe('2026-07-20');
+    const gb = (await admin.get(`/api/marks/${b.id}`)).body;
+    expect(gb.actions.some((x: { text: string }) => /AMJ - Accepted/.test(x.text))).toBe(true);
+
+    // Re-running doesn't duplicate.
+    const again = (await admin.post('/api/marks/import-actions').send({ rows }).expect(200)).body;
+    expect(again.imported).toBe(0);
+
+    await viewer.post('/api/marks/import-actions').send({ rows }).expect(403);
+  });
+
   it('adds missing renewal reminders without changing the locked renewal date', async () => {
     const m = (await admin.post('/api/marks').send({ name: 'REMINDME', jurisdiction: 'Australia', owner: 'Remind Pty Ltd' }).expect(201)).body;
     // A case with a locked renewal date but NO registration date — so the engine's

@@ -711,6 +711,22 @@ function DataImport() {
   const [alertMsg, setAlertMsg] = useState('');
   const [alertBusy, setAlertBusy] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
+  const [actionsBusy, setActionsBusy] = useState(false);
+  const [actionsResult, setActionsResult] = useState<{ imported: number; skipped: number; unmatched: number; unmatchedList: { trademark: string; jurisdiction: string; dateName: string }[]; casesChanged: number } | null>(null);
+
+  const importActionsFile = async (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    setActionsBusy(true);
+    setActionsResult(null);
+    try {
+      setActionsResult(await api.importActions(parseCsv(await f.text())));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Import failed.');
+    } finally {
+      setActionsBusy(false);
+    }
+  };
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ checked: number; matched: number; unmatched: number; mismatchCount: number; mismatches: { name: string; jur: string; field: string; source: string; current: string }[] } | null>(null);
 
@@ -978,6 +994,37 @@ function DataImport() {
               setBusy(false);
             }
           }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
+        </Card>
+
+        <Card label="Import trade mark actions (from legacy alerts)">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Upload the CSV of legacy action items. Each row is matched to a case by application / registration number (then by name + jurisdiction) and added as an alerting <strong>Trade mark action</strong>, keeping its original date. Standard jurisdiction/reminder dates are skipped (the engine already generates those), and any action already on a case isn’t duplicated. Existing dates are never changed.
+          </div>
+          <label className="btn secondary small" style={{ cursor: actionsBusy ? 'default' : 'pointer', display: 'inline-block' }}>
+            {actionsBusy ? 'Importing…' : '⬆ Choose actions CSV'}
+            <input type="file" accept=".csv,text/csv" disabled={actionsBusy} style={{ display: 'none' }}
+              onChange={(e) => { importActionsFile(e.target.files); e.currentTarget.value = ''; }} />
+          </label>
+          {actionsResult && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontWeight: 700, color: 'var(--success)' }}>
+                Imported {actionsResult.imported} action{actionsResult.imported === 1 ? '' : 's'} across {actionsResult.casesChanged} case{actionsResult.casesChanged === 1 ? '' : 's'} · {actionsResult.skipped} skipped · {actionsResult.unmatched} unmatched.
+              </div>
+              {actionsResult.unmatched > 0 && (
+                <>
+                  <div className="hint" style={{ marginTop: 8, marginBottom: 4 }}>Couldn’t be matched to a case (review these):</div>
+                  <table className="list">
+                    <thead><tr><th>Trade mark</th><th>Jurisdiction</th><th>Action</th></tr></thead>
+                    <tbody>
+                      {actionsResult.unmatchedList.slice(0, 100).map((u, i) => (
+                        <tr key={i}><td>{u.trademark}</td><td>{u.jurisdiction}</td><td>{u.dateName}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+          )}
         </Card>
 
         <Card label="Add missing renewal reminders">

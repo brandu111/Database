@@ -52,6 +52,7 @@ import {
 } from './db.js';
 import { IpAuError, ipAuConfigured, lookupTradeMark } from './ipaustralia.js';
 import { csvRowToMark, parseImportDate } from './import-marks.js';
+import { indexCases, isStandardDateName, matchCase, normName, toAction } from './import-actions.js';
 import { groupCompanies } from './import-companies.js';
 import { mailerConfigured, sendMail } from './mailer.js';
 import {
@@ -708,6 +709,37 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
     tx();
     res.json({ datesCleared, casesChanged: changed.length });
+  });
+
+  // Import legacy "Trademark Action" diary entries from the firm's alert export.
+  // Each row is matched to a case by application/registration number (then by
+  // name + jurisdiction). Standard jurisdiction/reminder date names are skipped
+  // (the engine already generates those); only free-text actions are added, as
+  // an alerting, not-done action keeping its original date. Duplicates (an action
+  // with the same text already on the case) are skipped. Nothing else is touched.
+  app.post('/api/marks/import-actions', full, (req, res) => {
+    const rows: Record<string, string>[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) return res.status(400).json({ error: 'No rows to import.' });
+    const index = indexCases(listMarks(db));
+    let imported = 0;
+    let skipped = 0;
+    const unmatched: { trademark: string; jurisdiction: string; dateName: string }[] = [];
+    const changed = new Set<Mark>();
+    for (const row of rows) {
+      const dn = String(row.DateName || '').trim();
+      if (!dn) continue;
+      if (isStandardDateName(dn)) { skipped++; continue; }
+      const mark = matchCase(row, index);
+      if (!mark) { unmatched.push({ trademark: row.Trademark || '', jurisdiction: row.Jurisdiction || '', dateName: dn }); continue; }
+      if ((mark.actions || []).some((a) => normName(a.text) === normName(dn))) { skipped++; continue; }
+      mark.actions = mark.actions || [];
+      mark.actions.push(toAction(dn, parseImportDate(String(row.Date || ''))));
+      imported++;
+      changed.add(mark);
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ imported, skipped, unmatched: unmatched.length, unmatchedList: unmatched.slice(0, 200), casesChanged: changed.size, total: rows.length });
   });
 
   // Re-run the deadline engine over every case, so rulebook changes (new

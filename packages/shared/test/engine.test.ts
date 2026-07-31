@@ -54,6 +54,34 @@ describe('Philippines DAU is a designation obligation, not an IR one', () => {
   });
 });
 
+describe('universal Case update task (filing + 3 months)', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  it('adds a Case update three months after a recent filing, on any jurisdiction', () => {
+    const m = blankMark({ jurisdiction: 'Fiji' }); // a jurisdiction with no special rules
+    m.dates.push({ name: 'Application Filed', date: today, done: false });
+    ensureRuleRows(m, rules);
+    const cu = m.dates.find((d) => d.name === 'Case update');
+    expect(cu).toBeTruthy();
+    expect(cu!.date > today).toBe(true); // three months out, i.e. upcoming
+  });
+  it('does not retroactively add a Case update to a long-filed case', () => {
+    const m = blankMark({ jurisdiction: 'Australia' });
+    m.dates.push({ name: 'Application Filed', date: '2010-01-01', done: true });
+    m.dates.push({ name: 'Registration Date', date: '2011-01-01', done: true });
+    ensureRuleRows(m, rules);
+    expect(m.dates.some((d) => d.name === 'Case update')).toBe(false);
+  });
+  it('stays deleted once the user removes it', () => {
+    const m = blankMark({ jurisdiction: 'Fiji' });
+    m.dates.push({ name: 'Application Filed', date: today, done: false });
+    ensureRuleRows(m, rules);
+    m.dates = m.dates.filter((d) => d.name !== 'Case update');
+    m.suppressedRules = ['Case update'];
+    ensureRuleRows(m, rules);
+    expect(m.dates.some((d) => d.name === 'Case update')).toBe(false);
+  });
+});
+
 describe('user-deleted date rows stay deleted', () => {
   it('does not recreate a rule row the user suppressed, and re-creates it once un-suppressed', () => {
     const m = blankMark({ jurisdiction: 'Australia' });

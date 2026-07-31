@@ -1,4 +1,4 @@
-import { fmtDate, shift } from './dates.js';
+import { fmtDate, shift, todayISO } from './dates.js';
 import { designRulesFor, isDesign } from './rules.js';
 import type { Mark, MarkDate, Rule, RuleBook } from './types.js';
 
@@ -171,6 +171,21 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
   // (e.g. on a Madrid designation), along with their reminder rows.
   if (!conventionAllowed) {
     m.dates = (m.dates || []).filter((d) => !(/convention priority/i.test(d.name) && (d.auBase || d.auGen)));
+  }
+  // Universal "Case update" task: three months after an application is filed, on
+  // every matter regardless of jurisdiction. Created only while still upcoming so
+  // it never retroactively floods long-filed cases with an overdue task; kept in
+  // sync with the filing date unless pinned/edited, and not recreated once the
+  // user deletes it.
+  const filedForUpdate = val('Application Filed');
+  if (filedForUpdate && !suppressed.has('Case update')) {
+    const due = shift(filedForUpdate, 3, 'months');
+    const existing = (m.dates || []).find((d) => d.name === 'Case update');
+    if (existing) {
+      if (!existing.pinned) existing.date = due;
+    } else if (due >= todayISO()) {
+      m.dates.push({ name: 'Case update', date: due, done: false, notify: true });
+    }
   }
   rollCompletedRenewals(m);
   // Two passes so rows whose base was itself just computed resolve in one call.
