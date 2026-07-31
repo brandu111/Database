@@ -216,6 +216,32 @@ export function loadRules(db: DB): RuleBook {
   return out;
 }
 
+/**
+ * Write a consistent, self-contained snapshot of the database into `destDir` as
+ * `brandu-YYYY-MM-DD.sqlite`, then keep only the newest `keep` daily snapshots.
+ * `VACUUM INTO` produces a fully committed copy even while the app is running in
+ * WAL mode (no need to stop the server or copy the -wal/-shm files), so it is
+ * safe to run from a daily cron job. Returns the file written and how many old
+ * snapshots were pruned.
+ */
+export function backupDatabase(db: DB, destDir: string, keep = 30): { file: string; pruned: number } {
+  fs.mkdirSync(destDir, { recursive: true });
+  const stamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const dest = path.join(destDir, `brandu-${stamp}.sqlite`);
+  if (fs.existsSync(dest)) fs.rmSync(dest); // re-run on the same day replaces that day's copy
+  db.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`);
+  const snaps = fs
+    .readdirSync(destDir)
+    .filter((f) => /^brandu-\d{4}-\d{2}-\d{2}\.sqlite$/.test(f))
+    .sort(); // lexical sort == chronological for YYYY-MM-DD
+  let pruned = 0;
+  while (snaps.length > Math.max(1, keep)) {
+    fs.rmSync(path.join(destDir, snaps.shift() as string));
+    pruned++;
+  }
+  return { file: dest, pruned };
+}
+
 export function saveRules(db: DB, rules: RuleBook): void {
   const up = db.prepare(`INSERT INTO rules(jurisdiction,doc) VALUES(?,?) ON CONFLICT(jurisdiction) DO UPDATE SET doc=excluded.doc`);
   const tx = db.transaction(() => {

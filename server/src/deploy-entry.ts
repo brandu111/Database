@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { createApp, runDailyDigest } from './app.js';
-import { openDb } from './db.js';
+import { backupDatabase, openDb } from './db.js';
 import { seed } from './seed.js';
 
 /**
@@ -40,6 +40,21 @@ if (process.env.RUN_TASK === 'daily-digest') {
       console.error('Daily digest failed:', (e as Error).message);
       process.exit(1);
     });
+} else if (process.env.RUN_TASK === 'backup') {
+  // One-shot database backup (for cPanel cron). Writes a consistent daily
+  // snapshot and keeps the newest BACKUP_KEEP_DAYS (default 30). Cron example
+  // (2:00 AM daily):
+  //   source ~/nodevenv/brandu-tm/24/bin/activate && cd ~/brandu-tm && RUN_TASK=backup node app.cjs
+  try {
+    const dir = process.env.BACKUP_DIR || path.join(cwd, 'backups');
+    const keep = parseInt(process.env.BACKUP_KEEP_DAYS || '30', 10);
+    const r = backupDatabase(db, dir, keep);
+    console.log(`Backup written: ${r.file}${r.pruned ? ` (pruned ${r.pruned} old snapshot${r.pruned === 1 ? '' : 's'})` : ''}.`);
+    process.exit(0);
+  } catch (e) {
+    console.error('Backup failed:', (e as Error).message);
+    process.exit(1);
+  }
 } else {
 
 if (process.env.SEED_ON_START === '1') {
