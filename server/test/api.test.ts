@@ -409,6 +409,24 @@ describe('bulk import & clear', () => {
     await viewer.get('/api/backup/download').expect(403);
   });
 
+  it('imports Headstart details onto a matching case and drives the workflow', async () => {
+    const m = (await admin.post('/api/marks').send({ name: 'HSIMPORT', jurisdiction: 'Australia', application: '2629844' }).expect(201)).body;
+    const rows = [
+      { Trademark: 'HSIMPORT', Jurisdiction: 'Australia', Application: '2629844', Registration: '', HeadstartApplicationFiled: '23/02/2026', HeadstartPrelimAssessmentReceived: '02/03/2026', HeadstartFeePaid: '' },
+      { Trademark: 'NOMATCH', Jurisdiction: 'Australia', Application: '9999999', Registration: '', HeadstartApplicationFiled: '01/01/2026', HeadstartPrelimAssessmentReceived: '', HeadstartFeePaid: '' },
+    ];
+    const r = (await admin.post('/api/marks/import-headstart').send({ rows }).expect(200)).body;
+    expect(r.imported).toBe(1);
+    expect(r.unmatched).toBe(1);
+    const got = (await admin.get(`/api/marks/${m.id}`)).body;
+    const byName = Object.fromEntries(got.dates.map((d: { name: string; date: string }) => [d.name, d.date]));
+    expect(byName['Headstart - Application Filed']).toBe('2026-02-23');
+    expect(byName['Headstart - Preliminary Assessment Received']).toBe('2026-03-02');
+    // The engine derived the Part 2 fee deadline (5 business days from 02 Mar 2026 = 09 Mar).
+    expect(byName['Headstart - Part 2 Fee Due']).toBe('2026-03-09');
+    await viewer.post('/api/marks/import-headstart').send({ rows }).expect(403);
+  });
+
   it('gates the AU sync and reports when IP Australia is not configured', async () => {
     // Full users pass the permission gate but get a clear 400 when the register
     // credentials aren't set (as in tests); viewers are refused outright.

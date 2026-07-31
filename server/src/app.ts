@@ -705,6 +705,56 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ remindersAdded, casesChanged: changed.length });
   });
 
+  // Import Headstart details onto their cases (matched by number, then name +
+  // jurisdiction). Headstart isn't on the public register, so it comes from the
+  // legacy export. Adds the Headstart filing and preliminary-assessment dates;
+  // the engine then builds the Headstart workflow. If the case has since been
+  // filed as a full application, the whole Headstart phase is marked done so it
+  // stays as history rather than raising stale alerts.
+  app.post('/api/marks/import-headstart', full, (req, res) => {
+    const rows: Record<string, string>[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) return res.status(400).json({ error: 'No rows to import.' });
+    const rules = loadRules(db);
+    const cuMonths = getFirmSettings(db).caseUpdateMonths;
+    const index = indexCases(listMarks(db));
+    let imported = 0;
+    const unmatched: { trademark: string; jurisdiction: string }[] = [];
+    const changed = new Set<Mark>();
+    for (const row of rows) {
+      const haf = parseImportDate(row.HeadstartApplicationFiled || '');
+      const hpa = parseImportDate(row.HeadstartPrelimAssessmentReceived || '');
+      const hfp = parseImportDate(row.HeadstartFeePaid || '');
+      if (!haf && !hpa) continue;
+      const mark = matchCase(row, index);
+      if (!mark) { unmatched.push({ trademark: row.Trademark || '', jurisdiction: row.Jurisdiction || '' }); continue; }
+      mark.dates = mark.dates || [];
+      const setDate = (name: string, date: string) => {
+        if (!date) return;
+        const ex = mark.dates.find((d) => d.name === name);
+        if (ex) { if (!ex.pinned) ex.date = date; } else mark.dates.push({ name, date, done: true });
+      };
+      setDate('Headstart - Application Filed', haf);
+      setDate('Headstart - Preliminary Assessment Received', hpa);
+      ensureRuleRows(mark, rules, undefined, cuMonths);
+      // Fee paid: close off the "has the fee been paid?" chase.
+      if (hfp) {
+        const paid = mark.dates.find((d) => d.name === 'Headstart - Has the Part 2 Fee been Paid');
+        if (paid) paid.done = true;
+      }
+      // If the mark has since been filed as a full application, the Headstart is
+      // complete — tick every Headstart row so it's kept as history, not alerts.
+      if (mark.dates.some((d) => d.name === 'Application Filed' && d.date)) {
+        for (const d of mark.dates) if (/^headstart -/i.test(d.name) && !d.done) d.done = true;
+      }
+      mark.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+      imported++;
+      changed.add(mark);
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ imported, unmatched: unmatched.length, unmatchedList: unmatched.slice(0, 100), casesChanged: changed.size, total: rows.length });
+  });
+
   // Sync pending Australian cases against the official IP Australia register.
   // Batched (offset/limit) so it never times out on shared hosting: for each
   // pending AU case it fetches the live record and reconciles the STATUS and the

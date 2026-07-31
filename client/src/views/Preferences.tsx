@@ -719,6 +719,8 @@ function DataImport() {
   const [alertMsg, setAlertMsg] = useState('');
   const [alertBusy, setAlertBusy] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
+  const [hsBusy, setHsBusy] = useState(false);
+  const [hsMsg, setHsMsg] = useState('');
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [syncLog, setSyncLog] = useState<{ name: string; number: string; changes: string[] }[]>([]);
@@ -1005,6 +1007,28 @@ function DataImport() {
               setBusy(false);
             }
           }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
+        </Card>
+
+        <Card label="Import Headstart details">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Adds the Headstart filing and preliminary-assessment dates onto their cases (matched by application / registration number). The engine builds the Headstart workflow from there; where the mark has already been filed as a full application, the Headstart is recorded as completed history rather than raising alerts.
+          </div>
+          <label className="btn secondary small" style={{ cursor: hsBusy ? 'default' : 'pointer', display: 'inline-block' }}>
+            {hsBusy ? 'Importing…' : '⬆ Choose Headstart CSV'}
+            <input type="file" accept=".csv,text/csv" disabled={hsBusy} style={{ display: 'none' }}
+              onChange={async (e) => {
+                const f = e.target.files?.[0]; e.currentTarget.value = '';
+                if (!f) return;
+                setHsBusy(true); setHsMsg('');
+                try {
+                  const r = await api.importHeadstart(parseCsv(await f.text()));
+                  setHsMsg(`Imported Headstart details onto ${r.imported} case${r.imported === 1 ? '' : 's'}${r.unmatched ? ` · ${r.unmatched} unmatched` : ''}.`);
+                } catch (err) {
+                  setHsMsg(err instanceof Error ? err.message : 'Import failed.');
+                } finally { setHsBusy(false); }
+              }} />
+          </label>
+          {hsMsg && <div className="hint" style={{ marginTop: 8 }}>{hsMsg}</div>}
         </Card>
 
         <Card label="Sync pending AU cases from IP Australia">
