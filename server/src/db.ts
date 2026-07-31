@@ -224,12 +224,22 @@ export function loadRules(db: DB): RuleBook {
  * safe to run from a daily cron job. Returns the file written and how many old
  * snapshots were pruned.
  */
+/**
+ * Write a fully committed copy of the database to an exact path via
+ * `VACUUM INTO` (WAL-safe, no server stop needed). Overwrites any existing file
+ * at that path. Used for both the dated daily backup and on-demand downloads.
+ */
+export function snapshotDatabase(db: DB, destFile: string): void {
+  fs.mkdirSync(path.dirname(destFile), { recursive: true });
+  if (fs.existsSync(destFile)) fs.rmSync(destFile);
+  db.exec(`VACUUM INTO '${destFile.replace(/'/g, "''")}'`);
+}
+
 export function backupDatabase(db: DB, destDir: string, keep = 30): { file: string; pruned: number } {
   fs.mkdirSync(destDir, { recursive: true });
   const stamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const dest = path.join(destDir, `brandu-${stamp}.sqlite`);
-  if (fs.existsSync(dest)) fs.rmSync(dest); // re-run on the same day replaces that day's copy
-  db.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`);
+  snapshotDatabase(db, dest);
   const snaps = fs
     .readdirSync(destDir)
     .filter((f) => /^brandu-\d{4}-\d{2}-\d{2}\.sqlite$/.test(f))

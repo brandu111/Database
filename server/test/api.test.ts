@@ -399,6 +399,16 @@ describe('bulk import & clear', () => {
     await viewer.post('/api/marks/pin-all-dates').expect(403);
   });
 
+  it('streams an on-demand database backup to full users only', async () => {
+    await admin.post('/api/marks').send({ name: 'BACKUP DL', jurisdiction: 'Australia' }).expect(201);
+    const res = await admin.get('/api/backup/download').expect(200);
+    expect(res.headers['content-disposition']).toMatch(/attachment; filename=.*brandu-backup-\d{4}-\d{2}-\d{2}\.sqlite/);
+    // The payload is a real SQLite file (magic header "SQLite format 3\0").
+    const body: Buffer = res.body instanceof Buffer ? res.body : Buffer.from(res.text || '');
+    expect(body.slice(0, 16).toString('utf8')).toBe('SQLite format 3 ');
+    await viewer.get('/api/backup/download').expect(403);
+  });
+
   it('verifies the database against the source-of-truth CSV (read-only)', async () => {
     // A case whose source-of-truth dates we will check.
     const m = (await admin.post('/api/marks').send({ name: 'VERIFYME', jurisdiction: 'Australia', owner: 'Verify Holdings Pty Ltd' }).expect(201)).body;

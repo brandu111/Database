@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import {
@@ -40,6 +41,7 @@ import {
   saveOpposition,
   saveJurisdictionRules,
   saveRules,
+  snapshotDatabase,
   setFirmSettings,
   setOppDatesMaster,
   loadRules,
@@ -587,6 +589,23 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.delete('/api/marks/:id', edit, (req, res) => {
     deleteMark(db, req.params.id);
     res.json({ ok: true });
+  });
+
+  // On-demand database backup: stream a fresh, consistent snapshot of the whole
+  // database to the browser as a download. VACUUM INTO gives a fully committed
+  // copy while the app keeps running; the temp file is deleted once sent.
+  app.get('/api/backup/download', full, (_req, res) => {
+    const tmp = path.join(os.tmpdir(), `brandu-backup-${Date.now()}.sqlite`);
+    try {
+      snapshotDatabase(db, tmp);
+    } catch (e) {
+      return res.status(500).json({ error: e instanceof Error ? e.message : 'Backup failed.' });
+    }
+    const filename = `brandu-backup-${new Date().toISOString().slice(0, 10)}.sqlite`;
+    res.download(tmp, filename, (err) => {
+      fs.rm(tmp, { force: true }, () => undefined);
+      if (err && !res.headersSent) res.status(500).end();
+    });
   });
 
   // Pin every current renewal deadline exactly as it stands now, so the date

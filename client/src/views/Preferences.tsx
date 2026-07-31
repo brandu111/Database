@@ -980,6 +980,13 @@ function DataImport() {
           }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
         </Card>
 
+        <Card label="Download a backup">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Downloads a complete, up-to-the-second copy of the whole database as a single <code>.sqlite</code> file. Safe to run any time — it snapshots without interrupting the app. Keep a copy off the server for peace of mind; to restore, place the file back as <code>data/brandu.sqlite</code>. (A daily automatic backup can also run on the server — ask about the cron job.)
+          </div>
+          <a className="btn secondary small" href="/api/backup/download" style={{ display: 'inline-block', textDecoration: 'none' }}>⬇ Download backup now</a>
+        </Card>
+
         <Card label="Lock renewal dates (source of truth)">
           <div className="hint" style={{ marginBottom: 8 }}>
             Pins every renewal deadline currently in the database <strong>exactly as it stands now</strong>, so the date engine can never silently recompute or shift it — not on a lookup, not on “Recompute all”, not on a save. It does <strong>not</strong> recompute first, so today’s values are frozen as-is. You can still change any date by hand on the case, and reminders keep counting back from the locked date. Run this once, after you’ve confirmed the data is correct.
