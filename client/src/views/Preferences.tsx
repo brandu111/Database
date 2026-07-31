@@ -719,6 +719,9 @@ function DataImport() {
   const [alertMsg, setAlertMsg] = useState('');
   const [alertBusy, setAlertBusy] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+  const [syncLog, setSyncLog] = useState<{ name: string; number: string; changes: string[] }[]>([]);
   const [actionsBusy, setActionsBusy] = useState(false);
   const [actionsResult, setActionsResult] = useState<{ imported: number; skipped: number; unmatched: number; unmatchedList: { trademark: string; jurisdiction: string; dateName: string }[]; casesChanged: number } | null>(null);
 
@@ -1002,6 +1005,46 @@ function DataImport() {
               setBusy(false);
             }
           }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
+        </Card>
+
+        <Card label="Sync pending AU cases from IP Australia">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Checks every <strong>pending Australian</strong> case against the official IP Australia register and reconciles its <strong>status</strong> and <strong>examination dates</strong> (filing, first report / OA issued, publication, registration), then recomputes deadlines from the corrected dates. It never changes a <strong>locked renewal date</strong>. <strong>Download a backup first.</strong> Runs in batches; leave the page open until it finishes.
+          </div>
+          <button className="btn secondary small" disabled={syncBusy} onClick={async () => {
+            if (!window.confirm('Sync pending Australian cases against the IP Australia register? Status and examination dates will be updated from the official record. Locked renewal dates are not touched. Make sure you have a backup.')) return;
+            setSyncBusy(true);
+            setSyncMsg('');
+            setSyncLog([]);
+            try {
+              let offset = 0, total = 0, changed = 0;
+              const log: { name: string; number: string; changes: string[] }[] = [];
+              const errs: { name: string; error: string }[] = [];
+              do {
+                const r = await api.syncAuPending(offset);
+                offset = r.offset; total = r.total; changed += r.changed;
+                log.push(...r.changesLog); errs.push(...r.errors);
+                setSyncMsg(`Syncing… ${Math.min(offset, total)} of ${total} pending AU cases checked · ${changed} updated${errs.length ? ` · ${errs.length} errors` : ''}.`);
+                setSyncLog([...log]);
+              } while (offset < total);
+              setSyncMsg(`Done — checked ${total} pending AU cases, updated ${changed}${errs.length ? `, ${errs.length} could not be looked up` : ''}.`);
+            } catch (e) {
+              setSyncMsg(e instanceof Error ? e.message : 'Sync failed.');
+            } finally {
+              setSyncBusy(false);
+            }
+          }}>{syncBusy ? 'Syncing…' : 'Sync pending AU cases'}</button>
+          {syncMsg && <div className="hint" style={{ marginTop: 8 }}>{syncMsg}</div>}
+          {syncLog.length > 0 && (
+            <table className="list nozebra" style={{ marginTop: 8 }}>
+              <thead><tr><th>Case</th><th>Number</th><th>Changes</th></tr></thead>
+              <tbody>
+                {syncLog.slice(0, 200).map((c, i) => (
+                  <tr key={i}><td>{c.name}</td><td className="mono">{c.number}</td><td>{c.changes.join('; ')}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </Card>
 
         <Card label="Add Admin to every case's contacts">

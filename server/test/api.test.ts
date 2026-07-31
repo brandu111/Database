@@ -409,6 +409,15 @@ describe('bulk import & clear', () => {
     await viewer.get('/api/backup/download').expect(403);
   });
 
+  it('gates the AU sync and reports when IP Australia is not configured', async () => {
+    // Full users pass the permission gate but get a clear 400 when the register
+    // credentials aren't set (as in tests); viewers are refused outright.
+    const r = await admin.post('/api/marks/sync-au-pending').send({ offset: 0 });
+    expect([400, 200]).toContain(r.status); // 400 when unconfigured (the test env), 200 if creds happen to be present
+    if (r.status === 400) expect(String(r.body.error)).toMatch(/not configured/i);
+    await viewer.post('/api/marks/sync-au-pending').send({ offset: 0 }).expect(403);
+  });
+
   it('records the Admin contact on every case (on save and via backfill)', async () => {
     // A new case gets Admin automatically on creation/save.
     const m = (await admin.post('/api/marks').send({ name: 'ADMINAUTO', jurisdiction: 'Australia' }).expect(201)).body;

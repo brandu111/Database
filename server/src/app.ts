@@ -705,6 +705,64 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ remindersAdded, casesChanged: changed.length });
   });
 
+  // Sync pending Australian cases against the official IP Australia register.
+  // Batched (offset/limit) so it never times out on shared hosting: for each
+  // pending AU case it fetches the live record and reconciles the STATUS and the
+  // examination/anchor dates (application filed, first report / OA issued,
+  // publication, registration). It never touches a pinned/locked date (renewals
+  // are safe), never adds renewal rows (the engine derives those), and on a
+  // now-registered case brings only filing + registration across. Deadlines are
+  // then recomputed from the corrected anchors. Returns a per-case change log.
+  app.post('/api/marks/sync-au-pending', full, async (req, res) => {
+    if (!ipAuConfigured()) return res.status(400).json({ error: 'IP Australia lookup is not configured on this server.' });
+    const offset = Math.max(0, Math.trunc(Number((req.body || {}).offset)) || 0);
+    const limit = Math.min(20, Math.max(1, Math.trunc(Number((req.body || {}).limit)) || 10));
+    const rules = loadRules(db);
+    const cuMonths = getFirmSettings(db).caseUpdateMonths;
+    const terminal = (s?: string) => !!s && /lapse|dead|withdraw|abandon|refus|remov|ceas|not renewed|expired|closed|finalis|finaliz|transfer/i.test(s);
+    const candidates = listMarks(db)
+      .filter((m) => ['Australia', 'Australia TTMF'].includes(m.jurisdiction) && !/register/i.test(m.status) && !terminal(m.status))
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    const batch = candidates.slice(offset, offset + limit);
+    const changesLog: { id: string; name: string; number: string; changes: string[] }[] = [];
+    const errors: { name: string; error: string }[] = [];
+    for (const m0 of batch) {
+      const number = (m0.application || m0.registration || '').trim();
+      if (!number) continue;
+      try {
+        const fetched = await lookupTradeMark(number);
+        const fresh = getMark(db, m0.id);
+        if (!fresh) continue;
+        const changes: string[] = [];
+        if (fetched.status && fetched.status !== fresh.status) {
+          changes.push(`Status: ${fresh.status || '(none)'} → ${fetched.status}`);
+          fresh.status = fetched.status;
+        }
+        const fdates = fetched.dates || [];
+        const isReg = /register/i.test(fetched.status || '') || fdates.some((d) => d.name === 'Registration Date' && d.date);
+        const keepWhenReg = new Set(['Application Filed', 'Registration Date']);
+        fresh.dates = fresh.dates || [];
+        for (const f of fdates) {
+          if (!f.date || /renewal/i.test(f.name)) continue;
+          if (isReg && !keepWhenReg.has(f.name)) continue;
+          const ex = fresh.dates.find((d) => d.name === f.name);
+          if (!ex) { fresh.dates.push({ name: f.name, date: f.date, done: true }); changes.push(`+ ${f.name}: ${f.date}`); }
+          else if (!ex.pinned && ex.date !== f.date) { changes.push(`${f.name}: ${ex.date || '(none)'} → ${f.date}`); ex.date = f.date; ex.done = true; }
+        }
+        if (changes.length) {
+          ensureRuleRows(fresh, rules, undefined, cuMonths);
+          ensureAdminContact(fresh);
+          fresh.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+          saveMark(db, fresh);
+          changesLog.push({ id: fresh.id, name: fresh.name || number, number, changes });
+        }
+      } catch (e) {
+        errors.push({ name: m0.name || number, error: (e as Error).message });
+      }
+    }
+    res.json({ processed: batch.length, changed: changesLog.length, changesLog, errors, offset: offset + batch.length, total: candidates.length });
+  });
+
   // Tidy registered cases: on any case that has a Registration Date, tick off
   // (mark done) every still-outstanding date dated on/before registration — the
   // pre-registration prosecution deadlines (office actions, acceptance,
