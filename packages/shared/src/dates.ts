@@ -35,6 +35,7 @@ export function daysInMonth(y: number, m: number): number {
 /** Shift an ISO date by v units. Returns '' for empty/invalid input. */
 export function shift(iso: string, v: number, u: DateUnit): string {
   if (!iso || !isValidISO(iso)) return '';
+  if (u === 'business days') return addBusinessDays(iso, v);
   const { y, m, d } = toParts(iso);
   if (u === 'days') {
     const t = new Date(Date.UTC(y, m - 1, d));
@@ -50,6 +51,24 @@ export function shift(iso: string, v: number, u: DateUnit): string {
   const ty = Math.floor(total / 12);
   const tm = (total % 12 + 12) % 12; // 0-based
   return fromParts(ty, tm + 1, Math.min(d, daysInMonth(ty, tm + 1)));
+}
+
+/**
+ * Add (or subtract, when `n` is negative) `n` business days to an ISO date,
+ * skipping Saturdays and Sundays. The result itself is always a business day.
+ * Used for deadlines quoted in working days (e.g. the AU Headstart Part 2 fee).
+ */
+export function addBusinessDays(iso: string, n: number): string {
+  if (!iso || !isValidISO(iso)) return '';
+  const step = n >= 0 ? 1 : -1;
+  let remaining = Math.abs(n);
+  let cur = iso;
+  while (remaining > 0) {
+    cur = shift(cur, step, 'days');
+    const dow = dayOfWeek(cur);
+    if (dow !== 0 && dow !== 6) remaining--;
+  }
+  return cur;
 }
 
 /** Day of week for an ISO date: 0=Sunday … 6=Saturday. */

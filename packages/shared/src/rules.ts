@@ -8,7 +8,7 @@ import type { OppDateMaster, OppSchedule, Rule, RuleBook } from './types.js';
  * If any built-in rule changes, bump RULES_VERSION and let migrateRules()
  * refresh stored rulebooks (user rules flagged `custom: true` survive).
  */
-export const RULES_VERSION = 10;
+export const RULES_VERSION = 11;
 
 const T_REN =
   'Dear {{client}},\n\nRe: Trade mark {{mark}} ({{jurisdiction}})\n\nThis is a reminder that the renewal deadline for the above trade mark is {{deadline}}. Please confirm whether you would like us to attend to the renewal, and we will provide a cost estimate.\n\nKind regards\nBrandU Legal';
@@ -118,6 +118,15 @@ export function defaultRules(): RuleBook {
       r('Renewal Reminder - Second', 'Renewal Deadline', -3, 'months', true, T_REN),
       r('Renewal Reminder - Final', 'Renewal Deadline', -1, 'months', true, T_REN),
       r('6 Month Renewal Grace Period', 'Renewal Deadline', 6, 'months', false),
+      // --- Headstart (AU pre-filing assessment service) --------------------
+      // Enter "Headstart - Application Filed" to start the chain. The prelim
+      // assessment chase fires 4 days later; entering the assessment date auto-
+      // ticks it (engine) and sets the Part 2 fee deadline 5 business days out;
+      // a chase to the responsible attorney lands 2 business days before that.
+      // Ticking the fee-paid reminder reveals the standard Application Filed date.
+      r('Headstart - Preliminary Assessment Received?', 'Headstart - Application Filed', 4, 'days', true),
+      r('Headstart - Part 2 Fee Due', 'Headstart - Preliminary Assessment Received', 5, 'business days', true),
+      r('Headstart - Has the Part 2 Fee been Paid', 'Headstart - Part 2 Fee Due', -2, 'business days', true),
     ],
     'New Zealand': [
       r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),

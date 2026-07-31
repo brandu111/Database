@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysBetween, fmtDate, rollForwardToBusinessDay, shift } from '../src/dates.js';
+import { addBusinessDays, daysBetween, fmtDate, rollForwardToBusinessDay, shift } from '../src/dates.js';
 
 /**
  * Acceptance suite ported from `Date Rule Test Cases.dc.html` — the handoff's
@@ -44,6 +44,22 @@ describe('Date Rule Test Cases acceptance harness', () => {
     it('skips a holiday Monday after a weekend', () => {
       expect(rollForwardToBusinessDay('2024-03-30', new Set(['2024-04-01']))).toBe('2024-04-02');
     });
+  });
+});
+
+describe('business days', () => {
+  it('adds business days skipping weekends', () => {
+    // Mon 2026-01-05 + 5 business days = Mon 2026-01-12 (skips Sat/Sun).
+    expect(addBusinessDays('2026-01-05', 5)).toBe('2026-01-12');
+    // Fri 2026-01-09 + 1 business day = Mon 2026-01-12.
+    expect(addBusinessDays('2026-01-09', 1)).toBe('2026-01-12');
+  });
+  it('subtracts business days', () => {
+    // Mon 2026-01-12 − 2 business days = Thu 2026-01-08.
+    expect(addBusinessDays('2026-01-12', -2)).toBe('2026-01-08');
+  });
+  it('is reachable through shift() with the business days unit', () => {
+    expect(shift('2026-01-05', 5, 'business days')).toBe('2026-01-12');
   });
 });
 

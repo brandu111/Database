@@ -433,6 +433,7 @@ function RuleRow({ r, i, isFull, expanded, onToggle, onChange, onDelete }: {
         <td>
           <select value={r.u} disabled={ro} onChange={(e) => onChange({ u: e.target.value as Rule['u'] })}>
             <option value="days">days</option>
+            <option value="business days">business days</option>
             <option value="months">months</option>
             <option value="years">years</option>
           </select>

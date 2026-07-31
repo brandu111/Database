@@ -1,6 +1,6 @@
 /** Shared domain types for the BrandU trade mark database. */
 
-export type DateUnit = 'days' | 'months' | 'years';
+export type DateUnit = 'days' | 'months' | 'years' | 'business days';
 
 export type MarkType =
   | 'Word'

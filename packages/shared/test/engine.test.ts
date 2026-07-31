@@ -54,6 +54,33 @@ describe('Philippines DAU is a designation obligation, not an IR one', () => {
   });
 });
 
+describe('AU Headstart workflow', () => {
+  // 2026-01-05 is a Monday; 01-12 the next Monday.
+  it('chains the Headstart dates with business-day offsets and the two auto-behaviours', () => {
+    const m = blankMark({ jurisdiction: 'Australia' });
+    m.dates.push({ name: 'Headstart - Application Filed', date: '2026-01-05', done: false });
+    ensureRuleRows(m, rules);
+    // Prelim assessment chase fires 4 calendar days after the Headstart filing.
+    expect(dateOf(m, 'Headstart - Preliminary Assessment Received?')).toBe('2026-01-09');
+
+    // Enter the assessment date → the chase reminder auto-ticks, and the Part 2
+    // fee deadline is set 5 business days out.
+    m.dates.push({ name: 'Headstart - Preliminary Assessment Received', date: '2026-01-05', done: false });
+    ensureRuleRows(m, rules);
+    expect(m.dates.find((d) => d.name === 'Headstart - Preliminary Assessment Received?')!.done).toBe(true);
+    expect(dateOf(m, 'Headstart - Part 2 Fee Due')).toBe('2026-01-12'); // 5 business days (skips the weekend)
+    expect(dateOf(m, 'Headstart - Has the Part 2 Fee been Paid')).toBe('2026-01-08'); // 2 business days before
+
+    // Application Filed doesn't exist until the fee is marked paid.
+    expect(m.dates.some((d) => d.name === 'Application Filed')).toBe(false);
+    m.dates.find((d) => d.name === 'Headstart - Has the Part 2 Fee been Paid')!.done = true;
+    ensureRuleRows(m, rules);
+    const af = m.dates.find((d) => d.name === 'Application Filed');
+    expect(af).toBeTruthy();
+    expect(af!.date).toBe(''); // opened for entry, empty to be filled in
+  });
+});
+
 describe('universal Case update task (filing + 3 months)', () => {
   const today = new Date().toISOString().slice(0, 10);
   it('adds a Case update three months after a recent filing, on any jurisdiction', () => {

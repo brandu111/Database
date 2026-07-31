@@ -101,7 +101,7 @@ export function auRecompute(m: Mark): void {
     // Universal "1 week before" reminder for every alerting deadline. Excludes
     // reminder rows, grace periods and the "OA Issued?" prompt (which are not
     // themselves deadlines).
-    const isDeadline = dr.auAlert && (dr.auOff || 0) > 0 && !dr.reminder && !/grace|issued\?/i.test(dr.name);
+    const isDeadline = dr.auAlert && (dr.auOff || 0) > 0 && !dr.reminder && !/grace|issued\?|headstart/i.test(dr.name);
     const wkName = `${dr.name} — 1 Week Reminder`;
     const wex = m.dates.findIndex((x) => x.name === wkName);
     if (isDeadline && dr.date) {
@@ -150,7 +150,7 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
   const conventionAllowed = ['Australia', 'New Zealand'].includes(m.jurisdiction) && !m.irId;
   // Rows the user deleted by hand stay deleted — the engine must not recreate them.
   const suppressed = new Set(m.suppressedRules || []);
-  list.forEach((r) => {
+  const generate = () => list.forEach((r) => {
     if (!r.name || !r.trigger) return;
     if (suppressed.has(r.name)) return;
     if (/convention priority/i.test(r.name) && !conventionAllowed) return;
@@ -167,6 +167,13 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
     if (!gateOk) return;
     ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts });
   });
+  // Two generation passes with a compute in between, so a rule whose trigger is
+  // itself a computed date (a chained deadline, e.g. the Headstart Part 2 fee
+  // reminder that hangs off the computed Part 2 Fee Due date) is created once its
+  // trigger has a value.
+  generate();
+  auRecompute(m);
+  generate();
   // Remove any auto-generated Convention Priority rows that shouldn't be here
   // (e.g. on a Madrid designation), along with their reminder rows.
   if (!conventionAllowed) {
@@ -186,6 +193,21 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[]): voi
     } else if (due >= todayISO()) {
       m.dates.push({ name: 'Case update', date: due, done: false, notify: true });
     }
+  }
+  // --- Australian Headstart workflow --------------------------------------
+  // Entering the "Preliminary Assessment Received" date closes off the earlier
+  // "Preliminary Assessment Received?" chase reminder automatically.
+  if ((m.dates || []).some((d) => d.name === 'Headstart - Preliminary Assessment Received' && d.date)) {
+    const prompt = (m.dates || []).find((d) => d.name === 'Headstart - Preliminary Assessment Received?');
+    if (prompt && !prompt.done) prompt.done = true;
+  }
+  // Once the Part 2 fee reminder is ticked (fee paid), the Headstart becomes a
+  // full application: open up the standard "Application Filed" date for entry.
+  if (
+    (m.dates || []).some((d) => d.name === 'Headstart - Has the Part 2 Fee been Paid' && d.done) &&
+    !(m.dates || []).some((d) => d.name === 'Application Filed')
+  ) {
+    m.dates.push({ name: 'Application Filed', date: '', done: false });
   }
   rollCompletedRenewals(m);
   // Two passes so rows whose base was itself just computed resolve in one call.
