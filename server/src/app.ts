@@ -636,24 +636,30 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   // One transaction, O(n) — safe on large portfolios.
   app.post('/api/marks/pin-all-dates', full, (_req, res) => {
     const all = listMarks(db);
-    let pinned = 0;
+    let pinned = 0; // newly locked this run
+    let alreadyPinned = 0; // renewal deadlines already locked (e.g. from import)
+    let linkedIr = 0; // Madrid designations — renewal inherited from the IR
+    let noRenewal = 0; // cases with no active renewal deadline yet (e.g. pending)
     const changed: Mark[] = [];
     for (const m of all) {
-      let ch = false;
-      for (const d of m.dates || []) {
-        // The only engine-computed hard date is the active "Renewal Deadline".
-        // Archived renewals are already done+pinned; reminders/grace are derived.
-        if (/^renewal deadline$/i.test(d.name) && d.date && !d.linkedToIR && !d.pinned) {
-          d.pinned = true;
-          pinned++;
-          ch = true;
-        }
-      }
-      if (ch) changed.push(m);
+      const ren = (m.dates || []).find((d) => /^renewal deadline$/i.test(d.name) && d.date);
+      if (!ren) { noRenewal++; continue; }
+      if (ren.linkedToIR) { linkedIr++; continue; }
+      if (ren.pinned) { alreadyPinned++; continue; }
+      ren.pinned = true;
+      pinned++;
+      changed.push(m);
     }
     const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
     tx();
-    res.json({ pinned, casesChanged: changed.length, casesTotal: all.length });
+    res.json({
+      pinned,
+      alreadyPinned,
+      lockedTotal: pinned + alreadyPinned,
+      linkedIr,
+      noRenewal,
+      casesTotal: all.length,
+    });
   });
 
   // Add any missing renewal reminders to cases that already have a renewal

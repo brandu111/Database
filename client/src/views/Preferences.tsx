@@ -1103,7 +1103,10 @@ function DataImport() {
             setPinBusy(true);
             try {
               const r = await api.pinAllDates();
-              window.alert(`Locked ${r.pinned} renewal date${r.pinned === 1 ? '' : 's'} across ${r.casesChanged} of ${r.casesTotal} cases. These are now immune to automatic recomputation.`);
+              window.alert(
+                `Renewal dates now locked: ${r.lockedTotal} total (${r.pinned} newly locked this run, ${r.alreadyPinned} were already locked on import).\n\n` +
+                `Of ${r.casesTotal} cases: ${r.lockedTotal} have a locked renewal date, ${r.noRenewal} have no renewal date yet (e.g. pending / unregistered), and ${r.linkedIr} are Madrid designations that inherit their renewal from the international registration.`
+              );
             } catch (e) {
               window.alert(e instanceof Error ? e.message : 'Lock failed.');
             } finally {
