@@ -451,7 +451,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
 
   const jurNames = useMemo(() => {
     const list = rulesFor(rules, m.jurisdiction);
-    return [...new Set(['Application Filed', 'OA Issued', 'Publication Date', 'Registration Date', 'Notice of Allowance', 'Opposition filed', ...list.map((r) => r.name), ...list.map((r) => r.trigger)])].filter(Boolean);
+    return [...new Set(['Application Filed', 'OA Issued', 'OA Issued?', 'Case update', 'Publication Date', 'Registration Date', 'Notice of Allowance', 'Opposition filed', ...list.map((r) => r.name), ...list.map((r) => r.trigger)])].filter(Boolean);
   }, [rules, m.jurisdiction]);
 
   const schema = addrSchema(m.country || '');

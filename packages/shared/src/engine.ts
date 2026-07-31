@@ -179,20 +179,20 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[], case
   if (!conventionAllowed) {
     m.dates = (m.dates || []).filter((d) => !(/convention priority/i.test(d.name) && (d.auBase || d.auGen)));
   }
-  // Universal "Case update" task: three months after an application is filed, on
-  // every matter regardless of jurisdiction. Created only while still upcoming so
-  // it never retroactively floods long-filed cases with an overdue task; kept in
-  // sync with the filing date unless pinned/edited, and not recreated once the
-  // user deletes it.
+  // Universal "OA Issued?" prompt: a set number of months after an application is
+  // filed (default 3), on every matter regardless of jurisdiction — a nudge to
+  // check whether an office action has issued. Created only while still upcoming
+  // so it never retroactively floods long-filed cases; kept in sync with the
+  // filing date unless pinned/edited, and not recreated once the user deletes it.
   const filedForUpdate = val('Application Filed');
   const cuMonths = Number.isFinite(caseUpdateMonths) && caseUpdateMonths > 0 ? caseUpdateMonths : 3;
-  if (filedForUpdate && !suppressed.has('Case update')) {
+  if (filedForUpdate && !suppressed.has('OA Issued?')) {
     const due = shift(filedForUpdate, cuMonths, 'months');
-    const existing = (m.dates || []).find((d) => d.name === 'Case update');
+    const existing = (m.dates || []).find((d) => d.name === 'OA Issued?');
     if (existing) {
       if (!existing.pinned) existing.date = due;
     } else if (due >= todayISO()) {
-      m.dates.push({ name: 'Case update', date: due, done: false, notify: true });
+      m.dates.push({ name: 'OA Issued?', date: due, done: false, notify: true });
     }
   }
   // --- Australian Headstart workflow --------------------------------------

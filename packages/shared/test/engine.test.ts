@@ -82,13 +82,13 @@ describe('AU Headstart workflow', () => {
   });
 });
 
-describe('universal Case update task (filing + 3 months)', () => {
+describe('universal OA Issued? prompt (filing + 3 months)', () => {
   const today = new Date().toISOString().slice(0, 10);
-  it('adds a Case update three months after a recent filing, on any jurisdiction', () => {
+  it('adds an OA Issued? prompt three months after a recent filing, on any jurisdiction', () => {
     const m = blankMark({ jurisdiction: 'Fiji' }); // a jurisdiction with no special rules
     m.dates.push({ name: 'Application Filed', date: today, done: false });
     ensureRuleRows(m, rules);
-    const cu = m.dates.find((d) => d.name === 'Case update');
+    const cu = m.dates.find((d) => d.name === 'OA Issued?');
     expect(cu).toBeTruthy();
     expect(cu!.date > today).toBe(true); // three months out, i.e. upcoming
   });
@@ -96,24 +96,24 @@ describe('universal Case update task (filing + 3 months)', () => {
     const m = blankMark({ jurisdiction: 'Fiji' });
     m.dates.push({ name: 'Application Filed', date: today, done: false });
     ensureRuleRows(m, rules, undefined, 6);
-    const cu = m.dates.find((d) => d.name === 'Case update')!;
+    const cu = m.dates.find((d) => d.name === 'OA Issued?')!;
     expect(cu.date).toBe(shift(today, 6, 'months'));
   });
-  it('does not retroactively add a Case update to a long-filed case', () => {
+  it('does not retroactively add an OA Issued? prompt to a long-filed case', () => {
     const m = blankMark({ jurisdiction: 'Australia' });
     m.dates.push({ name: 'Application Filed', date: '2010-01-01', done: true });
     m.dates.push({ name: 'Registration Date', date: '2011-01-01', done: true });
     ensureRuleRows(m, rules);
-    expect(m.dates.some((d) => d.name === 'Case update')).toBe(false);
+    expect(m.dates.some((d) => d.name === 'OA Issued?')).toBe(false);
   });
   it('stays deleted once the user removes it', () => {
     const m = blankMark({ jurisdiction: 'Fiji' });
     m.dates.push({ name: 'Application Filed', date: today, done: false });
     ensureRuleRows(m, rules);
-    m.dates = m.dates.filter((d) => d.name !== 'Case update');
-    m.suppressedRules = ['Case update'];
+    m.dates = m.dates.filter((d) => d.name !== 'OA Issued?');
+    m.suppressedRules = ['OA Issued?'];
     ensureRuleRows(m, rules);
-    expect(m.dates.some((d) => d.name === 'Case update')).toBe(false);
+    expect(m.dates.some((d) => d.name === 'OA Issued?')).toBe(false);
   });
 });
 

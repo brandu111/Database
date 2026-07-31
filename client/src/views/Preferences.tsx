@@ -538,10 +538,10 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
           </div>
           <div className="grid2">
             <Field label="Documents folder"><input type="text" value={fs.documentsFolder} disabled={ro} onChange={(e) => saveSettings({ ...fs, documentsFolder: e.target.value })} /></Field>
-            <Field label="“Case update” task — months after filing">
+            <Field label="“OA Issued?” prompt — months after filing">
               <input type="number" min={1} max={60} value={fs.caseUpdateMonths ?? 3} disabled={ro}
                 onChange={(e) => saveSettings({ ...fs, caseUpdateMonths: Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 3)) })} />
-              <div className="hint" style={{ marginTop: 2 }}>The automatic Case update task falls this many months after each application is filed. Changes apply to new filings; run “Recompute all” to update existing cases.</div>
+              <div className="hint" style={{ marginTop: 2 }}>The automatic “OA Issued?” prompt falls this many months after each application is filed. Changes apply to new filings; run “Recompute all” to update existing cases.</div>
             </Field>
           </div>
           <Field label="Default firm sign-off (fallback for staff without their own)">
