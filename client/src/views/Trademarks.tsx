@@ -533,6 +533,21 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
     update({ contacts: m.contacts.map((x, j) => (j === i ? next : x)) }, !!match);
   };
 
+  // When a case contact's company matches a Contacts record, and the row has no
+  // person named yet, pull that company's first contact so the row can be
+  // populated by company just as easily as by contact name.
+  const setContactCompany = (i: number, company: string) => {
+    const row = m.contacts[i];
+    const co = companies.find((c) => (c.name || '').toLowerCase() === company.trim().toLowerCase());
+    let next = { ...row, company };
+    if (co && !(row.name || '').trim() && co.contacts?.length) {
+      const cc = co.contacts[0];
+      const name = (cc.name || [cc.first, cc.middle, cc.last].filter(Boolean).join(' ')).trim();
+      next = { ...next, name, position: cc.position || cc.title || '', phone: cc.phone || '', email: cc.email || '' };
+    }
+    update({ contacts: m.contacts.map((x, j) => (j === i ? next : x)) }, !!co);
+  };
+
   const selectOwner = (name: string) => {
     const co = companies.find((c) => c.name === name);
     const patch: Partial<Mark> = { owner: name };
@@ -697,108 +712,6 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
             </div>
           </Card>
 
-          <Card
-            label="Owner"
-            right={
-              ownerCompany ? (
-                <button className="btn secondary small" onClick={() => go_company(ownerCompany.id)}>Open contact record</button>
-              ) : undefined
-            }
-          >
-            <div className="hint" style={{ marginBottom: 8 }}>
-              Owner details are pulled from the Contacts records — select an owner to copy their address and contacts onto this case.
-            </div>
-            <div className="grid2">
-              <Field label="Owner">
-                <input type="text" list="owner-list" value={m.owner} onChange={(e) => selectOwner(e.target.value)} disabled={ro} />
-                <datalist id="owner-list">
-                  {companies.map((c) => <option key={c.id} value={c.name} />)}
-                </datalist>
-              </Field>
-              <Field label="Owner type">
-                <select value={m.ownerType || 'Company'} onChange={(e) => update({ ownerType: e.target.value as Mark['ownerType'] }, true)} disabled={ro}>
-                  <option>Company</option>
-                  <option>Individual</option>
-                </select>
-              </Field>
-            </div>
-            <div className="grid2">
-              <Field label="ACN / ARBN"><input type="text" value={m.ownerAcn || ''} onChange={(e) => update({ ownerAcn: e.target.value })} disabled={ro} /></Field>
-              <Field label="ABN"><input type="text" value={m.ownerAbn || ''} onChange={(e) => update({ ownerAbn: e.target.value })} disabled={ro} /></Field>
-            </div>
-            <div className="grid2">
-              <Field label="Address"><input type="text" value={m.address1 || ''} onChange={(e) => update({ address1: e.target.value })} disabled={ro} /></Field>
-              <Field label="Address 2"><input type="text" value={m.address2 || ''} onChange={(e) => update({ address2: e.target.value })} disabled={ro} /></Field>
-            </div>
-            <div className="grid3">
-              <Field label={schema.city}><input type="text" value={m.city} onChange={(e) => update({ city: e.target.value })} disabled={ro} /></Field>
-              {schema.state && <Field label={schema.state}><input type="text" value={m.state} onChange={(e) => update({ state: e.target.value })} disabled={ro} /></Field>}
-              <Field label={schema.zip}><input type="text" value={m.zip} onChange={(e) => update({ zip: e.target.value })} disabled={ro} /></Field>
-            </div>
-            <div className="grid2">
-              <Field label="Country">
-                <input type="text" list="country-list" value={m.country} onChange={(e) => update({ country: e.target.value })} disabled={ro} />
-                <datalist id="country-list">
-                  {allJurisdictions().filter((j) => !/Madrid Protocol|WIPO/.test(j)).map((j) => <option key={j} value={j} />)}
-                </datalist>
-              </Field>
-              <Field label="Phone"><input type="text" value={m.phone} onChange={(e) => update({ phone: e.target.value })} disabled={ro} /></Field>
-            </div>
-          </Card>
-
-          <Card label="Case contacts" right={canEdit ? (
-            <div className="row">
-              {ownerCompany?.contacts?.length ? <button className="btn secondary small" onClick={importOwnerContacts}>Import from owner</button> : null}
-              <button className="btn small" onClick={() => update({ contacts: [...(m.contacts || []), { name: '', company: m.owner, position: '', phone: '', email: '' }] }, true)}>+ Add contact</button>
-            </div>
-          ) : undefined}>
-            <div className="grid2">
-              <Field label="Responsible attorney (BrandU staff)">
-                <select value={m.attorney || ''} onChange={(e) => update({ attorney: e.target.value })} disabled={ro}>
-                  <option value="">— Unassigned —</option>
-                  {[...new Set([...staff.map((s) => s.name), ...(m.attorney ? [m.attorney] : [])])].map((n) => (
-                    <option key={n} value={n}>{n}{staff.find((s) => s.name === n)?.title ? ` — ${staff.find((s) => s.name === n)!.title}` : ''}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Foreign associate / agent">
-                <input type="text" list="associate-contacts" value={m.associate || ''} onChange={(e) => update({ associate: e.target.value })} disabled={ro}
-                  placeholder="Start typing to pull from Contacts…" />
-                <datalist id="associate-contacts">{companies.map((c) => <option key={c.id} value={c.name} />)}</datalist>
-              </Field>
-            </div>
-            <div className="grid2">
-              <Field label="Associate’s file ref."><input type="text" value={m.associateRef || ''} onChange={(e) => update({ associateRef: e.target.value })} disabled={ro} /></Field>
-            </div>
-            {(m.contacts || []).length === 0 && (
-              <div className="hint" style={{ marginTop: 4 }}>No contacts on this case{ownerCompany?.contacts?.length ? ' — import them from the owner record.' : '. Add one, or set an owner with contacts.'}</div>
-            )}
-            {(m.contacts || []).length > 0 && (
-              <table className="list" style={{ marginTop: 6 }}>
-                <thead><tr><th>Name</th><th>Company</th><th>Position</th><th>Phone</th><th>Email</th><th /></tr></thead>
-                <tbody>
-                  {m.contacts.map((c, i) => (
-                    <tr key={i}>
-                      {(['name', 'company', 'position', 'phone', 'email'] as const).map((k) => (
-                        <td key={k}>
-                          {k === 'name' ? (
-                            <input type="text" value={c.name || ''} disabled={ro} list="case-contact-names" autoComplete="off"
-                              onChange={(e) => setContactName(i, e.target.value)} />
-                          ) : (
-                            <input type="text" value={c[k] || ''} disabled={ro}
-                              onChange={(e) => update({ contacts: m.contacts.map((x, j) => (j === i ? { ...x, [k]: e.target.value } : x)) })} />
-                          )}
-                        </td>
-                      ))}
-                      <td>{canEdit && <button className="btn danger-link" onClick={() => update({ contacts: m.contacts.filter((_, j) => j !== i) }, true)}>✕</button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            <datalist id="case-contact-names">{contactNames.map((n) => <option key={n} value={n} />)}</datalist>
-          </Card>
-
         </div>
 
         <div>
@@ -858,10 +771,6 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
         </div>
       </div>
 
-      <Card label="Goods / services">
-        <textarea value={m.goods} onChange={(e) => update({ goods: e.target.value })} disabled={ro} rows={5} />
-      </Card>
-
       <Card label="Trade mark actions" right={canEdit ? <button className="btn small" onClick={() => update({ actions: [...(m.actions || []), { date: todayISO(), text: '', done: false, createdBy: myName }] }, true)}>+ Add action</button> : undefined}>
         {(m.actions || []).length === 0 && <div className="hint">No actions.</div>}
         {(m.actions || []).length > 0 && (
@@ -895,86 +804,148 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
         )}
       </Card>
 
+      <Card
+        label="Owner"
+        right={
+          ownerCompany ? (
+            <button className="btn secondary small" onClick={() => go_company(ownerCompany.id)}>Open contact record</button>
+          ) : undefined
+        }
+      >
+        <div className="hint" style={{ marginBottom: 8 }}>
+          Owner details are pulled from the Contacts records — select an owner to copy their address and contacts onto this case.
+        </div>
+        <div className="grid3">
+          <Field label="Owner">
+            <input type="text" list="owner-list" value={m.owner} onChange={(e) => selectOwner(e.target.value)} disabled={ro} />
+            <datalist id="owner-list">
+              {companies.map((c) => <option key={c.id} value={c.name} />)}
+            </datalist>
+          </Field>
+          <Field label="Owner type">
+            <select value={m.ownerType || 'Company'} onChange={(e) => update({ ownerType: e.target.value as Mark['ownerType'] }, true)} disabled={ro}>
+              <option>Company</option>
+              <option>Individual</option>
+            </select>
+          </Field>
+          <Field label="ACN / ARBN"><input type="text" value={m.ownerAcn || ''} onChange={(e) => update({ ownerAcn: e.target.value })} disabled={ro} /></Field>
+        </div>
+        <div className="grid3">
+          <Field label="ABN"><input type="text" value={m.ownerAbn || ''} onChange={(e) => update({ ownerAbn: e.target.value })} disabled={ro} /></Field>
+          <Field label="Address"><input type="text" value={m.address1 || ''} onChange={(e) => update({ address1: e.target.value })} disabled={ro} /></Field>
+          <Field label="Address 2"><input type="text" value={m.address2 || ''} onChange={(e) => update({ address2: e.target.value })} disabled={ro} /></Field>
+        </div>
+        <div className="grid3">
+          <Field label={schema.city}><input type="text" value={m.city} onChange={(e) => update({ city: e.target.value })} disabled={ro} /></Field>
+          {schema.state && <Field label={schema.state}><input type="text" value={m.state} onChange={(e) => update({ state: e.target.value })} disabled={ro} /></Field>}
+          <Field label={schema.zip}><input type="text" value={m.zip} onChange={(e) => update({ zip: e.target.value })} disabled={ro} /></Field>
+        </div>
+        <div className="grid2">
+          <Field label="Country">
+            <input type="text" list="country-list" value={m.country} onChange={(e) => update({ country: e.target.value })} disabled={ro} />
+            <datalist id="country-list">
+              {allJurisdictions().filter((j) => !/Madrid Protocol|WIPO/.test(j)).map((j) => <option key={j} value={j} />)}
+            </datalist>
+          </Field>
+          <Field label="Phone"><input type="text" value={m.phone} onChange={(e) => update({ phone: e.target.value })} disabled={ro} /></Field>
+        </div>
+      </Card>
+
       <div className="detail-cols">
         <div>
-          <Card label="Disclaimers">
-            <textarea value={m.disclaimers} onChange={(e) => update({ disclaimers: e.target.value })} disabled={ro} />
-          </Card>
-
-          <Card label="Documents" right={canEdit ? <button className="btn small" onClick={() => update({ docs: [...(m.docs || []), { desc: '', link: '' }] }, true)}>+ Add document</button> : undefined}>
-            {(m.docs || []).length === 0 && <div className="hint">No documents.</div>}
-            {(m.docs || []).map((d, i) => (
-              <div key={i} className="row" style={{ marginBottom: 6 }}>
-                <input type="text" placeholder="Description" style={{ flex: 2 }} value={d.desc} disabled={ro}
-                  onChange={(e) => update({ docs: m.docs.map((x, j) => (j === i ? { ...x, desc: e.target.value } : x)) })} />
-                <input type="text" placeholder="Link" style={{ flex: 2 }} value={d.link} disabled={ro}
-                  onChange={(e) => update({ docs: m.docs.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)) })} />
-                {d.fileUrl ? (
-                  <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)', fontSize: 12.5 }}>{d.fileName || 'file'}</a>
-                ) : (
-                  canEdit && (
-                    <label className="btn secondary small" style={{ cursor: 'pointer' }}>
-                      ⬆ Upload
-                      <input type="file" style={{ display: 'none' }} onChange={async (e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        const up = await uploadFile(f);
-                        update({ docs: m.docs.map((x, j) => (j === i ? { ...x, fileUrl: up.url, fileName: up.fileName, desc: x.desc || up.fileName } : x)) }, true);
-                      }} />
-                    </label>
-                  )
-                )}
-                {canEdit && <button className="btn danger-link" onClick={() => update({ docs: m.docs.filter((_, j) => j !== i) }, true)}>✕</button>}
-              </div>
-            ))}
+          <Card label="Goods / services">
+            <textarea value={m.goods} onChange={(e) => update({ goods: e.target.value })} disabled={ro} rows={9} />
           </Card>
         </div>
-
         <div>
-          <MarkHistory markId={m.id} saveState={saveState} />
-
-          <Card label="Madrid Protocol">
-            {isDesignation && irCase && (
-              <div className="hint" style={{ marginBottom: 8 }}>
-                Designation under the{' '}
-                <button className="back" style={{ margin: 0 }} onClick={() => onOpen(irCase.id)}>International Registration{irCase.irNumber ? ` (${irCase.irNumber})` : ''}</button>.
-                The renewal date is inherited from the IR and appears once this designation is registered.
-              </div>
-            )}
-            {isIR && (
-              <div className="hint" style={{ marginBottom: 8 }}>
-                International Registration. Renewal is 10 years from the IR filing date and covers every designation; it appears once registered.
-                Use <strong>+ Add subsequent designation(s)</strong> above to designate more jurisdictions later.
-              </div>
-            )}
-            {designations.length > 0 && (
-              <>
-                <div className="section-label">Designations ({designations.length})</div>
-                <table className="list">
-                  <thead><tr><th>Jurisdiction</th><th>Filed</th><th>Application</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {designations.map((d) => (
-                      <tr key={d.id} className="click" onClick={() => onOpen(d.id)}>
-                        <td>{d.jurisdiction}</td>
-                        <td className="mono">{fmtDate((d.dates || []).find((x) => x.name === 'Application Filed')?.date || '') || '—'}</td>
-                        <td className="mono">{d.application || '—'}</td>
-                        <td><StatusBadge status={d.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-            {!isIR && !isDesignation && !irCase && (
-              <div className="hint">
-                {mpEligible
-                  ? 'Use “🌐 File a Madrid case” at the top to file an international registration based on this case and designate Madrid member countries.'
-                  : 'Madrid Protocol filings are made from an Australian or New Zealand basic case.'}
-              </div>
-            )}
+          <Card label="Disclaimers">
+            <textarea value={m.disclaimers} onChange={(e) => update({ disclaimers: e.target.value })} disabled={ro} rows={9} />
           </Card>
         </div>
       </div>
+
+      <Card label="Case contacts" right={canEdit ? (
+        <div className="row">
+          {ownerCompany?.contacts?.length ? <button className="btn secondary small" onClick={importOwnerContacts}>Import from owner</button> : null}
+          <button className="btn small" onClick={() => update({ contacts: [...(m.contacts || []), { name: '', company: m.owner, position: '', phone: '', email: '' }] }, true)}>+ Add contact</button>
+        </div>
+      ) : undefined}>
+        <div className="grid3">
+          <Field label="Responsible attorney (BrandU staff)">
+            <select value={m.attorney || ''} onChange={(e) => update({ attorney: e.target.value })} disabled={ro}>
+              <option value="">— Unassigned —</option>
+              {[...new Set([...staff.map((s) => s.name), ...(m.attorney ? [m.attorney] : [])])].map((n) => (
+                <option key={n} value={n}>{n}{staff.find((s) => s.name === n)?.title ? ` — ${staff.find((s) => s.name === n)!.title}` : ''}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Foreign associate / agent">
+            <input type="text" list="associate-contacts" value={m.associate || ''} onChange={(e) => update({ associate: e.target.value })} disabled={ro}
+              placeholder="Start typing to pull from Contacts…" />
+            <datalist id="associate-contacts">{companies.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+          </Field>
+          <Field label="Associate’s file ref."><input type="text" value={m.associateRef || ''} onChange={(e) => update({ associateRef: e.target.value })} disabled={ro} /></Field>
+        </div>
+        {(m.contacts || []).length === 0 && (
+          <div className="hint" style={{ marginTop: 4 }}>No contacts on this case{ownerCompany?.contacts?.length ? ' — import them from the owner record.' : '. Add one by contact name or company below, or set an owner with contacts.'}</div>
+        )}
+        {(m.contacts || []).length > 0 && (
+          <table className="list" style={{ marginTop: 6 }}>
+            <thead><tr><th>Contact Name</th><th>Company</th><th>Position</th><th>Contact Phone</th><th>Contact Email</th><th /></tr></thead>
+            <tbody>
+              {m.contacts.map((c, i) => (
+                <tr key={i}>
+                  {(['name', 'company', 'position', 'phone', 'email'] as const).map((k) => (
+                    <td key={k}>
+                      {k === 'name' ? (
+                        <input type="text" value={c.name || ''} disabled={ro} list="case-contact-names" autoComplete="off"
+                          onChange={(e) => setContactName(i, e.target.value)} />
+                      ) : k === 'company' ? (
+                        <input type="text" value={c.company || ''} disabled={ro} list="case-contact-companies" autoComplete="off"
+                          onChange={(e) => setContactCompany(i, e.target.value)} />
+                      ) : (
+                        <input type="text" value={c[k] || ''} disabled={ro}
+                          onChange={(e) => update({ contacts: m.contacts.map((x, j) => (j === i ? { ...x, [k]: e.target.value } : x)) })} />
+                      )}
+                    </td>
+                  ))}
+                  <td>{canEdit && <button className="btn danger-link" onClick={() => update({ contacts: m.contacts.filter((_, j) => j !== i) }, true)}>✕</button>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <datalist id="case-contact-names">{contactNames.map((n) => <option key={n} value={n} />)}</datalist>
+        <datalist id="case-contact-companies">{companies.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+      </Card>
+
+      <Card label="Documents" right={canEdit ? <button className="btn small" onClick={() => update({ docs: [...(m.docs || []), { desc: '', link: '' }] }, true)}>+ Add document</button> : undefined}>
+        {(m.docs || []).length === 0 && <div className="hint">No documents.</div>}
+        {(m.docs || []).map((d, i) => (
+          <div key={i} className="row" style={{ marginBottom: 6 }}>
+            <input type="text" placeholder="Description" style={{ flex: 2 }} value={d.desc} disabled={ro}
+              onChange={(e) => update({ docs: m.docs.map((x, j) => (j === i ? { ...x, desc: e.target.value } : x)) })} />
+            <input type="text" placeholder="Link" style={{ flex: 2 }} value={d.link} disabled={ro}
+              onChange={(e) => update({ docs: m.docs.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)) })} />
+            {d.fileUrl ? (
+              <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)', fontSize: 12.5 }}>{d.fileName || 'file'}</a>
+            ) : (
+              canEdit && (
+                <label className="btn secondary small" style={{ cursor: 'pointer' }}>
+                  ⬆ Upload
+                  <input type="file" style={{ display: 'none' }} onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    const up = await uploadFile(f);
+                    update({ docs: m.docs.map((x, j) => (j === i ? { ...x, fileUrl: up.url, fileName: up.fileName, desc: x.desc || up.fileName } : x)) }, true);
+                  }} />
+                </label>
+              )
+            )}
+            {canEdit && <button className="btn danger-link" onClick={() => update({ docs: m.docs.filter((_, j) => j !== i) }, true)}>✕</button>}
+          </div>
+        ))}
+      </Card>
 
       {mpModal && (
         <div

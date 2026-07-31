@@ -52,33 +52,39 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <div className="topbar">
+      <nav className="sidebar">
         <div className="brand">
-          brand<em>U</em> <span style={{ fontWeight: 500, color: 'var(--muted)', fontSize: 13 }}>Trade Mark Database</span>
+          brand<em>U</em>
+          <span className="brand-sub">Trade Mark Database</span>
         </div>
-        {TABS.map((t) => (
-          <button key={t.key} className={`tab${nav.view === t.key ? ' active' : ''}`} onClick={() => go({ view: t.key })}>
-            {t.label}
-          </button>
-        ))}
-        <GlobalSearch onOpenMark={openMark} onOpenCompany={openCompany} />
+        <div className="nav-links">
+          {TABS.map((t) => (
+            <button key={t.key} className={`navlink${nav.view === t.key ? ' active' : ''}`} onClick={() => go({ view: t.key })}>
+              {t.label}
+            </button>
+          ))}
+        </div>
         <div className="whoami">
-          <span>
-            {me.name} · {me.level}
-          </span>
+          <span>{me.name}</span>
+          <span className="who-level">{me.level}</span>
           <button className="btn secondary small" onClick={() => api.logout().then(() => setMe(null))}>
             Sign out
           </button>
         </div>
-      </div>
-      <div className="main">
-        {nav.view === 'dashboard' && <Dashboard openMark={openMark} openOpposition={openOpposition} go={(view) => go({ view })} canEdit={canEdit} />}
-        {nav.view === 'trademarks' && <Trademarks nav={nav} go={go} canEdit={canEdit} />}
-        {nav.view === 'oppositions' && <Oppositions nav={nav} go={go} canEdit={canEdit} />}
-        {nav.view === 'contacts' && <Contacts nav={nav} go={go} canEdit={canEdit} openMark={openMark} />}
-        {nav.view === 'alerts' && <Alerts openMark={openMark} openOpposition={openOpposition} canEdit={canEdit} />}
-        {nav.view === 'reports' && <Reports />}
-        {nav.view === 'preferences' && <Preferences isFull={isFull} />}
+      </nav>
+      <div className="content">
+        <div className="topstrip">
+          <GlobalSearch onOpenMark={openMark} onOpenCompany={openCompany} />
+        </div>
+        <div className="main">
+          {nav.view === 'dashboard' && <Dashboard openMark={openMark} openOpposition={openOpposition} go={(view) => go({ view })} canEdit={canEdit} />}
+          {nav.view === 'trademarks' && <Trademarks nav={nav} go={go} canEdit={canEdit} />}
+          {nav.view === 'oppositions' && <Oppositions nav={nav} go={go} canEdit={canEdit} />}
+          {nav.view === 'contacts' && <Contacts nav={nav} go={go} canEdit={canEdit} openMark={openMark} />}
+          {nav.view === 'alerts' && <Alerts openMark={openMark} openOpposition={openOpposition} canEdit={canEdit} />}
+          {nav.view === 'reports' && <Reports />}
+          {nav.view === 'preferences' && <Preferences isFull={isFull} />}
+        </div>
       </div>
     </div>
   );
