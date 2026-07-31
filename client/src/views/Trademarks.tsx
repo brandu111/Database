@@ -435,8 +435,20 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
       // dates the case is missing; never overwrite a date it already has, and
       // never introduce/alter renewal rows (those are engine-computed/pinned).
       const existing = m.dates || [];
+      // Once a mark is registered, the prosecution-stage dates (OA issued,
+      // publication, priority, acceptance) are no longer relevant — a registered
+      // case only needs Application Filed and Registration Date, from which the
+      // engine builds the Renewal Deadline and its reminders. So on a registered
+      // case, don't pull the prosecution dates across.
+      const isRegistered =
+        /register/i.test((rest as { status?: string }).status || m.status || '') ||
+        fetchedDates.some((f) => f.name === 'Registration Date' && f.date);
+      const keepWhenRegistered = new Set(['Application Filed', 'Registration Date']);
       const additions = fetchedDates.filter(
-        (f) => !/renewal/i.test(f.name) && !existing.some((d) => d.name === f.name && d.date)
+        (f) =>
+          !/renewal/i.test(f.name) &&
+          !existing.some((d) => d.name === f.name && d.date) &&
+          (!isRegistered || keepWhenRegistered.has(f.name))
       );
       update({ ...rest, dates: [...existing, ...additions] }, true);
       setLookupMsg(`Loaded from IP Australia (${number})${additions.length ? '' : ' — no missing dates to add'}.`);
