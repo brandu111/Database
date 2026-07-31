@@ -179,7 +179,7 @@ function alertSuppressed(name: string, date: string, today: string, status?: str
   // Dead/closed matters: nothing should alert once the matter is lapsed,
   // withdrawn, abandoned, refused, removed, ceased or otherwise closed (renewal
   // reminders included — a lapsed case isn't being renewed).
-  if (status && /lapse|dead|withdraw|abandon|refus|remov|ceas|not renewed|expired|closed|finalis|finaliz/i.test(status)) return true;
+  if (status && /lapse|dead|withdraw|abandon|refus|remov|ceas|not renewed|expired|closed|finalis|finaliz|transfer/i.test(status)) return true;
   return false;
 }
 

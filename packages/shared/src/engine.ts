@@ -21,7 +21,7 @@ export function stageOrder(): string[] {
 }
 
 export function statusOptions(): string[] {
-  return stageOrder().concat(['Opposed', 'Lapsed', 'Allow to lapse', 'Withdrawn', 'Watching', 'Matter settled']);
+  return stageOrder().concat(['Opposed', 'Lapsed', 'Allow to lapse', 'Withdrawn', 'File Transferred', 'Watching', 'Matter settled']);
 }
 
 interface StageCfg {
