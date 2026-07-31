@@ -8,9 +8,12 @@ import { randomBytes } from 'node:crypto';
 import {
   applyStage,
   daysBetween,
+  designRulesFor,
   ensureRuleRows,
   fmtDate,
+  isDesign,
   oppSchedule,
+  rulesFor,
   shift,
   todayISO,
   type AlertRow,
@@ -634,6 +637,77 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
     tx();
     res.json({ pinned, casesChanged: changed.length, casesTotal: all.length });
+  });
+
+  // Add any missing renewal reminders to cases that already have a renewal
+  // deadline. This ONLY inserts the reminder rows the jurisdiction's rulebook
+  // defines (computed by counting back from the existing renewal date) — it
+  // never touches, recomputes or moves the renewal deadline itself or any other
+  // existing date, so it cannot corrupt source-of-truth dates. Reminders a user
+  // deliberately deleted (suppressedRules) are not re-added.
+  app.post('/api/marks/add-renewal-reminders', full, (_req, res) => {
+    const book = loadRules(db);
+    let remindersAdded = 0;
+    const changed: Mark[] = [];
+    for (const m of listMarks(db)) {
+      const ren = (m.dates || []).find((d) => /^renewal deadline$/i.test(d.name) && d.date);
+      if (!ren) continue;
+      const list = isDesign(m.type) ? designRulesFor(m.jurisdiction) : rulesFor(book, m.jurisdiction);
+      const reminderRules = list.filter((r) => r.trigger === 'Renewal Deadline' && /reminder/i.test(r.name));
+      const have = new Set((m.dates || []).map((d) => d.name));
+      const suppressed = new Set(m.suppressedRules || []);
+      let ch = false;
+      for (const r of reminderRules) {
+        if (have.has(r.name) || suppressed.has(r.name)) continue;
+        m.dates.push({
+          name: r.name,
+          date: shift(ren.date, r.v, r.u),
+          done: false,
+          auBase: 'Renewal Deadline',
+          auOff: r.v,
+          auUnit: r.u,
+          auRem: Math.trunc(Number(r.rem)) || 0,
+          auAlert: r.alerts,
+        });
+        remindersAdded++;
+        ch = true;
+      }
+      if (ch) {
+        m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+        changed.push(m);
+      }
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ remindersAdded, casesChanged: changed.length });
+  });
+
+  // Tidy registered cases: on any case that has a Registration Date, tick off
+  // (mark done) every still-outstanding date dated on/before registration — the
+  // pre-registration prosecution deadlines (office actions, acceptance,
+  // publication, opposition windows) that are moot once the mark is registered.
+  // Renewal-cluster rows are never touched. Nothing is deleted and no date value
+  // changes: rows just move to "done" so they drop out of Alerts but stay as
+  // ticked history.
+  app.post('/api/marks/tidy-registered', full, (_req, res) => {
+    let datesCleared = 0;
+    const changed: Mark[] = [];
+    for (const m of listMarks(db)) {
+      const reg = (m.dates || []).find((d) => d.name === 'Registration Date' && d.date)?.date;
+      if (!reg) continue;
+      let ch = false;
+      for (const d of m.dates || []) {
+        if (!d.done && d.date && d.date <= reg && !/renewal|grace/i.test(d.name) && d.name !== 'Registration Date') {
+          d.done = true;
+          datesCleared++;
+          ch = true;
+        }
+      }
+      if (ch) changed.push(m);
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ datesCleared, casesChanged: changed.length });
   });
 
   // Re-run the deadline engine over every case, so rulebook changes (new

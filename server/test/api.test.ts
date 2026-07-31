@@ -409,6 +409,56 @@ describe('bulk import & clear', () => {
     await viewer.get('/api/backup/download').expect(403);
   });
 
+  it('adds missing renewal reminders without changing the locked renewal date', async () => {
+    const m = (await admin.post('/api/marks').send({ name: 'REMINDME', jurisdiction: 'Australia', owner: 'Remind Pty Ltd' }).expect(201)).body;
+    // A case with a locked renewal date but NO registration date — so the engine's
+    // registration gate means it never generated renewal reminders on save.
+    m.dates = [
+      { name: 'Application Filed', date: '2014-05-01', done: true },
+      { name: 'Renewal Deadline', date: '2024-05-01', done: false, pinned: true },
+    ];
+    await admin.put(`/api/marks/${m.id}`).send(m).expect(200);
+    // Confirm the "missing reminders" precondition actually holds after the save.
+    const pre = (await admin.get(`/api/marks/${m.id}`)).body;
+    expect(pre.dates.some((d: { name: string }) => /renewal reminder/i.test(d.name))).toBe(false);
+
+    const r = (await admin.post('/api/marks/add-renewal-reminders').expect(200)).body;
+    expect(r.remindersAdded).toBeGreaterThanOrEqual(1);
+    const after = (await admin.get(`/api/marks/${m.id}`)).body;
+    // Reminders now exist and are dated before the renewal deadline.
+    const reminders = after.dates.filter((d: { name: string }) => /renewal reminder/i.test(d.name));
+    expect(reminders.length).toBeGreaterThanOrEqual(1);
+    expect(reminders.every((d: { date: string }) => d.date < '2024-05-01')).toBe(true);
+    // The locked renewal date is untouched.
+    expect(after.dates.find((d: { name: string }) => d.name === 'Renewal Deadline').date).toBe('2024-05-01');
+
+    await viewer.post('/api/marks/add-renewal-reminders').expect(403);
+  });
+
+  it('tidies registered cases by ticking off pre-registration deadlines only', async () => {
+    const m = (await admin.post('/api/marks').send({ name: 'TIDYME', jurisdiction: 'Australia', owner: 'Tidy Pty Ltd' }).expect(201)).body;
+    m.dates = [
+      { name: 'Application Filed', date: '2018-01-01', done: true },
+      { name: 'OA Response Due', date: '2018-09-01', done: false },       // pre-reg, outstanding → cleared
+      { name: 'Acceptance Deadline', date: '2019-01-01', done: false },   // pre-reg, outstanding → cleared
+      { name: 'Registration Date', date: '2019-06-01', done: true },
+      { name: 'Renewal Deadline', date: '2028-01-01', done: false, pinned: true }, // after reg → untouched
+    ];
+    await admin.put(`/api/marks/${m.id}`).send(m).expect(200);
+
+    const r = (await admin.post('/api/marks/tidy-registered').expect(200)).body;
+    expect(r.datesCleared).toBeGreaterThanOrEqual(2);
+    const after = (await admin.get(`/api/marks/${m.id}`)).body;
+    const byName = Object.fromEntries(after.dates.map((d: { name: string; done: boolean; date: string }) => [d.name, d]));
+    expect(byName['OA Response Due'].done).toBe(true);
+    expect(byName['Acceptance Deadline'].done).toBe(true);
+    // Renewal deadline: not cleared, date unchanged.
+    expect(byName['Renewal Deadline'].done).toBe(false);
+    expect(byName['Renewal Deadline'].date).toBe('2028-01-01');
+
+    await viewer.post('/api/marks/tidy-registered').expect(403);
+  });
+
   it('verifies the database against the source-of-truth CSV (read-only)', async () => {
     // A case whose source-of-truth dates we will check.
     const m = (await admin.post('/api/marks').send({ name: 'VERIFYME', jurisdiction: 'Australia', owner: 'Verify Holdings Pty Ltd' }).expect(201)).body;

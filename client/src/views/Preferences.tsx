@@ -980,6 +980,41 @@ function DataImport() {
           }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
         </Card>
 
+        <Card label="Add missing renewal reminders">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Some cases have a renewal deadline but no reminder rows. This adds the reminders your rulebook defines (counted back from the <strong>existing</strong> renewal date) to every case that’s missing them. It never changes, moves or recomputes the renewal date itself or any other date — it only inserts the missing reminders — so it’s safe on locked dates. Reminders you deleted by hand are not brought back.
+          </div>
+          <button className="btn secondary small" disabled={busy} onClick={async () => {
+            setBusy(true);
+            try {
+              const r = await api.addRenewalReminders();
+              window.alert(`Added ${r.remindersAdded} renewal reminder${r.remindersAdded === 1 ? '' : 's'} across ${r.casesChanged} case${r.casesChanged === 1 ? '' : 's'}. No existing dates were changed.`);
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : 'Failed.');
+            } finally {
+              setBusy(false);
+            }
+          }}>{busy ? 'Working…' : 'Add missing renewal reminders'}</button>
+        </Card>
+
+        <Card label="Tidy registered cases">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            On every case that has a <strong>Registration Date</strong>, this ticks off the still-outstanding deadlines dated on or before registration — the pre-registration items (office actions, acceptance, publication, opposition windows) that no longer apply once the mark is registered. They drop out of Alerts but stay on the case as ticked history. Renewal dates and reminders are never touched, and nothing is deleted.
+          </div>
+          <button className="btn secondary small" disabled={busy} onClick={async () => {
+            if (!window.confirm('Tick off all outstanding pre-registration deadlines on registered cases? Renewal dates are not affected, and nothing is deleted.')) return;
+            setBusy(true);
+            try {
+              const r = await api.tidyRegistered();
+              window.alert(`Cleared ${r.datesCleared} redundant pre-registration deadline${r.datesCleared === 1 ? '' : 's'} across ${r.casesChanged} registered case${r.casesChanged === 1 ? '' : 's'}.`);
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : 'Failed.');
+            } finally {
+              setBusy(false);
+            }
+          }}>{busy ? 'Working…' : 'Tidy registered cases'}</button>
+        </Card>
+
         <Card label="Download a backup">
           <div className="hint" style={{ marginBottom: 8 }}>
             Downloads a complete, up-to-the-second copy of the whole database as a single <code>.sqlite</code> file. Safe to run any time — it snapshots without interrupting the app. Keep a copy off the server for peace of mind; to restore, place the file back as <code>data/brandu.sqlite</code>. (A daily automatic backup can also run on the server — ask about the cron job.)
