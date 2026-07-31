@@ -103,12 +103,14 @@ export function ensureRulesCurrent(db: DB): void {
   for (const row of db.prepare(`SELECT jurisdiction, doc FROM rules`).all() as { jurisdiction: string; doc: string }[]) {
     stored[row.jurisdiction] = JSON.parse(row.doc);
   }
-  if (Object.keys(stored).length === 0) {
-    saveRules(db, defaultRules());
-  } else {
-    const { rules } = migrateRules(stored, storedVersion);
-    saveRules(db, rules);
-  }
+  const book = Object.keys(stored).length === 0 ? defaultRules() : migrateRules(stored, storedVersion).rules;
+  // Seed the central "master date list" catalogue once, from the baseline. It is
+  // never applied to a case by the engine (rulesFor only resolves real
+  // jurisdiction names or `_default`); it exists purely as an editable list to
+  // copy dates across to jurisdictions that have none. Only seed when absent so
+  // the user's own edits (including emptying it) are preserved on later boots.
+  if (!('_master' in book)) book._master = JSON.parse(JSON.stringify(book._default || []));
+  saveRules(db, book);
   db.prepare(`INSERT INTO meta(key,value) VALUES('rulesVersion',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(String(RULES_VERSION));
 }
 

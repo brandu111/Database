@@ -457,6 +457,43 @@ describe('oppositions', () => {
   });
 });
 
+describe('date rules — master list & copy across jurisdictions', () => {
+  it('seeds a master date list that is not applied to cases by the engine', async () => {
+    const { rules } = (await admin.get('/api/rules').expect(200)).body;
+    expect(Array.isArray(rules._master)).toBe(true);
+    expect(rules._master.length).toBeGreaterThan(0);
+    // A case in a jurisdiction with no own rules falls back to the baseline, NOT the master.
+    const m = (await admin.post('/api/marks').send({ name: 'MASTERCHK', jurisdiction: 'Iceland' }).expect(201)).body;
+    m.dates = [{ name: 'Registration Date', date: '2020-01-01', done: true }];
+    const saved = (await admin.put(`/api/marks/${m.id}`).send(m).expect(200)).body;
+    // Baseline gives it a Renewal Deadline; the master list existing does not double it up.
+    expect(saved.dates.filter((d: { name: string }) => d.name === 'Renewal Deadline').length).toBe(1);
+  });
+
+  it('copies dates from the master list onto chosen empty jurisdictions', async () => {
+    // A jurisdiction with no rules of its own.
+    const before = (await admin.get('/api/rules').expect(200)).body.rules;
+    expect((before['Fiji'] || []).length).toBe(0);
+    const r = (await admin.post('/api/rules/copy').send({ source: '_master', targets: ['Fiji', 'Tonga'], mode: 'replace' }).expect(200)).body;
+    expect(r.copied).toBe(2);
+    expect(r.rules.Fiji.length).toBeGreaterThan(0);
+    // Copied rules are marked custom so they survive rulebook upgrades.
+    expect(r.rules.Fiji.every((x: { custom?: boolean }) => x.custom)).toBe(true);
+    // Persisted.
+    const after = (await admin.get('/api/rules').expect(200)).body.rules;
+    expect(after.Fiji.length).toBe(after._master.length);
+
+    // Merge mode only adds names the target doesn't already have.
+    const fijiLen = after.Fiji.length;
+    const merged = (await admin.post('/api/rules/copy').send({ source: '_master', targets: ['Fiji'], mode: 'merge' }).expect(200)).body;
+    expect(merged.rules.Fiji.length).toBe(fijiLen); // nothing new to add
+
+    // Guardrails.
+    await admin.post('/api/rules/copy').send({ source: '_master', targets: [], mode: 'merge' }).expect(400);
+    await viewer.post('/api/rules/copy').send({ source: '_master', targets: ['Fiji'], mode: 'merge' }).expect(403);
+  });
+});
+
 describe('client extranet', () => {
   it('grants scoped read-only access with a hashed password', async () => {
     await admin.post('/api/marks').send({ name: 'CLIENT MARK', owner: 'Acme Pty Ltd' }).expect(201);

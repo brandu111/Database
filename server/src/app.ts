@@ -18,6 +18,8 @@ import {
   type MarkDate,
   type Opposition,
   type OppositionDate,
+  type Rule,
+  type RuleBook,
   type StaffLevel,
 } from '@brandu/shared';
 import {
@@ -37,6 +39,7 @@ import {
   saveMark,
   saveOpposition,
   saveJurisdictionRules,
+  saveRules,
   setFirmSettings,
   setOppDatesMaster,
   loadRules,
@@ -1329,6 +1332,40 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     if (!list) return res.status(400).json({ error: 'rules array required' });
     saveJurisdictionRules(db, req.params.jurisdiction, list);
     res.json({ ok: true });
+  });
+
+  // Copy a set of date rules from one source (the master list, the baseline, or
+  // any jurisdiction) across to one or more target jurisdictions in a single
+  // transaction. `mode` 'merge' adds only dates the target doesn't already have
+  // (matched by name); 'replace' overwrites the target's list. Optional `names`
+  // limits the copy to a chosen subset of the source's dates. Copied rules are
+  // marked custom so they survive future rulebook upgrades.
+  app.post('/api/rules/copy', full, (req, res) => {
+    const source = String(req.body?.source || '');
+    const targets: string[] = Array.isArray(req.body?.targets) ? req.body.targets.map(String) : [];
+    const mode = req.body?.mode === 'replace' ? 'replace' : 'merge';
+    const names: string[] | null = Array.isArray(req.body?.names) ? req.body.names.map(String) : null;
+    const rules = loadRules(db);
+    let sourceList: Rule[] = rules[source] || [];
+    if (names) sourceList = sourceList.filter((r) => names.includes(r.name));
+    if (!sourceList.length) return res.status(400).json({ error: 'The source has no dates to copy.' });
+    const clone = (): Rule[] => (JSON.parse(JSON.stringify(sourceList)) as Rule[]).map((r) => ({ ...r, custom: true }));
+    const changed: RuleBook = {};
+    for (const t of targets) {
+      // Never copy onto the source itself or onto the reserved catalogue keys.
+      if (!t || t === source || t === '_master' || t === '_default') continue;
+      const existing = rules[t] || [];
+      if (mode === 'replace') {
+        changed[t] = clone();
+      } else {
+        const have = new Set(existing.map((r) => r.name));
+        changed[t] = existing.concat(clone().filter((r) => !have.has(r.name)));
+      }
+    }
+    const copied = Object.keys(changed).length;
+    if (!copied) return res.status(400).json({ error: 'No valid target jurisdictions.' });
+    saveRules(db, changed);
+    res.json({ copied, targets: Object.keys(changed), rules: { ...rules, ...changed } });
   });
 
   app.get('/api/opp-dates-master', view, (_req, res) => res.json(getOppDatesMaster(db)));

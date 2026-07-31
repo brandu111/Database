@@ -77,6 +77,8 @@ export const api = {
 
   rules: () => req<{ rulesVersion: number; rules: RuleBook }>('GET', '/api/rules'),
   saveRules: (jurisdiction: string, rules: Rule[]) => req<{ ok: true }>('PUT', `/api/rules/${encodeURIComponent(jurisdiction)}`, { rules }),
+  copyRules: (source: string, targets: string[], mode: 'merge' | 'replace', names?: string[]) =>
+    req<{ copied: number; targets: string[]; rules: RuleBook }>('POST', '/api/rules/copy', { source, targets, mode, names }),
   oppDatesMaster: () => req<OppDateMaster[]>('GET', '/api/opp-dates-master'),
   saveOppDatesMaster: (v: OppDateMaster[]) => req<{ ok: true }>('PUT', '/api/opp-dates-master', v),
 

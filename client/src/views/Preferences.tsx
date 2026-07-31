@@ -200,10 +200,11 @@ function EmailTemplates({ isFull }: { isFull: boolean }) {
 function DateRules({ isFull }: { isFull: boolean }) {
   const [rules, setRules] = useState<RuleBook>({});
   const [rulesVersion, setRulesVersion] = useState<number | null>(null);
-  const [prefKey, setPrefKey] = useState('_default');
+  const [prefKey, setPrefKey] = useState('_master');
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(-1);
   const [saveState, setSaveState] = useState('');
+  const [copyOpen, setCopyOpen] = useState(false);
 
   useEffect(() => {
     api.rules().then((r) => {
@@ -218,6 +219,7 @@ function DateRules({ isFull }: { isFull: boolean }) {
   }, [search]);
 
   const cur = rules[prefKey] || [];
+  const label = prefKey === '_master' ? 'Master date list' : prefKey === '_default' ? 'Baseline rules' : `${prefKey} rules`;
 
   const persist = async (jur: string, list: Rule[]) => {
     setRules((r) => ({ ...r, [jur]: list }));
@@ -236,39 +238,55 @@ function DateRules({ isFull }: { isFull: boolean }) {
     <div className="pref-layout">
       <div className="card" style={{ padding: 10 }}>
         <input type="text" placeholder="Find jurisdiction…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 8 }} />
+        <div className={`jur-item${prefKey === '_master' ? ' on' : ''}`} onClick={() => { setPrefKey('_master'); setExpanded(-1); }}>
+          <span>★ Master date list</span>
+          <span className="hint">{(rules._master || []).length}</span>
+        </div>
         <div className={`jur-item${prefKey === '_default' ? ' on' : ''}`} onClick={() => { setPrefKey('_default'); setExpanded(-1); }}>
           <span>Baseline (all jurisdictions)</span>
           <span className="hint">{(rules._default || []).length}</span>
         </div>
-        {jurs.map((j) => (
-          <div key={j} className={`jur-item${prefKey === j ? ' on' : ''}`} onClick={() => { setPrefKey(j); setExpanded(-1); }}>
-            <span>{j}</span>
-            <span className="hint">{(rules[j] || []).length || ''}</span>
-          </div>
-        ))}
+        {jurs.map((j) => {
+          const n = (rules[j] || []).length;
+          return (
+            <div key={j} className={`jur-item${prefKey === j ? ' on' : ''}`} onClick={() => { setPrefKey(j); setExpanded(-1); }}>
+              <span>{j}</span>
+              <span className="hint" style={{ color: n ? undefined : 'var(--danger)' }}>{n || 'none'}</span>
+            </div>
+          );
+        })}
       </div>
 
       <div>
         <Card
-          label={prefKey === '_default' ? 'Baseline rules' : `${prefKey} rules`}
+          label={label}
           right={
             <div className="row">
               <span className="hint">rules v{rulesVersion ?? '…'} · offsets from trigger date · date format {fmtDate('2009-01-01')}</span>
-              {isFull && prefKey !== '_default' && cur.length === 0 && (
-                <button className="btn secondary small" onClick={() => persist(prefKey, JSON.parse(JSON.stringify(rules._default || [])))}>
-                  Copy baseline
+              {isFull && cur.length > 0 && (
+                <button className="btn secondary small" onClick={() => setCopyOpen(true)}>Copy to jurisdictions…</button>
+              )}
+              {isFull && prefKey !== '_default' && prefKey !== '_master' && cur.length === 0 && (
+                <button className="btn secondary small" onClick={() => persist(prefKey, JSON.parse(JSON.stringify(rules._master?.length ? rules._master : rules._default || [])))}>
+                  Copy master list
                 </button>
               )}
               {isFull && (
                 <button className="btn small" onClick={() => persist(prefKey, [...cur, { name: 'New date', trigger: 'Application Filed', v: 1, u: 'months', alerts: true, template: '', custom: true }])}>
-                  + Add rule
+                  + Add date
                 </button>
               )}
               <span className="save-state">{saveState}</span>
             </div>
           }
         >
-          {cur.length === 0 && <div className="hint">No rules for this jurisdiction — the baseline applies. Copy the baseline to customise.</div>}
+          {prefKey === '_master' && (
+            <div className="hint" style={{ marginBottom: 8 }}>
+              Your central catalogue of dates. It is <strong>not</strong> applied to any case on its own — build it here, then use <strong>Copy to jurisdictions…</strong> to push these dates onto jurisdictions that have none (e.g. countries with no official source-of-truth timeline).
+            </div>
+          )}
+          {cur.length === 0 && prefKey !== '_master' && <div className="hint">No dates for this jurisdiction — the baseline applies. Use “Copy master list” or the master list’s “Copy to jurisdictions…” to give it a set of dates.</div>}
+          {cur.length === 0 && prefKey === '_master' && <div className="hint">The master list is empty. Add dates with “+ Add date”.</div>}
           {cur.length > 0 && (
             <table className="list">
               <thead>
@@ -279,14 +297,117 @@ function DateRules({ isFull }: { isFull: boolean }) {
                   <RuleRow key={i} r={r} i={i} isFull={isFull} expanded={expanded === i}
                     onToggle={() => setExpanded(expanded === i ? -1 : i)}
                     onChange={(patch) => setRule(i, patch)}
-                    onDelete={() => { if (confirmDelete(`rule "${r.name}"`)) persist(prefKey, cur.filter((_, j) => j !== i)); }} />
+                    onDelete={() => { if (confirmDelete(`date "${r.name}"`)) persist(prefKey, cur.filter((_, j) => j !== i)); }} />
                 ))}
               </tbody>
             </table>
           )}
         </Card>
         <div className="hint">
-          Built-in rules are statutory periods reviewed with the client; changing them here is firm policy. Rules you add are marked custom and survive rulebook upgrades.
+          Built-in rules are statutory periods reviewed with the client; changing them here is firm policy. Dates you add are marked custom and survive rulebook upgrades.
+        </div>
+      </div>
+
+      {copyOpen && (
+        <CopyDatesModal
+          source={prefKey}
+          sourceLabel={label}
+          dates={cur}
+          rules={rules}
+          onClose={() => setCopyOpen(false)}
+          onDone={(updated) => { setRules(updated); setCopyOpen(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CopyDatesModal({ source, sourceLabel, dates, rules, onClose, onDone }: {
+  source: string;
+  sourceLabel: string;
+  dates: Rule[];
+  rules: RuleBook;
+  onClose: () => void;
+  onDone: (updated: RuleBook) => void;
+}) {
+  const all = useMemo(() => jurList().filter((j) => j !== source), [source]);
+  const [search, setSearch] = useState('');
+  const [targets, setTargets] = useState<Set<string>>(new Set());
+  const [mode, setMode] = useState<'merge' | 'replace'>('merge');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const shown = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    return all.filter((j) => !s || j.toLowerCase().includes(s));
+  }, [all, search]);
+  const emptyOnes = useMemo(() => all.filter((j) => !(rules[j] || []).length), [all, rules]);
+
+  const toggle = (j: string) => setTargets((cur) => {
+    const n = new Set(cur);
+    if (n.has(j)) n.delete(j); else n.add(j);
+    return n;
+  });
+
+  const run = async () => {
+    if (!targets.size) { setErr('Pick at least one jurisdiction.'); return; }
+    setBusy(true);
+    setErr('');
+    try {
+      const r = await api.copyRules(source, Array.from(targets), mode);
+      onDone(r.rules);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Copy failed.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(22,35,59,0.4)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 50, padding: '40px 16px', overflowY: 'auto' }} onClick={() => !busy && onClose()}>
+      <div className="card" style={{ maxWidth: 640, width: '100%', margin: 0 }} onClick={(e) => e.stopPropagation()}>
+        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+          <div className="section-label" style={{ marginBottom: 0 }}>Copy dates to jurisdictions</div>
+          <button className="btn danger-link" onClick={() => !busy && onClose()}>✕</button>
+        </div>
+        <div className="hint" style={{ marginBottom: 10 }}>
+          Copies the <strong>{dates.length}</strong> date{dates.length === 1 ? '' : 's'} from <strong>{sourceLabel}</strong> onto the jurisdictions you tick below. Existing cases update the next time they’re saved or when you run “Recompute all”.
+        </div>
+        <div className="row" style={{ gap: 12, marginBottom: 8 }}>
+          <label className="row" style={{ gap: 6, cursor: 'pointer' }}>
+            <input type="radio" checked={mode === 'merge'} onChange={() => setMode('merge')} />
+            <span className="hint">Add missing dates only (keep what’s there)</span>
+          </label>
+          <label className="row" style={{ gap: 6, cursor: 'pointer' }}>
+            <input type="radio" checked={mode === 'replace'} onChange={() => setMode('replace')} />
+            <span className="hint">Replace the target’s dates</span>
+          </label>
+        </div>
+        <div className="row" style={{ gap: 8, marginBottom: 6 }}>
+          <input type="text" placeholder="Find jurisdiction…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ flex: 1 }} />
+          <button className="btn secondary small" title="Select every jurisdiction that has no dates yet" onClick={() => setTargets(new Set(emptyOnes))}>Select empty ({emptyOnes.length})</button>
+          <button className="btn secondary small" onClick={() => setTargets(new Set(shown))}>Select shown</button>
+          <button className="btn secondary small" onClick={() => setTargets(new Set())}>Clear</button>
+        </div>
+        <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8 }}>
+          <div className="grid2" style={{ gap: '2px 14px' }}>
+            {shown.map((j) => {
+              const n = (rules[j] || []).length;
+              return (
+                <label key={j} className="row" style={{ gap: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={targets.has(j)} onChange={() => toggle(j)} />
+                  <span>{j}</span>
+                  <span className="hint" style={{ color: n ? undefined : 'var(--danger)' }}>{n ? `${n}` : 'none'}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+        {err && <div className="err" style={{ marginTop: 8 }}>{err}</div>}
+        <div className="row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+          <button className="btn secondary small" onClick={() => !busy && onClose()}>Cancel</button>
+          <button className="btn small" disabled={busy || !targets.size} onClick={run}>
+            {busy ? 'Copying…' : `Copy to ${targets.size} jurisdiction${targets.size === 1 ? '' : 's'}`}
+          </button>
         </div>
       </div>
     </div>
