@@ -19,6 +19,7 @@
   --border-2: #eeede9;
   --border-3: #f1f0ee;
   --danger: #c2372e;
+  --critical: #e0730a;
   --success: #1e7a3d;
   --success-bg: #eaf5ee;
   --defend-bg: #fdeeed;
@@ -118,6 +119,9 @@ table.list td { padding: 9px 10px; border-bottom: 1px solid var(--border-3); fon
 /* Zebra striping — alternating white / grey rows for easier scanning. */
 table.list tbody tr > td { background: #fff; }
 table.list tbody tr:nth-child(even) > td { background: var(--stripe); }
+/* Opt-out of zebra striping: plain white rows (e.g. the case Dates box). */
+table.list.nozebra tbody tr > td,
+table.list.nozebra tbody tr:nth-child(even) > td { background: #fff; }
 table.list tr.click { cursor: pointer; }
 table.list tbody tr:hover > td { background: var(--hover-row); }
 table.list td input, table.list td select { padding: 6px 8px; font-size: 13.5px; }

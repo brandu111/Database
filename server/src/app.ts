@@ -110,6 +110,16 @@ function blankMark(over: Partial<Mark>): Mark {
  * designation renewal propagation across the family — and persist every mark
  * the engine touched. The deadline engine runs exclusively server-side.
  */
+// Firm administrator contact recorded on every case's Case contacts.
+const ADMIN_CONTACT = { name: 'Admin', company: 'BrandU Legal', position: 'Admin', phone: '', email: 'admin@brandulegal.com.au' };
+/** Ensure the Admin contact is present on a case. Returns true if it was added. */
+function ensureAdminContact(m: Mark): boolean {
+  m.contacts = m.contacts || [];
+  if (m.contacts.some((c) => (c.email || '').toLowerCase() === ADMIN_CONTACT.email)) return false;
+  m.contacts.push({ ...ADMIN_CONTACT });
+  return true;
+}
+
 function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   const rules = loadRules(db);
   const all = listMarks(db).filter((x) => x.id !== incoming.id);
@@ -117,6 +127,7 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   all.push(m);
   if (previous && previous.status !== m.status) applyStage(m, rules, m.status);
   ensureRuleRows(m, rules, all, getFirmSettings(db).caseUpdateMonths);
+  ensureAdminContact(m);
   m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
   // Keep the International Registration number in sync across the Madrid family:
   // it is entered once on the IR case and copied down to every designation
@@ -569,6 +580,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
 
   app.post('/api/marks', edit, (req, res) => {
     const m = blankMark(req.body || {});
+    ensureAdminContact(m);
     saveMark(db, m);
     ensureOwnerCompany(db, m);
     const s = readSession(db, req);
@@ -709,6 +721,17 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
     tx();
     res.json({ datesCleared, casesChanged: changed.length });
+  });
+
+  // Record the firm Admin contact on every existing case that doesn't have it.
+  // New/edited cases get it automatically on save; this backfills the rest.
+  app.post('/api/marks/add-admin-contact', full, (_req, res) => {
+    const all = listMarks(db);
+    const changed: Mark[] = [];
+    for (const m of all) if (ensureAdminContact(m)) changed.push(m);
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ added: changed.length, casesTotal: all.length });
   });
 
   // Import legacy "Trademark Action" diary entries from the firm's alert export.

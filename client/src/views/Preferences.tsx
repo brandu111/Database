@@ -1004,6 +1004,23 @@ function DataImport() {
           }}>{busy ? 'Working…' : 'Recompute all cases'}</button>
         </Card>
 
+        <Card label="Add Admin to every case's contacts">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Records <strong>Admin (admin@brandulegal.com.au)</strong> in the Case contacts of every case that doesn’t already have it. New and edited cases get it automatically; this backfills existing ones.
+          </div>
+          <button className="btn secondary small" disabled={busy} onClick={async () => {
+            setBusy(true);
+            try {
+              const r = await api.addAdminContact();
+              window.alert(`Added Admin to ${r.added} case${r.added === 1 ? '' : 's'} (of ${r.casesTotal}). The rest already had it.`);
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : 'Failed.');
+            } finally {
+              setBusy(false);
+            }
+          }}>{busy ? 'Working…' : 'Add Admin to all cases'}</button>
+        </Card>
+
         <Card label="Import trade mark actions (from legacy alerts)">
           <div className="hint" style={{ marginBottom: 8 }}>
             Upload the CSV of legacy action items. Each row is matched to a case by application / registration number (then by name + jurisdiction) and added as an alerting <strong>Trade mark action</strong>, keeping its original date. Standard jurisdiction/reminder dates are skipped (the engine already generates those), and any action already on a case isn’t duplicated. Existing dates are never changed.

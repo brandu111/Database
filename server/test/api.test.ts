@@ -409,6 +409,21 @@ describe('bulk import & clear', () => {
     await viewer.get('/api/backup/download').expect(403);
   });
 
+  it('records the Admin contact on every case (on save and via backfill)', async () => {
+    // A new case gets Admin automatically on creation/save.
+    const m = (await admin.post('/api/marks').send({ name: 'ADMINAUTO', jurisdiction: 'Australia' }).expect(201)).body;
+    const got = (await admin.get(`/api/marks/${m.id}`)).body;
+    expect(got.contacts.some((c: { email: string }) => c.email === 'admin@brandulegal.com.au')).toBe(true);
+    // Saving again doesn't duplicate it.
+    await admin.put(`/api/marks/${m.id}`).send(got).expect(200);
+    const again = (await admin.get(`/api/marks/${m.id}`)).body;
+    expect(again.contacts.filter((c: { email: string }) => c.email === 'admin@brandulegal.com.au').length).toBe(1);
+    // Backfill endpoint is idempotent and full-only.
+    const r = (await admin.post('/api/marks/add-admin-contact').expect(200)).body;
+    expect(r.added).toBe(0); // everything already has it
+    await viewer.post('/api/marks/add-admin-contact').expect(403);
+  });
+
   it('imports legacy free-text actions, matching by number and skipping standard dates', async () => {
     const a = (await admin.post('/api/marks').send({ name: 'ACTIONMATCH', jurisdiction: 'Australia', application: '2655445', owner: 'Act Pty Ltd' }).expect(201)).body;
     const b = (await admin.post('/api/marks').send({ name: 'IRMATCH', jurisdiction: 'Canada', registration: 'IR No. 1744851', owner: 'Act Pty Ltd' }).expect(201)).body;

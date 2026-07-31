@@ -11,6 +11,7 @@ import {
   type EmailTemplate,
   type FirmSettings,
   type Mark,
+  type Opposition,
   type RuleBook,
 } from '@brandu/shared';
 import type { Nav } from '../App';
@@ -87,6 +88,7 @@ export function Trademarks({ nav, go, canEdit }: Props) {
           go({ markId: null });
         }}
         onOpen={(id) => go({ markId: id })}
+        onOpenOpposition={(id) => go({ view: 'oppositions', oppositionId: id })}
         onChanged={(m) => setMarks((cur) => (cur ? cur.map((x) => (x.id === m.id ? m : x)) : cur))}
         onDeleted={() => {
           reload();
@@ -331,12 +333,13 @@ interface DetailProps {
   canEdit: boolean;
   onBack: () => void;
   onOpen: (id: string) => void;
+  onOpenOpposition: (id: string) => void;
   onChanged: (m: Mark) => void;
   onDeleted: () => void;
   onCreated: () => void;
 }
 
-function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySignature, myName, canEdit, onBack, onOpen, onChanged, onDeleted, onCreated }: DetailProps) {
+function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySignature, myName, canEdit, onBack, onOpen, onOpenOpposition, onChanged, onDeleted, onCreated }: DetailProps) {
   const [m, setM] = useState<Mark>(initial);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [addDateName, setAddDateName] = useState('');
@@ -349,7 +352,9 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   const [showRelated, setShowRelated] = useState(false);
   const [staff, setStaff] = useState<{ name: string; title?: string }[]>([]);
   const [email, setEmail] = useState<ComposedEmail | null>(null);
+  const [oppositions, setOppositions] = useState<Opposition[]>([]);
   useEffect(() => { api.staffNames().then(setStaff, () => undefined); }, []);
+  useEffect(() => { api.oppositions().then(setOppositions, () => undefined); }, []);
   const timer = useRef<number | null>(null);
   const latest = useRef(m);
   latest.current = m;
@@ -586,6 +591,17 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   const now = Date.now();
   const relatedList = m.madridId ? allMarks.filter((x) => x.madridId === m.madridId) : [m];
   const inFamily = relatedList.length > 1;
+  // Oppositions that reference this case by application/registration/IR number,
+  // so an opposed application links straight to its opposition matter.
+  const relatedOpps = useMemo(() => {
+    const toks = new Set<string>();
+    for (const v of [m.application, m.registration, m.irNumber]) for (const t of (v || '').matchAll(/\d{4,}/g)) toks.add(t[0]);
+    if (!toks.size) return [] as Opposition[];
+    const refHits = (n?: string) => [...(n || '').matchAll(/\d{4,}/g)].some((mm) => toks.has(mm[0]));
+    return oppositions.filter((o) =>
+      [...(o.clientMarks || []), ...(o.oppMarks || [])].some((ref) => refHits(ref.application) || refHits(ref.registration))
+    );
+  }, [oppositions, m.application, m.registration, m.irNumber]);
   const filedOf = (r: Mark) => (r.dates || []).find((x) => x.name === 'Application Filed')?.date || '';
   const familyLabel = (r: Mark) =>
     r.jurisdiction === 'Madrid Protocol (WIPO)'
@@ -661,6 +677,25 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
         </Card>
       )}
 
+      {relatedOpps.length > 0 && (
+        <Card label={`Linked opposition${relatedOpps.length > 1 ? 's' : ''} (${relatedOpps.length})`}>
+          <div className="hint" style={{ marginBottom: 8 }}>This case is the subject of an opposition — click to open the opposition matter.</div>
+          <table className="list nozebra">
+            <thead><tr><th>Opposition</th><th>Parties</th><th>Jurisdiction</th><th>Status</th></tr></thead>
+            <tbody>
+              {relatedOpps.map((o) => (
+                <tr key={o.id} className="click" onClick={() => onOpenOpposition(o.id)}>
+                  <td style={{ fontWeight: 600, color: 'var(--heading)' }}>{o.name || o.proceeding || 'Opposition'}</td>
+                  <td>{[o.client, o.opponent].filter(Boolean).join(' v ') || '—'}</td>
+                  <td>{o.jurisdiction}</td>
+                  <td><StatusBadge status={o.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
       <div className="detail-cols">
         <div>
           <Card label="Trade mark">
@@ -716,7 +751,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
 
         <div>
           <Card label="Dates">
-            <table className="list">
+            <table className="list nozebra">
               <thead>
                 <tr><th style={{ width: 30 }}>✓</th><th>Date name</th><th style={{ width: 140 }}>Date</th><th>Note</th><th style={{ width: 60 }}></th></tr>
               </thead>
@@ -724,11 +759,14 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 {visibleDates.map(({ d, i }) => {
                   const days = d.date ? (new Date(d.date + 'T00:00:00').getTime() - now) / 86400000 : NaN;
                   const urgent = !d.done && days >= -1 && days <= 30;
+                  // Critical (non-completed, non-reminder) deadlines show in orange;
+                  // an imminent one (within 30 days) escalates to red.
+                  const critical = !d.done && !d.reminder && /deadline/i.test(d.name);
                   const sendEmail = emailForDate(d.name, d.emailFor, d.date);
                   return (
                     <tr key={`${d.name}-${i}`}>
                       <td><input type="checkbox" checked={!!d.done} disabled={ro} onChange={() => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) }, true)} /></td>
-                      <td className={d.done ? 'done' : ''} style={{ color: urgent ? 'var(--danger)' : undefined, fontWeight: d.reminder ? 400 : 500 }}>
+                      <td className={d.done ? 'done' : ''} style={{ color: urgent ? 'var(--danger)' : critical ? 'var(--critical)' : undefined, fontWeight: d.reminder ? 400 : critical ? 700 : 500 }}>
                         {d.name}
                         {d.linkedToIR && <span className="hint" title="Linked to IR renewal date"> ⟳ IR</span>}
                       </td>
@@ -890,7 +928,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
           <div className="hint" style={{ marginTop: 4 }}>No contacts on this case{ownerCompany?.contacts?.length ? ' — import them from the owner record.' : '. Add one by contact name or company below, or set an owner with contacts.'}</div>
         )}
         {(m.contacts || []).length > 0 && (
-          <table className="list" style={{ marginTop: 6 }}>
+          <table className="list nozebra" style={{ marginTop: 6 }}>
             <thead><tr><th>Contact Name</th><th>Company</th><th>Position</th><th>Contact Phone</th><th>Contact Email</th><th /></tr></thead>
             <tbody>
               {m.contacts.map((c, i) => (
