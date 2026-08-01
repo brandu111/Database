@@ -409,6 +409,31 @@ describe('bulk import & clear', () => {
     await viewer.get('/api/backup/download').expect(403);
   });
 
+  it('full-mirror import stores every legacy date verbatim and locked, no recompute', async () => {
+    const rows = [{
+      MarkName: 'MIRRORME', Jurisdiction: 'USA', Status: 'Pending - under examination',
+      ApplicationNo: '90111222', RegistrationNo: '',
+      'Application Filed': '22/09/2025', 'OA Issued': '13/03/2026', 'OA Response Due': '12/01/2027',
+      '2nd OA issued': '12/07/2026',
+    }];
+    const r = (await admin.post('/api/marks/import-full').send({ rows }).expect(200)).body;
+    expect(r.imported).toBe(1);
+    const m = ((await admin.get('/api/marks')).body as { id: string; name: string }[]).find((x) => x.name === 'MIRRORME')!;
+    const got = (await admin.get(`/api/marks/${m.id}`)).body;
+    const byName = Object.fromEntries(got.dates.map((d: { name: string; date: string; pinned?: boolean }) => [d.name, d]));
+    // The legacy OA Response Due (12 Jan 2027) is kept verbatim — NOT recomputed to
+    // OA Issued + 6 months (13 Sep 2026). This is the whole point of the mirror.
+    expect(byName['OA Response Due'].date).toBe('2027-01-12');
+    expect(byName['OA Response Due'].pinned).toBe(true);
+    expect(byName['2nd OA issued'].date).toBe('2026-07-12');
+    expect(byName['Application Filed'].date).toBe('2025-09-22');
+    // A save must not move the locked date either.
+    await admin.put(`/api/marks/${m.id}`).send(got).expect(200);
+    const after = (await admin.get(`/api/marks/${m.id}`)).body;
+    expect(after.dates.find((d: { name: string }) => d.name === 'OA Response Due').date).toBe('2027-01-12');
+    await viewer.post('/api/marks/import-full').send({ rows }).expect(403);
+  });
+
   it('imports Headstart details onto a matching case and drives the workflow', async () => {
     const m = (await admin.post('/api/marks').send({ name: 'HSIMPORT', jurisdiction: 'Australia', application: '2629844' }).expect(201)).body;
     const rows = [

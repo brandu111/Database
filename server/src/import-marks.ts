@@ -1,5 +1,36 @@
+import { todayISO } from '@brandu/shared';
 import type { Mark, MarkContact, MarkDate } from '@brandu/shared';
 export { IMPORT_COLUMNS } from '@brandu/shared';
+
+/** Core (non-date) column headers used by the full-mirror import. Everything
+ * else on the row is treated as a legacy date field. */
+const FULL_CORE_HEADERS = new Set([
+  'MarkName', 'Type', 'Jurisdiction', 'Status', 'ApplicationNo', 'RegistrationNo', 'IRNo', 'Classes',
+  'GoodsServices', 'OurRef', 'ClientRef', 'FileNumber', 'Comments', 'Disclaimers', 'OwnerName',
+  'OwnerACN', 'OwnerABN', 'ResponsibleAttorney', 'Associate', 'AssociateRef', 'Tags', 'RenewalFee',
+  'ClientContactName', 'ClientContactEmail',
+]);
+
+/**
+ * Full-mirror row → Mark: keep the legacy's dates verbatim. Core fields are
+ * mapped as usual, then EVERY other column that holds a date becomes a pinned
+ * date row named exactly as in the legacy export, so the engine displays it and
+ * never recomputes it. Past dates come in ticked (completed history); the active
+ * renewal deadline stays open. No engine rules are applied — this is a mirror.
+ */
+export function fullRowToMark(row: Record<string, string>, today = todayISO()): Partial<Mark> {
+  const base = csvRowToMark(row);
+  const dates: MarkDate[] = [];
+  for (const [k, v] of Object.entries(row)) {
+    if (FULL_CORE_HEADERS.has(k) || !v) continue;
+    const iso = parseImportDate(v);
+    if (!iso) continue;
+    const isRenewal = /^renewal deadline$/i.test(k);
+    dates.push({ name: k, date: iso, done: isRenewal ? false : iso < today, pinned: true });
+  }
+  base.dates = dates;
+  return base;
+}
 
 /**
  * CSV → Mark mapping for bulk case import. One CSV row = one case. Column

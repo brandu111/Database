@@ -51,7 +51,7 @@ import {
   type DB,
 } from './db.js';
 import { IpAuError, ipAuConfigured, lookupTradeMark } from './ipaustralia.js';
-import { csvRowToMark, parseImportDate } from './import-marks.js';
+import { csvRowToMark, fullRowToMark, parseImportDate } from './import-marks.js';
 import { indexCases, isStandardDateName, matchCase, normName, toAction } from './import-actions.js';
 import { groupCompanies } from './import-companies.js';
 import { mailerConfigured, sendMail } from './mailer.js';
@@ -952,6 +952,38 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     });
     tx();
     res.json({ imported: built.length, errors, total: rows.length });
+  });
+
+  // Full-mirror import: bring the legacy's dates across VERBATIM. Every date
+  // column becomes a pinned date row (named exactly as in the legacy export), so
+  // the case mirrors the legacy database date-for-date. The deadline engine is
+  // deliberately NOT run here — nothing is recomputed — so no date can diverge
+  // from the source. O(n): build in memory, persist in one transaction.
+  app.post('/api/marks/import-full', full, (req, res) => {
+    const rows: Record<string, string>[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) return res.status(400).json({ error: 'No rows to import.' });
+    const errors: { line: number; error: string }[] = [];
+    const built: Mark[] = [];
+    let totalDates = 0;
+    rows.forEach((row, i) => {
+      try {
+        const m = blankMark(fullRowToMark(row));
+        ensureAdminContact(m);
+        m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+        totalDates += m.dates.length;
+        built.push(m);
+      } catch (e) {
+        errors.push({ line: i + 2, error: (e as Error).message });
+      }
+    });
+    const tx = db.transaction(() => {
+      for (const m of built) {
+        saveMark(db, m);
+        recordHistory(db, m.id, 'Import', 'Case imported (full mirror — dates locked)');
+      }
+    });
+    tx();
+    res.json({ imported: built.length, dates: totalDates, errors, total: rows.length });
   });
 
   // Bulk-delete selected cases. Restricted to the principal (Natalie) — a

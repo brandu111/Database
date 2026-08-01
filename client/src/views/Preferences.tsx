@@ -856,6 +856,20 @@ function DataImport() {
     }
   };
 
+  const doImportFull = async () => {
+    if (!rows?.length) return;
+    setBusy(true);
+    try {
+      const r = await api.importFull(rows);
+      setResult({ imported: r.imported, total: r.total, errors: r.errors });
+      window.alert(`Imported ${r.imported} of ${r.total} cases with ${r.dates} dates — all locked to mirror the legacy database (nothing recomputed).${r.errors.length ? `\n\n${r.errors.length} row(s) had errors.` : ''}`);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Import failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const downloadTemplate = () => {
     const csv = toCsv(IMPORT_COLUMNS, [IMPORT_EXAMPLE_ROW]);
     const a = document.createElement('a');
@@ -968,7 +982,11 @@ function DataImport() {
                     </tbody>
                   </table>
                   {rows.length > preview.length && <div className="hint" style={{ marginBottom: 8 }}>…and {rows.length - preview.length} more.</div>}
-                  <button className="btn" disabled={busy} onClick={doImport}>{busy ? 'Importing…' : `Import ${rows.length} case${rows.length === 1 ? '' : 's'}`}</button>
+                  <div className="row">
+                    <button className="btn" disabled={busy} onClick={doImport}>{busy ? 'Importing…' : `Import ${rows.length} case${rows.length === 1 ? '' : 's'}`}</button>
+                    <button className="btn secondary" disabled={busy} title="Bring every date across exactly as in the legacy export, locked. Use this for the legacy mirror file." onClick={doImportFull}>{busy ? 'Importing…' : 'Import as full mirror (dates locked)'}</button>
+                  </div>
+                  <div className="hint" style={{ marginTop: 6 }}>Use <strong>full mirror</strong> for the all-dates legacy file — it stores every date exactly as the legacy holds it and never recomputes. Use the normal import for the standard template (renewals/reminders auto-calculated).</div>
                 </>
               )}
               {rows.length === 0 && <div className="hint" style={{ color: 'var(--danger)' }}>No rows found — check the file has a header row and at least one case.</div>}
