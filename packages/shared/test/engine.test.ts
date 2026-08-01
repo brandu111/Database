@@ -51,7 +51,7 @@ describe('Philippines DAU is a designation obligation, not an IR one', () => {
     const m = blankMark({ jurisdiction: 'Philippines' });
     m.dates.push({ name: 'Application Filed', date: '2020-01-01', done: true });
     ensureRuleRows(m, rules);
-    expect(dateOf(m, 'Philippines DAU deadline (3 years from filing)')).toBe('2023-01-01');
+    expect(dateOf(m, 'Philippines - DAU 3rd ann deadline')).toBe('2023-01-01');
   });
 });
 
@@ -82,9 +82,9 @@ describe('AU Headstart workflow', () => {
   });
 });
 
-describe('universal OA Issued? prompt (filing + 3 months)', () => {
+describe('universal OA Issued? prompt (filing + 5 months)', () => {
   const today = new Date().toISOString().slice(0, 10);
-  it('adds an OA Issued? prompt three months after a recent filing, on any jurisdiction', () => {
+  it('adds an OA Issued? prompt some months after a recent filing, on any jurisdiction', () => {
     const m = blankMark({ jurisdiction: 'Fiji' }); // a jurisdiction with no special rules
     m.dates.push({ name: 'Application Filed', date: today, done: false });
     ensureRuleRows(m, rules);
@@ -202,13 +202,14 @@ describe('opposition schedules', () => {
   });
 });
 
-describe('Mexico Declaration of Use', () => {
-  it('deadline = Mexican registration + 3 years + 3 months', () => {
+describe('Mexico Declaration of Use (legacy mirror)', () => {
+  it('3-year Declaration of Use = Mexican registration + 39 months', () => {
     const m = blankMark({ jurisdiction: 'Mexico', country: 'Mexico' });
     m.dates.push({ name: 'Registration Date', date: '2021-05-10', done: true });
     ensureRuleRows(m, rules);
-    expect(dateOf(m, 'Mexico Declaration of Use window opens (3rd anniversary)')).toBe('2024-05-10');
-    expect(dateOf(m, 'Mexico Declaration of Use deadline')).toBe('2024-08-10');
+    expect(dateOf(m, 'Mexico - 3 year DOU')).toBe('2024-08-10');
+    // Reminder 1 year before the 3-year DoU.
+    expect(dateOf(m, 'Mexico - 3 year DOU reminder')).toBe('2023-08-10');
   });
 
   it('a Madrid designation of Mexico runs its DoU from its own grant date, not the IR date', () => {
@@ -220,33 +221,27 @@ describe('Mexico Declaration of Use', () => {
     const all = [ir, des];
     ensureRuleRows(ir, rules, all);
     ensureRuleRows(des, rules, all);
-    // Anchored on the Mexican grant date (2021-09-01) → deadline 2024-12-01,
-    // not the IR date (2019-04-04) which would give 2022-07-04.
-    expect(dateOf(des, 'Mexico Declaration of Use deadline')).toBe('2024-12-01');
+    // Anchored on the Mexican grant date (2021-09-01) + 39 months → 2024-12-01,
+    // not the IR date (2019-04-04).
+    expect(dateOf(des, 'Mexico - 3 year DOU')).toBe('2024-12-01');
   });
 
-  it('renewal DoU stays dormant until the WIPO renewal-notice recording date is entered, then runs +3 months', () => {
-    const m = blankMark({ jurisdiction: 'Mexico', country: 'Mexico', irId: 'ir9' });
+  it('the 10-year Declaration of Use runs from the registration date', () => {
+    const m = blankMark({ jurisdiction: 'Mexico', country: 'Mexico' });
     m.dates.push({ name: 'Registration Date', date: '2015-01-10', done: true });
     ensureRuleRows(m, rules);
-    const key = 'Mexico DoU (renewal) deadline — 3 months from IMPI recording of WIPO renewal notice';
-    // No recording date yet → no deadline row.
-    expect(m.dates.some((d) => d.name === key)).toBe(false);
-    // Enter the date IMPI records the WIPO renewal notice → deadline = +3 months.
-    m.dates.push({ name: 'WIPO renewal notice recorded by IMPI', date: '2025-02-01', done: true });
-    ensureRuleRows(m, rules);
-    expect(dateOf(m, key)).toBe('2025-05-01');
+    expect(dateOf(m, 'Mexico - DOU on 10 year renewal')).toBe('2025-01-10');
   });
 });
 
 describe('every alerting deadline gets an automatic 1-week reminder', () => {
-  it('the AU acceptance deadline has a −1 week reminder', () => {
+  it('the AU OA response deadline has a −1 week reminder', () => {
     const m = blankMark({ jurisdiction: 'Australia' });
     m.dates.push({ name: 'OA Issued', date: '2024-01-15', done: true });
     ensureRuleRows(m, rules);
-    // Acceptance Deadline = OA Issued + 15 months = 2025-04-15; −1 week = 2025-04-08.
-    expect(dateOf(m, 'Acceptance Deadline')).toBe('2025-04-15');
-    expect(dateOf(m, 'Acceptance Deadline — 1 Week Reminder')).toBe('2025-04-08');
+    // OA Response Due = OA Issued + 15 months = 2025-04-15; −1 week = 2025-04-08.
+    expect(dateOf(m, 'OA Response Due')).toBe('2025-04-15');
+    expect(dateOf(m, 'OA Response Due — 1 Week Reminder')).toBe('2025-04-08');
   });
 });
 
@@ -257,14 +252,12 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     m.dates.push({ name: 'Registration Date', date: '2021-02-10', done: true });
     ensureRuleRows(m, rules);
     expect(dateOf(m, 'Renewal Deadline')).toBe('2030-08-15');
-    // Full AU reminder chain: −6m, −3m (Second), −1m (Final); grace +6m; and the
+    // Legacy AU reminder chain: −12m (AU lead), −1m (Final); grace +6m; and the
     // engine's automatic −1 week reminder on the deadline.
-    expect(dateOf(m, 'Renewal Reminder')).toBe('2030-02-15');
-    expect(dateOf(m, 'Renewal Reminder - Second')).toBe('2030-05-15');
+    expect(dateOf(m, 'Renewal Reminder')).toBe('2029-08-15');
     expect(dateOf(m, 'Renewal Reminder - Final')).toBe('2030-07-15');
     expect(dateOf(m, 'Renewal Deadline — 1 Week Reminder')).toBe('2030-08-08');
     expect(dateOf(m, '6 Month Renewal Grace Period')).toBe('2031-02-15');
-    expect(dateOf(m, 'Non-use vulnerability date')).toBe('2024-02-10');
   });
 
   it('keeps the completed renewal as a ticked history row and opens the next one', () => {
@@ -284,7 +277,7 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     const ren = m.dates.find((d) => d.name === 'Renewal Deadline')!;
     expect(ren.date).toBe('2040-08-15');
     expect(ren.done).toBe(false);
-    expect(dateOf(m, 'Renewal Reminder')).toBe('2040-02-15');
+    expect(dateOf(m, 'Renewal Reminder')).toBe('2039-08-15');
     expect(dateOf(m, '6 Month Renewal Grace Period')).toBe('2041-02-15');
     expect(m.dates.find((d) => d.name === 'Renewal Reminder')!.done).toBe(false);
   });
@@ -312,7 +305,7 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     m.dates.push({ name: 'Renewal Deadline', date: '2031-06-30', done: false, pinned: true });
     ensureRuleRows(m, rules);
     expect(dateOf(m, 'Renewal Deadline')).toBe('2031-06-30'); // kept, not the computed 2030-08-15
-    expect(dateOf(m, 'Renewal Reminder')).toBe('2030-12-30'); // reminders relative to the pinned date
+    expect(dateOf(m, 'Renewal Reminder')).toBe('2030-06-30'); // reminders relative to the pinned date (AU −12m)
   });
 
   it('does not create renewal rows before a Registration Date exists', () => {
@@ -324,25 +317,25 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     expect(dateOf(m, 'Convention Priority Deadline')).toBe('2021-02-15');
   });
 
-  it('AU Acceptance Deadline = 15 months from the first report (OA Issued)', () => {
+  it('AU OA Response Due = 15 months from the first report (OA Issued)', () => {
     const m = blankMark();
     m.dates.push({ name: 'OA Issued', date: '2024-03-01', done: true });
     ensureRuleRows(m, rules);
-    expect(dateOf(m, 'Acceptance Deadline')).toBe('2025-06-01');
+    expect(dateOf(m, 'OA Response Due')).toBe('2025-06-01');
   });
 
-  it('US OA response due 6 months from issue; renewal runs from registration', () => {
+  it('US OA response due 3 months from issue; renewal runs from registration', () => {
     const m = blankMark({ jurisdiction: 'USA' });
     m.dates.push({ name: 'Application Filed', date: '2017-06-01', done: true });
     m.dates.push({ name: 'OA Issued', date: '2018-01-15', done: true });
     m.dates.push({ name: 'Registration Date', date: '2018-02-13', done: true });
     ensureRuleRows(m, rules);
-    expect(dateOf(m, 'OA Response Due')).toBe('2018-07-15');
+    expect(dateOf(m, 'OA Response Due')).toBe('2018-04-15');
     expect(dateOf(m, 'Renewal Deadline')).toBe('2028-02-13');
     // §8 Declaration of Use falls in the 5th–6th year (6 years from registration).
-    expect(dateOf(m, 'US Declaration of Use (5th-6th year)')).toBe('2024-02-13');
+    expect(dateOf(m, 'US - Deadline for Dec of Use 5th Anniversary')).toBe('2024-02-13');
     // Engine adds an automatic 1-week reminder before the OA response deadline.
-    expect(dateOf(m, 'OA Response Due — 1 Week Reminder')).toBe('2018-07-08');
+    expect(dateOf(m, 'OA Response Due — 1 Week Reminder')).toBe('2018-04-08');
   });
 
   it('no longer generates an "Opposition period expires" date', () => {
@@ -352,15 +345,14 @@ describe('ensureRuleRows — the client-verified AU example', () => {
     expect(m.dates.some((d) => d.name === 'Opposition period expires')).toBe(false);
   });
 
-  it('generates monthly countdown reminders for rules with rem set', () => {
+  it('generates the convention-priority reminder rows (30 days / 7 days before)', () => {
     const m = blankMark();
     m.dates.push({ name: 'Application Filed', date: '2024-01-31', done: true });
     ensureRuleRows(m, rules);
-    // Convention Priority Deadline = 2024-07-31, rem 3 → reminders at −3, −2, −1 months
+    // Convention Priority Deadline = 2024-07-31; legacy AU reminders 30 days then 7 days before.
     expect(dateOf(m, 'Convention Priority Deadline')).toBe('2024-07-31');
-    expect(dateOf(m, 'Convention Priority Deadline — Reminder 1 of 3')).toBe('2024-04-30');
-    expect(dateOf(m, 'Convention Priority Deadline — Reminder 2 of 3')).toBe('2024-05-31');
-    expect(dateOf(m, 'Convention Priority Deadline — Reminder 3 of 3')).toBe('2024-06-30');
+    expect(dateOf(m, 'Reminder for Convention Priority')).toBe('2024-07-01');
+    expect(dateOf(m, 'Final Reminder for Convention Priority')).toBe('2024-07-24');
   });
 
   it('is idempotent and recomputes when a base date changes', () => {
@@ -393,8 +385,8 @@ describe('applyStage — status engine', () => {
     expect(m.dates.some((x) => x.name === 'Registration Date' && x.auInput)).toBe(true);
     // Renewal Deadline row activated (AU: anchored to Application Filed)
     expect(dateOf(m, 'Renewal Deadline')).toBe('2030-08-15');
-    // Non-use rule triggers off Registration Date, which is still empty
-    expect(dateOf(m, 'Non-use vulnerability date')).toBe('');
+    // Legacy AU carries no computed non-use vulnerability date.
+    expect(m.dates.some((d) => d.name === 'Non-use vulnerability date')).toBe(false);
   });
 
   it('Convention Priority auto-activation is limited to AU/NZ', () => {
@@ -463,7 +455,7 @@ describe('rulesVersion migration', () => {
     expect(rulesVersion).toBe(RULES_VERSION);
     expect(migrated.Australia.some((r) => r.name === 'Stale rule')).toBe(false);
     expect(migrated.Australia.some((r) => r.name === 'My custom rule')).toBe(true);
-    expect(migrated.Australia.some((r) => r.name === 'Acceptance Deadline')).toBe(true);
+    expect(migrated.Australia.some((r) => r.name === 'OA Response Due')).toBe(true);
     expect(migrated._default.some((r) => r.name === 'Old builtin')).toBe(false);
   });
 

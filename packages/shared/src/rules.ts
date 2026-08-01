@@ -8,7 +8,7 @@ import type { OppDateMaster, OppSchedule, Rule, RuleBook } from './types.js';
  * If any built-in rule changes, bump RULES_VERSION and let migrateRules()
  * refresh stored rulebooks (user rules flagged `custom: true` survive).
  */
-export const RULES_VERSION = 12;
+export const RULES_VERSION = 13;
 
 const T_REN =
   'Dear {{client}},\n\nRe: Trade mark {{mark}} ({{jurisdiction}})\n\nThis is a reminder that the renewal deadline for the above trade mark is {{deadline}}. Please confirm whether you would like us to attend to the renewal, and we will provide a cost estimate.\n\nKind regards\nBrandU Legal';
@@ -34,18 +34,15 @@ export function isDesign(type: string | undefined): boolean {
  */
 export function designRulesFor(jurisdiction: string): Rule[] {
   const j = (jurisdiction || '').toLowerCase();
-  const reminders: Rule[] = [
-    r('Renewal Reminder', 'Renewal Deadline', -3, 'months', true, T_DES),
-    r('Renewal Reminder - Final', 'Renewal Deadline', -1, 'months', true, T_DES),
-  ];
-  const renew = (maxYears: number): Rule[] => [
+  // Legacy reminder lead: AU registered designs 6 months before; NZ 12 months.
+  const renew = (maxYears: number, remBefore: number): Rule[] => [
     r('Renewal Deadline', 'Application Filed', 5, 'years', true, T_DES),
-    ...reminders,
+    r('Renewal Reminder', 'Renewal Deadline', -remBefore, 'months', true, T_DES),
     r('Design Maximum Term Ends', 'Application Filed', maxYears, 'years', true),
   ];
-  if (j.includes('australia')) return renew(10);
-  if (j.includes('new zealand')) return renew(15);
-  if (j.includes('united kingdom') || j === 'uk' || j.includes('european union') || j.includes('eutm')) return renew(25);
+  if (j.includes('australia')) return renew(10, 6);
+  if (j.includes('new zealand')) return renew(15, 12);
+  if (j.includes('united kingdom') || j === 'uk' || j.includes('european union') || j.includes('eutm')) return renew(25, 6);
   if (j.includes('usa') || j.includes('united states')) {
     // US design patents: single 15-year term from grant, no renewal.
     return [r('Design Term Ends (no renewal)', 'Registration Date', 15, 'years', true)];
@@ -53,7 +50,7 @@ export function designRulesFor(jurisdiction: string): Rule[] {
   // Generic registered design — 5-year renewable; verify the local maximum term.
   return [
     r('Renewal Deadline', 'Application Filed', 5, 'years', true, T_DES),
-    ...reminders,
+    r('Renewal Reminder', 'Renewal Deadline', -6, 'months', true, T_DES),
   ];
 }
 
@@ -64,170 +61,279 @@ const r = (
   u: Rule['u'],
   alerts: boolean,
   template = '',
-  rem = 0
-): Rule => ({ name, trigger, v, u, alerts, template, rem });
+  rem = 0,
+  adj = 0
+): Rule => (adj ? { name, trigger, v, u, alerts, template, rem, adj } : { name, trigger, v, u, alerts, template, rem });
 
 /**
- * Standard renewal chain: deadline at +years from the anchor trigger, client
- * reminders at −6 months / −2 months (Final) / −1 week, and the 6-month grace
- * period after the deadline.
+ * Renewal chain mirroring the legacy (Reva) rulebook: a Renewal Deadline at
+ * +term from the anchor trigger (with the optional legacy ±day adjustment), plus
+ * a single client Renewal Reminder ahead of it. Legacy used a 6-month reminder
+ * lead everywhere except Australia and Mexico (12 months). A handful of
+ * jurisdictions also carry a Final reminder and/or the 6-month grace period —
+ * passed through `opts`.
+ *
+ * The engine adds a "— 1 Week Reminder" to every alerting deadline automatically,
+ * so the chain only carries the longer-lead client reminder(s).
  */
-// The engine adds a "— 1 Week Reminder" to every alerting deadline automatically,
-// so the chains below only carry the longer-lead client reminders.
-const renewalChain = (regTrigger: string, years: number): Rule[] => [
-  r('Renewal Deadline', regTrigger, years, 'years', true, T_REN),
-  r('Renewal Reminder', 'Renewal Deadline', -6, 'months', true, T_REN),
-  r('Renewal Reminder - Final', 'Renewal Deadline', -2, 'months', true, T_REN),
-  r('6 Month Renewal Grace Period', 'Renewal Deadline', 6, 'months', false),
+const renewal = (
+  anchor: string,
+  term: number,
+  opts: { unit?: 'years' | 'months'; remBefore?: number; adj?: number; final?: number; grace?: boolean } = {}
+): Rule[] => {
+  const unit = opts.unit || 'years';
+  const remBefore = opts.remBefore ?? 6;
+  const out: Rule[] = [
+    r('Renewal Deadline', anchor, term, unit, true, T_REN, 0, opts.adj || 0),
+    r('Renewal Reminder', 'Renewal Deadline', -remBefore, 'months', true, T_REN),
+  ];
+  if (opts.final) out.push(r('Renewal Reminder - Final', 'Renewal Deadline', -opts.final, 'months', true, T_REN));
+  if (opts.grace) out.push(r('6 Month Renewal Grace Period', 'Renewal Deadline', 6, 'months', false));
+  return out;
+};
+
+/** Non-use vulnerability date — jurisdiction-specific 3- or 5-year period from registration. */
+const nonUse = (years: number): Rule => r('Non-use vulnerability date', 'Registration Date', years, 'years', true);
+
+/**
+ * Convention priority chain (Australia / New Zealand only — the engine gates it
+ * to those jurisdictions). Deadline 6 months from filing; client reminders 30
+ * days then 7 days before, mirroring the legacy AU/NZ rows.
+ */
+const convention = (anchor = 'Application Filed'): Rule[] => [
+  r('Convention Priority Deadline', anchor, 6, 'months', true),
+  r('Reminder for Convention Priority', 'Convention Priority Deadline', -30, 'days', true),
+  r('Final Reminder for Convention Priority', 'Convention Priority Deadline', -7, 'days', true),
 ];
 
 /**
- * Built-in rules, version RULES_VERSION.
+ * Built-in rules, version RULES_VERSION — a faithful mirror of the legacy (Reva)
+ * "Trademark Dates" logic, transcribed jurisdiction-by-jurisdiction from the
+ * client's exported date-rule screens. Each array below contains ONLY the legacy
+ * "Is Relative" (computed) rows: a date name, its trigger, the interval, and the
+ * ±day adjustment where legacy carried one.
  *
- * Verified renewal anchors: AU/NZ/UK/EU/Singapore renew 10 years from FILING;
- * USA / Madrid / Canada / China / Japan renew 10 years from REGISTRATION.
- * Convention priority: 6 months from the earliest priority date.
- * AU examination: Acceptance Deadline = 15 months from date of first report.
- * US office action: response due 6 months from issue.
- * AU opposition period: 2 months from advertisement/publication.
- * Non-use vulnerability: AU/NZ/US/CA/CN/JP 3 years; UK/EU/SG 5 years.
+ * Deliberate global conventions layered over the raw legacy rows:
+ *  • Every Renewal Deadline gets a Renewal Reminder (6 months before; 12 for
+ *    Australia and Mexico, per legacy) so a renewal reminder is never missed —
+ *    legacy carried this on almost every jurisdiction; a few had it as a manual
+ *    field, which we automate. Delete it per-case if not wanted.
+ *  • The universal "OA Issued?" check-in prompt (5 months after Application Filed,
+ *    legacy "Case update" / "OA received?") is added by the engine on every case,
+ *    so it is not repeated per jurisdiction here.
+ *  • "Opposition period expires" is intentionally NOT generated (an unopposed
+ *    matter just proceeds to registration).
+ *  • Historical dates are imported pinned/verbatim, so these rules drive forward
+ *    computation and renewal roll-over only — the imported values are authoritative.
+ *
+ * Renewal anchors follow legacy exactly: filing vs registration varies by country
+ * (see each entry). ±1-day renewals (China, France, Hong Kong, Thailand, Myanmar)
+ * carry the legacy Adjustment via the rule's `adj` field.
  */
 export function defaultRules(): RuleBook {
-  return {
+  const rb: RuleBook = {
+    // Fallback for any jurisdiction without an explicit legacy entry below.
     _default: [
-      r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
       r('OA Response Due', 'OA Issued', 2, 'months', true, T_OA),
       r('OA Response - Instructions Reminder', 'OA Response Due', -1, 'months', true, T_OA),
-      r('Opposition response due', 'Opposition filed', 2, 'months', true),
-      ...renewalChain('Registration Date', 10),
+      ...renewal('Registration Date', 10, { grace: true }),
     ],
+
+    // ---------- Australia (national, Headstart, deferment, revocation) --------
     Australia: [
-      r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
-      // Single acceptance deadline replaces a separate "OA response due":
-      // 15 months from the date of the first report. A 6-month extension (no
-      // statutory declaration) exists but is added manually when needed.
-      r('Acceptance Deadline', 'OA Issued', 15, 'months', true, T_OA),
-      // Chase the client for instructions well before the acceptance deadline
-      // (plus the automatic 1-week reminder the engine adds).
-      r('Acceptance Deadline - Instructions Reminder', 'Acceptance Deadline', -3, 'months', true, T_OA),
-      r('Acceptance Deadline - Final Reminder', 'Acceptance Deadline', -1, 'months', true, T_OA),
-      r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
-      r('Renewal Deadline', 'Application Filed', 10, 'years', true, T_REN),
-      r('Renewal Reminder', 'Renewal Deadline', -6, 'months', true, T_REN),
-      r('Renewal Reminder - Second', 'Renewal Deadline', -3, 'months', true, T_REN),
-      r('Renewal Reminder - Final', 'Renewal Deadline', -1, 'months', true, T_REN),
-      r('6 Month Renewal Grace Period', 'Renewal Deadline', 6, 'months', false),
-      // --- Headstart (AU pre-filing assessment service) --------------------
-      // Enter "Headstart - Application Filed" to start the chain. The prelim
-      // assessment chase fires 4 days later; entering the assessment date auto-
-      // ticks it (engine) and sets the Part 2 fee deadline 5 business days out;
-      // a chase to the responsible attorney lands 2 business days before that.
+      ...convention(),
+      r('OA Maintenance Reminder', 'OA Issued', 6, 'months', true, T_OA),
+      r('OA Response Due', 'OA Issued', 15, 'months', true, T_OA),
+      r('OA Response - Instructions Reminder', 'OA Response Due', -3, 'months', true, T_OA),
+      r('OA Response - Final Reminder', 'OA Response Due', -1, 'months', true, T_OA),
+      // Renewal: 10 years from filing, reminder 12 months out (legacy AU lead),
+      // a final reminder 1 month out, and the 6-month grace period.
+      ...renewal('Application Filed', 10, { remBefore: 12, final: 1, grace: true }),
+      // Deferment of acceptance (cited marks / prior use) and revocation.
+      r('Deferment deadline - cited marks', 'Deferment request lodged', 6, 'months', true),
+      r('Deferment - Reminder (cited mark)', 'Deferment request lodged', 1, 'months', true),
+      r('Deferment for prior use deadline', 'Deferment request lodged (use)', 6, 'months', true),
+      r('Deferment - Reminder (use)', 'Deferment request lodged (use)', 3, 'months', true),
+      r('Revocation - deadline to respond', 'Revocation of Acceptance', 1, 'months', true),
+      r('Renewal Fees Paid? Renew', 'Renewal Instructions Received', 1, 'months', true),
+      // --- Headstart (AU pre-filing assessment) — business-day workflow -------
+      // Enter "Headstart - Application Filed" to start the chain. Entering the
+      // preliminary assessment date auto-ticks the chase and sets the Part 2 fee
+      // deadline 5 business days out; a chase lands 2 business days before that.
       // Ticking the fee-paid reminder reveals the standard Application Filed date.
       r('Headstart - Preliminary Assessment Received?', 'Headstart - Application Filed', 4, 'days', true),
       r('Headstart - Part 2 Fee Due', 'Headstart - Preliminary Assessment Received', 5, 'business days', true),
       r('Headstart - Has the Part 2 Fee been Paid', 'Headstart - Part 2 Fee Due', -2, 'business days', true),
     ],
+    // Trans-Tasman (TTMF) — anchored on "TTMF Application filed".
+    'Australia TTMF': [
+      r('OA Response Due', 'OA Issued', 15, 'months', true, T_OA),
+      r('Convention Priority Deadline', 'TTMF Application filed', 6, 'months', true),
+      r('Reminder for Convention Priority', 'TTMF Application filed', 3, 'months', true),
+      r('OA Issued?', 'TTMF Application filed', 6, 'months', true),
+      ...renewal('TTMF Application filed', 10),
+    ],
     'New Zealand': [
-      r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
-      r('Compliance Deadline', 'OA Issued', 12, 'months', true, T_OA),
-      r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
-      ...renewalChain('Application Filed', 10),
+      ...convention(),
+      r('OA Maintenance Reminder', 'OA Issued', 6, 'months', true, T_OA),
+      r('OA Response Due', 'OA Issued', 12, 'months', true, T_OA),
+      r('Notice of Renewal Received', 'Instruction to Renew Received', 1, 'months', false),
+      ...renewal('Application Filed', 10),
+      // Legacy NZ Final = 5 months after the (−6mo) Renewal Reminder ⇒ ~1 month out.
+      r('Renewal Reminder - Final', 'Renewal Reminder', 5, 'months', true, T_REN),
     ],
     USA: [
-      r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
-      r('OA Response Due', 'OA Issued', 6, 'months', true, T_OA),
-      r('OA Response - Instructions Reminder', 'OA Response Due', -2, 'months', true, T_OA),
-      r('Statement of Use Due', 'Notice of Allowance', 6, 'months', true),
-      r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
-      // §8 Declaration of Use — 5th–6th year window (grace to 6.5 years). First
-      // client reminder one year out, then six months, plus the automatic 1-week
-      // reminder the engine adds. (Names kept template-compatible.)
-      r('US Declaration of Use (5th-6th year)', 'Registration Date', 6, 'years', true, T_REN),
-      r('US Declaration of Use (5th-6th year) - 1 Year Reminder', 'US Declaration of Use (5th-6th year)', -12, 'months', true, T_REN),
-      r('US Declaration of Use (5th-6th year) - 6 Month Reminder', 'US Declaration of Use (5th-6th year)', -6, 'months', true, T_REN),
-      r('6 Month DOU Grace Period', 'US Declaration of Use (5th-6th year)', 6, 'months', false),
-      // §8 & §9 combined Declaration + Renewal — 9th–10th year, then every 10 years.
-      // First reminder one year out, then six months.
-      r('US Declaration of Use / Renewal (9th-10th year)', 'Registration Date', 10, 'years', true, T_REN),
-      r('US Declaration of Use / Renewal (9th-10th year) - 1 Year Reminder', 'US Declaration of Use / Renewal (9th-10th year)', -12, 'months', true, T_REN),
-      r('US Declaration of Use / Renewal (9th-10th year) - 6 Month Reminder', 'US Declaration of Use / Renewal (9th-10th year)', -6, 'months', true, T_REN),
-      ...renewalChain('Registration Date', 10),
+      r('OA Response Due', 'OA Issued', 3, 'months', true, T_OA),
+      r('OA Maintenance Reminder', 'OA Response Due', -1, 'months', true, T_OA),
+      r('Extension to Statement of Use', 'Notice of Allowance', 6, 'months', true),
+      r('Deadline to Appeal the Rejection Notice', 'Rejection Notice Issued', 6, 'months', true),
+      // Renewal: 10 years from registration + 6-month grace.
+      ...renewal('Registration Date', 10, { grace: true }),
+      // §8 Declaration of Use — 5th/6th year (6 years from registration), reminder 1 year out, 6-month grace.
+      r('US - Deadline for Dec of Use 5th Anniversary', 'Registration Date', 6, 'years', true, T_REN),
+      r('US - Reminder for Declaration of use 5/6 Ann', 'US - Deadline for Dec of Use 5th Anniversary', -12, 'months', true, T_REN),
+      r('US - DOU Grace Period Deadline', 'US - Deadline for Dec of Use 5th Anniversary', 6, 'months', false),
+      // §8 & §9 — 9th/10th year (10 years from registration), reminder 1 year out.
+      r('US - Deadline for Dec of Use 10th Anniversary', 'Registration Date', 10, 'years', true, T_REN),
+      r('US - Reminder for Dec of use 9/10 yrs', 'US - Deadline for Dec of Use 10th Anniversary', -12, 'months', true, T_REN),
     ],
     'United Kingdom': [
-      r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
-      r('OA Response Due', 'OA Issued', 2, 'months', true, T_OA),
-      r('Non-use vulnerability date', 'Registration Date', 5, 'years', true),
-      ...renewalChain('Application Filed', 10),
+      nonUse(5),
+      r('Renewal Fees Paid? Renew', 'Renewal Instructions Received', 1, 'months', true),
+      ...renewal('Application Filed', 10),
     ],
-    'European Union (EUTM)': [
-      r('Convention Priority Deadline', 'Application Filed', 6, 'months', true, '', 3),
-      r('OA Response Due', 'OA Issued', 2, 'months', true, T_OA),
-      r('Non-use vulnerability date', 'Registration Date', 5, 'years', true),
-      ...renewalChain('Application Filed', 10),
-    ],
+    // Legacy EU renews from the REGISTRATION date (not filing).
+    'European Union (EUTM)': [...renewal('Registration Date', 10)],
     'Madrid Protocol (WIPO)': [
-      // The IR renews 10 years from the international registration (filing)
-      // date, and the dependency / central-attack window runs 5 years from the
-      // same date — both anchored on the IR's Application Filed, not a later
-      // registration date. Designations inherit the IR renewal date.
+      // The IR renews 10 years from the international registration (filing) date;
+      // the dependency / central-attack window runs 5 years from the same date.
+      // Designations inherit the IR renewal date (see linkDesignationRenewal).
       r('Dependency Period Ends', 'Application Filed', 5, 'years', true),
       r('Irregularities notice response due', 'Irregularities Notice Issued', 3, 'months', true),
-      // NB: country-specific obligations (e.g. the Philippines Declaration of
-      // Actual Use) belong on the individual designation case, whose jurisdiction
-      // is that country — not on the Madrid IR itself.
-      ...renewalChain('Application Filed', 10),
+      // Country-specific designation obligations (e.g. the Philippines DAU) live on
+      // the individual designation case, not on the Madrid IR itself.
+      ...renewal('Application Filed', 10),
     ],
     Canada: [
       r('OA Response Due', 'OA Issued', 6, 'months', true, T_OA),
-      r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
-      ...renewalChain('Registration Date', 10),
+      r('Reminder for Payment of Registration Fee', 'Registration Fee Due', -1, 'months', true),
+      r('OA Maintenance Reminder', 'Declaration of Use due', -60, 'days', true),
+      ...renewal('Registration Date', 10),
     ],
+    // Renewal 10 years from registration, less one day (legacy Adjustment).
     China: [
-      r('Review of Refusal Deadline', 'OA Issued', 15, 'days', true, T_OA),
-      r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
-      ...renewalChain('Registration Date', 10),
+      r('OA Maintenance Reminder', 'OA Issued', 6, 'months', true, T_OA),
+      ...renewal('Registration Date', 10, { adj: -1 }),
     ],
-    Japan: [
-      r('OA Response Due', 'OA Issued', 3, 'months', true, T_OA),
-      r('Non-use vulnerability date', 'Registration Date', 3, 'years', true),
-      ...renewalChain('Registration Date', 10),
+    Japan: [nonUse(3), ...renewal('Registration Date', 10)],
+    Singapore: [...renewal('Application Filed', 10)],
+
+    // ---------- Rest of the legacy jurisdiction set --------------------------
+    Argentina: [
+      ...renewal('Registration Date', 10),
+      r('Affidavit of use/non-use 5th anniversary', 'Renewal Deadline', -5, 'years', true),
     ],
-    Singapore: [
-      r('OA Response Due', 'OA Issued', 4, 'months', true, T_OA),
-      r('Non-use vulnerability date', 'Registration Date', 5, 'years', true),
-      ...renewalChain('Application Filed', 10),
+    Brazil: [nonUse(5), ...renewal('Registration Date', 10)],
+    Cambodia: [
+      r('OA Maintenance Reminder', 'Registration Date', 4, 'years', true, T_OA),
+      r('Maintenance Date - Affidavit of use/non-use due', 'Registration Date', 5, 'years', true),
+      ...renewal('Application Filed', 10),
     ],
-    Philippines: [
-      // Declaration of Actual Use: 3rd anniversary of the filing / designation
-      // date. (The DAU within 1 year of each renewal can be added later.)
-      r('Philippines DAU deadline (3 years from filing)', 'Application Filed', 3, 'years', true, '', 3),
-      ...renewalChain('Registration Date', 10),
+    Chile: [...renewal('Registration Date', 10)],
+    Colombia: [nonUse(3), ...renewal('Registration Date', 126, { unit: 'months' })],
+    // First term 7 years from filing, then 14-year renewal terms.
+    Cyprus: [
+      ...renewal('Application Filed', 7),
+      r('Renewal deadline (after initial term)', 'Renewal Deadline', 14, 'years', true, T_REN),
+    ],
+    France: [...renewal('Application Filed', 10, { adj: -1 })],
+    'Hong Kong': [nonUse(3), ...renewal('Application Filed', 10, { adj: -1 })],
+    India: [
+      r('OA Maintenance Reminder', 'Application Filed', 12, 'months', true, T_OA),
+      r('OA Response Due', 'OA Issued', 1, 'months', true, T_OA),
+      nonUse(5),
+      ...renewal('Application Filed', 10),
+    ],
+    Indonesia: [
+      r('OA Maintenance Reminder', 'Application Filed', 12, 'months', true, T_OA),
+      r('OA Response Due', 'OA Issued', 15, 'days', true, T_OA),
+      nonUse(5),
+      ...renewal('Application Filed', 10),
+    ],
+    Lebanon: [
+      r('Deadline to rejoin cassation action', 'Cassation filed', 2, 'months', true),
+      ...renewal('Registration Date', 10),
+    ],
+    Macau: [...renewal('Registration Date', 7)],
+    Malaysia: [
+      r('Declaration of Ownership due', 'Application Filed', 1, 'years', true),
+      ...renewal('Application Filed', 10),
     ],
     Mexico: [
-      // Declaration of Use (Declaración de Uso). A registrant must declare actual
-      // and effective use within the 3 months FOLLOWING the 3rd anniversary of the
-      // Mexican registration. The window opens at +3 years and the deadline falls
-      // at +3 years +3 months; a further 3-month grace (with surcharge) follows.
-      //
-      // Anchor = the Mexican registration / grant-of-protection date. For a Madrid
-      // designation of Mexico this is the DESIGNATION's own Registration Date (the
-      // date IMPI grants protection), NOT the international registration date — so
-      // the 3-year declaration is standalone to the Mexican case, national or IR.
-      r('Mexico Declaration of Use window opens (3rd anniversary)', 'Registration Date', 3, 'years', false),
-      r('Mexico Declaration of Use deadline', 'Registration Date', 39, 'months', true, '', 2),
-      r('Mexico DoU grace period (with surcharge)', 'Mexico Declaration of Use deadline', 3, 'months', false),
-      // Renewal Declaration of Use — Madrid designations of Mexico. The declaration
-      // must be filed with IMPI within 3 months of the date IMPI records/publishes
-      // the 10-year international renewal notification from WIPO's International
-      // Bureau. Add that recording date ("WIPO renewal notice recorded by IMPI")
-      // on the case and this deadline computes; until then it stays dormant.
-      r('Mexico DoU (renewal) deadline — 3 months from IMPI recording of WIPO renewal notice', 'WIPO renewal notice recorded by IMPI', 3, 'months', true, '', 2),
-      // Renewal Declaration of Use — national Mexican registrations, filed together
-      // with the 10-year renewal.
-      r('Mexico Declaration of Use (national — with renewal)', 'Renewal Deadline', 0, 'days', true, '', 2),
-      ...renewalChain('Registration Date', 10),
+      nonUse(3),
+      ...renewal('Registration Date', 10, { remBefore: 12 }),
+      // Declaration of Use, 3 months after the 3rd anniversary (= 39 months), reminder 1 year out.
+      r('Mexico - 3 year DOU', 'Registration Date', 39, 'months', true),
+      r('Mexico - 3 year DOU reminder', 'Mexico - 3 year DOU', -12, 'months', true),
+      // Declaration of Use on the 10-year renewal, reminder 1 year out.
+      r('Mexico - DOU on 10 year renewal', 'Registration Date', 10, 'years', true),
+      r('Mexico - DOU on 10 year renewal reminder', 'Mexico - DOU on 10 year renewal', -12, 'months', true),
     ],
+    // Myanmar: 3-year renewal cycle anchored on the Declaration of Ownership.
+    Myanmar: [
+      r('Renewal Deadline', 'Declaration of Ownership Registered', 3, 'years', true, T_REN),
+      r('Renewal Reminder', 'Renewal Deadline', -6, 'months', true, T_REN),
+      r('Renewal of Declaration of Ownership', 'Declaration of Ownership Registered', 3, 'years', true, '', 0, -1),
+    ],
+    Pakistan: [
+      r('5 year use deadline', 'Application Filed', 5, 'years', true),
+      ...renewal('Application Filed', 10),
+    ],
+    Peru: [nonUse(3), ...renewal('Registration Date', 10)],
+    Philippines: [
+      // Declaration of Actual Use schedule (from filing, then from registration).
+      r('Philippines - DAU 3rd ann deadline', 'Application Filed', 3, 'years', true),
+      r('Philippines - DAU reminder 3rd ann', 'Philippines - DAU 3rd ann deadline', -12, 'months', true),
+      r('Philippines - DAU 5/6th ann deadline', 'Registration Date', 6, 'years', true),
+      r('Philippines - DAU reminder 5/6th ann', 'Philippines - DAU 5/6th ann deadline', -12, 'months', true),
+      ...renewal('Registration Date', 10),
+      r('Philippines - Next Renewal Deadline', 'Renewal Deadline', 10, 'years', false),
+      r('Philippines - Renewal Reminder', 'Philippines - Next Renewal Deadline', -12, 'months', true),
+    ],
+    Russia: [...renewal('Application Filed', 10)],
+    // Renewal deadline is set manually (Hijri calendar); only the reminder computes.
+    'Saudi Arabia': [
+      r('Renewal Reminder', 'Renewal Deadline', -6, 'months', true, T_REN),
+      r('Appeal deadline', 'Application refused', 30, 'days', true),
+    ],
+    'South Africa': [
+      r('OA Response Due', 'OA Issued', 3, 'months', true, T_OA),
+      ...renewal('Application Filed', 10),
+    ],
+    'South Korea': [nonUse(3), ...renewal('Registration Date', 10)],
+    'Sri Lanka': [
+      r('OA response lodged', 'OA Issued', 30, 'days', true, T_OA),
+      ...renewal('Application Filed', 10),
+    ],
+    Taiwan: [
+      r('OA Response Due', 'OA Issued', 30, 'days', true, T_OA),
+      ...renewal('Registration Date', 10),
+    ],
+    Thailand: [...renewal('Application Filed', 10, { adj: -1 })],
+    'Timor-Leste': [
+      r('Renewal of Cautionary Notice Advertisement Due', 'Date Cautionary Notice Advertised', 2, 'years', true),
+      r('Reminder re renewal of cautionary notice', 'Renewal of Cautionary Notice Advertisement Due', -6, 'months', true),
+    ],
+    UAE: [...renewal('Application Filed', 10)],
+    Ukraine: [nonUse(5), ...renewal('Application Filed', 10)],
   };
+  // Legacy jurisdiction names that differ from the app's canonical labels share
+  // the same rules (imported cases may carry either spelling).
+  rb['Republic of Korea'] = rb['South Korea'];
+  rb['Union of Myanmar'] = rb['Myanmar'];
+  rb['United Arab Emirates'] = rb['UAE'];
+  rb['East Timor'] = rb['Timor-Leste'];
+  return rb;
 }
 
 /**

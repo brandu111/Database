@@ -82,7 +82,12 @@ export function auRecompute(m: Mark): void {
     // to the next period; every other row has auCycle 0 (multiplier 1, no change).
     const cyc = Math.trunc(Number(dr.auCycle)) || 0;
     // A pinned row keeps its manually-set date; only its reminders recompute.
-    if (!(dr.pinned && dr.date)) dr.date = bd ? shift(bd, (dr.auOff || 0) * (cyc + 1), dr.auUnit || 'months') : '';
+    if (!(dr.pinned && dr.date)) {
+      const off = bd ? shift(bd, (dr.auOff || 0) * (cyc + 1), dr.auUnit || 'months') : '';
+      // Apply the legacy ±day adjustment (e.g. renewal = filing + 10 years − 1 day).
+      const adj = Math.trunc(Number(dr.auAdj)) || 0;
+      dr.date = off && adj ? shift(off, adj, 'days') : off;
+    }
     const rem = Math.trunc(Number(dr.auRem)) || 0;
     for (let k = 1; k <= 6; k++) {
       const rn = `${dr.name} — Reminder ${k} of ${rem}`;
@@ -129,7 +134,7 @@ const POST_REGISTRATION = /renewal|non-use|declaration of use|dependency|\bdau\b
  * `allMarks` supplies Madrid family members so a designation's renewal can be
  * linked to (and re-propagated from) its parent International Registration.
  */
-export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[], caseUpdateMonths = 3): void {
+export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[], caseUpdateMonths = 5): void {
   if (!m) return;
   // Registered designs use their own renewal cycle / maximum-term rules rather
   // than the trade-mark rulebook.
@@ -165,7 +170,7 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[], case
     const post = POST_REGISTRATION.test(r.name) && !eventAnchored;
     const gateOk = post ? (isMadridIr ? !!val(r.trigger) : regPresent) : val(r.trigger);
     if (!gateOk) return;
-    ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts });
+    ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts, auAdj: Math.trunc(Number(r.adj)) || 0 });
   });
   // Two generation passes with a compute in between, so a rule whose trigger is
   // itself a computed date (a chained deadline, e.g. the Headstart Part 2 fee
@@ -189,7 +194,7 @@ export function ensureRuleRows(m: Mark, rules: RuleBook, allMarks?: Mark[], case
   // so it never retroactively floods long-filed cases; kept in sync with the
   // filing date unless pinned/edited, and not recreated once the user deletes it.
   const filedForUpdate = val('Application Filed');
-  const cuMonths = Number.isFinite(caseUpdateMonths) && caseUpdateMonths > 0 ? caseUpdateMonths : 3;
+  const cuMonths = Number.isFinite(caseUpdateMonths) && caseUpdateMonths > 0 ? caseUpdateMonths : 5;
   if (filedForUpdate && !suppressed.has('OA Issued?')) {
     const due = shift(filedForUpdate, cuMonths, 'months');
     const existing = (m.dates || []).find((d) => d.name === 'OA Issued?');
@@ -328,12 +333,12 @@ export function applyStage(m: Mark, rules: RuleBook, status: string): void {
   (cfg.activate || []).forEach((n) => {
     if (n === 'Convention Priority Deadline' && (!['Australia', 'New Zealand'].includes(m.jurisdiction) || m.irId)) return;
     const r = byName(n);
-    if (r) ensureRow(m, n, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts });
+    if (r) ensureRow(m, n, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts, auAdj: Math.trunc(Number(r.adj)) || 0 });
   });
   if (cfg.activateTrigger) {
     list
       .filter((r) => r.trigger === cfg.activateTrigger && r.name)
-      .forEach((r) => ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts }));
+      .forEach((r) => ensureRow(m, r.name, { auBase: r.trigger, auOff: r.v, auUnit: r.u, auRem: Math.trunc(Number(r.rem)) || 0, auAlert: r.alerts, auAdj: Math.trunc(Number(r.adj)) || 0 }));
   }
   (cfg.extra || []).forEach((e) => ensureRow(m, e.name, { auBase: e.base, auOff: e.off, auUnit: e.unit, auRem: 0, auAlert: !!e.alert }));
   if (cfg.prompt) m.promptEmail = true;

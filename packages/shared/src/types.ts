@@ -27,6 +27,8 @@ export interface MarkDate {
   auBase?: string;
   auOff?: number;
   auUnit?: DateUnit;
+  /** ±day adjustment applied after the offset (e.g. legacy "−1 day" renewals). */
+  auAdj?: number;
   /** Monthly reminder count attached to the rule. */
   auRem?: number;
   /**
@@ -170,6 +172,11 @@ export interface Rule {
   alerts: boolean;
   template: string;
   rem?: number;
+  /**
+   * ±day adjustment applied after the offset. Mirrors the legacy "Adjustment"
+   * column (e.g. many jurisdictions' renewal deadline is filing + 10 years − 1 day).
+   */
+  adj?: number;
   /** User-added — preserved across rulesVersion migrations. */
   custom?: boolean;
 }

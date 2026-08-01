@@ -69,7 +69,8 @@ describe('marks and the server-side date engine', () => {
     expect(byName['Renewal Deadline']).toBe('2030-08-15');
     expect(byName['Renewal Deadline — 1 Week Reminder']).toBe('2030-08-08');
     expect(byName['6 Month Renewal Grace Period']).toBe('2031-02-15');
-    expect(byName['Non-use vulnerability date']).toBe('2024-02-10');
+    // Legacy AU renewal reminder lead is 12 months.
+    expect(byName['Renewal Reminder']).toBe('2029-08-15');
   });
 
   it('runs the stage engine on status change', async () => {
