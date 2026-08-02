@@ -843,30 +843,31 @@ function DataImport() {
   const fetchAuLogos = async () => {
     setLogoBusy(true);
     let offset = 0, total = 0, updated = 0, withUrl = 0, noImg = 0, dlFail = 0, noNum = 0;
-    let notFound = 0, rateLimited = 0, authErr = 0, otherErr = 0;
+    let notFound = 0, rateLimited = 0, authErr = 0, otherErr = 0, already = 0;
     let firstOther = '';
     try {
       do {
         const r = await api.fetchAuLogos(offset);
         offset = r.offset; total = r.total;
         updated += r.updated; withUrl += r.withImageUrl; noImg += r.noImageOnRegister; dlFail += r.downloadFailed; noNum += r.noNumber;
-        notFound += r.notFound; rateLimited += r.rateLimited; authErr += r.authErr; otherErr += r.otherErr;
+        notFound += r.notFound; rateLimited += r.rateLimited; authErr += r.authErr; otherErr += r.otherErr; already += r.alreadyHave;
         if (!firstOther && r.errors.length) firstOther = `${r.errors[0].name}: ${r.errors[0].error}`;
         setLogoMsg(`Fetching Australian logos… ${Math.min(offset, total)} of ${total} checked, ${updated} added.`);
       } while (offset < total);
-      let msg = `Done — ${updated} Australian logo${updated === 1 ? '' : 's'} added from the register.`;
+      let msg = `Done — ${updated} logo${updated === 1 ? '' : 's'} added of ${total} Australian logo case${total === 1 ? '' : 's'}.`;
       if (updated) msg += ' Now click "Copy logos to related cases" to fill Madrid and overseas filings.';
       const diag: string[] = [];
+      if (already) diag.push(`${already} already had a logo`);
       if (withUrl) diag.push(`${withUrl} had an image on the register`);
       if (dlFail) diag.push(`${dlFail} image download(s) failed`);
       if (noImg) diag.push(`${noImg} had no image on the register`);
       if (notFound) diag.push(`${notFound} not found on the register`);
       if (rateLimited) diag.push(`${rateLimited} rate-limited by IP Australia`);
       if (authErr) diag.push(`${authErr} auth errors`);
-      if (otherErr) diag.push(`${otherErr} other errors`);
+      if (otherErr) diag.push(`${otherErr} could not reach IP Australia`);
       if (noNum) diag.push(`${noNum} had no usable number`);
       if (diag.length) msg += `\n(${diag.join('; ')}.)`;
-      if (otherErr && firstOther) msg += `\nExample: ${firstOther}`;
+      if (otherErr && firstOther) msg += `\nDetail: ${firstOther}`;
       setLogoMsg(msg);
     } catch (e) {
       setLogoMsg(e instanceof Error ? e.message : 'Logo fetch failed.');

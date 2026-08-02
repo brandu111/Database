@@ -44,15 +44,20 @@ async function getAccessToken(): Promise<string> {
   // (client id/secret in the Authorization header); the body carries only the
   // grant type. Sending the secret in the body is rejected as invalid_request.
   const basic = Buffer.from(`${process.env.IPAU_CLIENT_ID}:${process.env.IPAU_CLIENT_SECRET}`).toString('base64');
-  const res = await fetch(token, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
-      Authorization: `Basic ${basic}`,
-    },
-    body: new URLSearchParams({ grant_type: 'client_credentials' }),
-  });
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(token, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+        Authorization: `Basic ${basic}`,
+      },
+      body: new URLSearchParams({ grant_type: 'client_credentials' }),
+    });
+  } catch (e) {
+    throw new IpAuError(503, `Cannot reach the IP Australia auth server (${(e as Error).message}). The hosting may be blocking outbound HTTPS.`);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new IpAuError(res.status === 401 || res.status === 403 ? 401 : 502, `IP Australia auth failed (${res.status}). Check IPAU_CLIENT_ID / IPAU_CLIENT_SECRET. ${text.slice(0, 200)}`);
@@ -256,9 +261,16 @@ export async function lookupTradeMark(numberRaw: string, opts: { saveImage?: Sav
   if (!num) throw new IpAuError(400, 'Enter an application or registration number to look up.');
   const token = await getAccessToken();
   const { base } = endpoints();
-  const res = await fetch(`${base}/trade-mark/${encodeURIComponent(num)}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(`${base}/trade-mark/${encodeURIComponent(num)}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+  } catch (e) {
+    // Network-level failure (e.g. the host blocks outbound HTTPS) — undici throws
+    // a bare "fetch failed". Give a message that says what actually happened.
+    throw new IpAuError(503, `Cannot reach the IP Australia search server (${(e as Error).message}). The hosting may be blocking outbound HTTPS.`);
+  }
   if (res.status === 404) throw new IpAuError(404, `No trade mark found on the IP Australia register for "${num}".`);
   if (res.status === 401 || res.status === 403) {
     cachedToken = null;

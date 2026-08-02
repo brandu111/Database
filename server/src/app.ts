@@ -1287,10 +1287,10 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const batch = candidates.slice(offset, offset + limit);
     let updated = 0;
     let withImageUrl = 0, noImageOnRegister = 0, downloadFailed = 0, noNumber = 0;
-    let notFound = 0, rateLimited = 0, authErr = 0, otherErr = 0;
+    let notFound = 0, rateLimited = 0, authErr = 0, otherErr = 0, alreadyHave = 0;
     const errors: { name: string; error: string }[] = [];
     for (const m of batch) {
-      if (m.image) continue;
+      if (m.image) { alreadyHave++; continue; }
       // AU register lookups key on the numeric trade-mark number; take the first
       // number in the application/registration field (the mirror export sometimes
       // holds free text like "IR No.1234567 / 5952431").
@@ -1327,7 +1327,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
         else { otherErr++; if (errors.length < 20) errors.push({ name: m.name || num, error: msg }); }
       }
     }
-    res.json({ processed: batch.length, updated, withImageUrl, noImageOnRegister, downloadFailed, noNumber, notFound, rateLimited, authErr, otherErr, offset: offset + batch.length, total: candidates.length, errors });
+    res.json({ processed: batch.length, updated, withImageUrl, noImageOnRegister, downloadFailed, noNumber, notFound, rateLimited, authErr, otherErr, alreadyHave, offset: offset + batch.length, total: candidates.length, errors });
   });
 
   // Copy each case's logo onto related cases that lack one — matched by owner +
