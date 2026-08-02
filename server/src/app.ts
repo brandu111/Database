@@ -1381,7 +1381,6 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const nName = (s?: string) => (s || '').toLowerCase().replace(/\b(logo|device|stylised|stylized|word|series|and logo)\b/g, '').replace(/[^a-z0-9]/g, '');
     const nOwner = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const nJur = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const nNum = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const dateOf = (m: Mark, n: string) => (m.dates || []).find((d) => d.name === n)?.date || '';
     // First value present among several possible column spellings (full-mirror
     // uses the legacy date-column names; a plain import CSV uses short aliases).
@@ -1389,28 +1388,42 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
       for (const k of keys) if (r[k] != null && String(r[k]).trim() !== '') return String(r[k]).trim();
       return '';
     };
-    // Match a file row to a case by jurisdiction + application no., then
-    // jurisdiction + registration no., then jurisdiction + mark name + owner.
-    // Numbers are scoped by jurisdiction because a Madrid family shares one IR
-    // number across every designated country — matching on the bare number would
-    // collapse the whole family onto one case and cross-compare their dates.
-    const byApp = new Map<string, Mark>();
-    const byReg = new Map<string, Mark>();
-    const byComposite = new Map<string, Mark>();
+    // Match a file row to a case by a UNIQUE identifying number, else by a UNIQUE
+    // jurisdiction + mark name + owner. Everything is scoped by jurisdiction (a
+    // Madrid family shares one IR number across every country), and we extract
+    // every 5+ digit number from the application/registration fields — the firm's
+    // export often stuffs several numbers into one field (e.g. "IR No.1739217/Reg
+    // No.7424123"), and the local serial/registration number is what tells same-
+    // country, same-name twins apart. We only accept a match when it is unique,
+    // so an ambiguous twin is reported as "not matched" rather than paired with
+    // its sibling (which would invent a false date difference).
+    const digitToks = (s?: string): string[] => (s || '').match(/\d{5,}/g) || [];
+    const tokIndex = new Map<string, Set<Mark>>();
+    const compIndex = new Map<string, Mark[]>();
     for (const m of listMarks(db)) {
       const j = nJur(m.jurisdiction);
-      const a = nNum(m.application); if (a && !byApp.has(`${j}|${a}`)) byApp.set(`${j}|${a}`, m);
-      const rg = nNum(m.registration); if (rg && !byReg.has(`${j}|${rg}`)) byReg.set(`${j}|${rg}`, m);
+      for (const src of [m.application, m.registration]) {
+        for (const t of digitToks(src)) {
+          const k = `${j}|${t}`;
+          let set = tokIndex.get(k);
+          if (!set) { set = new Set(); tokIndex.set(k, set); }
+          set.add(m);
+        }
+      }
       const ck = `${j}|${nName(m.name)}|${nOwner(m.owner)}`;
-      if (!byComposite.has(ck)) byComposite.set(ck, m);
+      const arr = compIndex.get(ck);
+      if (arr) arr.push(m); else compIndex.set(ck, [m]);
     }
     const find = (r: Record<string, string>): Mark | undefined => {
       const j = nJur(pick(r, 'Jurisdiction'));
-      const a = nNum(pick(r, 'ApplicationNo', 'ApplicationNumber', 'Application'));
-      if (a && byApp.has(`${j}|${a}`)) return byApp.get(`${j}|${a}`);
-      const rg = nNum(pick(r, 'RegistrationNo', 'RegistrationNumber', 'Registration'));
-      if (rg && byReg.has(`${j}|${rg}`)) return byReg.get(`${j}|${rg}`);
-      return byComposite.get(`${j}|${nName(pick(r, 'MarkName', 'Name'))}|${nOwner(pick(r, 'OwnerName', 'Owner'))}`);
+      for (const src of [pick(r, 'ApplicationNo', 'ApplicationNumber', 'Application'), pick(r, 'RegistrationNo', 'RegistrationNumber', 'Registration')]) {
+        for (const t of digitToks(src)) {
+          const set = tokIndex.get(`${j}|${t}`);
+          if (set && set.size === 1) return set.values().next().value;
+        }
+      }
+      const g = compIndex.get(`${j}|${nName(pick(r, 'MarkName', 'Name'))}|${nOwner(pick(r, 'OwnerName', 'Owner'))}`);
+      return g && g.length === 1 ? g[0] : undefined;
     };
     // Compare the key deadlines. Each entry lists the legacy column name first,
     // then the short alias, then the matching date row on the case.

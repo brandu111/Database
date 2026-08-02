@@ -617,6 +617,32 @@ describe('bulk import & clear', () => {
     expect(r.unmatched).toBe(0);
     expect(r.mismatchCount).toBe(0);
   });
+
+  it('distinguishes same-name, same-jurisdiction twins by their embedded numbers', async () => {
+    // Two US cases for the same mark/owner: an old national registration and a
+    // newer Madrid designation whose numbers are stuffed into a free-text field.
+    const older = (await admin.post('/api/marks').send({ name: 'TWINMARK', jurisdiction: 'USA', owner: 'Twin Co', application: '77732324', registration: '3721717' }).expect(201)).body;
+    older.dates = [
+      { name: 'Application Filed', date: '2009-05-08', done: true, pinned: true },
+      { name: 'Registration Date', date: '2009-12-08', done: true, pinned: true },
+    ];
+    await admin.put(`/api/marks/${older.id}`).send(older).expect(200);
+    const newer = (await admin.post('/api/marks').send({ name: 'TWINMARK', jurisdiction: 'USA', owner: 'Twin Co', registration: 'IR No.1739217/Reg No. 7424123' }).expect(201)).body;
+    newer.dates = [
+      { name: 'Application Filed', date: '2023-03-23', done: true, pinned: true },
+      { name: 'Registration Date', date: '2024-06-25', done: true, pinned: true },
+    ];
+    await admin.put(`/api/marks/${newer.id}`).send(newer).expect(200);
+
+    const rows = [
+      { MarkName: 'TWINMARK', Jurisdiction: 'USA', OwnerName: 'Twin Co', ApplicationNo: '77732324', RegistrationNo: '3721717', 'Application Filed': '2009-05-08', 'Registration Date': '2009-12-08' },
+      { MarkName: 'TWINMARK', Jurisdiction: 'USA', OwnerName: 'Twin Co', RegistrationNo: 'IR No.1739217/Reg No. 7424123', 'Application Filed': '2023-03-23', 'Registration Date': '2024-06-25' },
+    ];
+    const r = (await admin.post('/api/marks/verify-import').send({ rows }).expect(200)).body;
+    // Each row pairs with its own case via the unique number → no false diffs.
+    expect(r.matched).toBe(2);
+    expect(r.mismatchCount).toBe(0);
+  });
 });
 
 describe('oppositions', () => {
