@@ -11,7 +11,7 @@ import { Reports } from './views/Reports';
 import { Preferences } from './views/Preferences';
 import { Portal } from './views/Portal';
 
-export type View = 'dashboard' | 'trademarks' | 'oppositions' | 'contacts' | 'alerts' | 'reports' | 'preferences';
+export type View = 'dashboard' | 'trademarks' | 'designs' | 'oppositions' | 'contacts' | 'alerts' | 'reports' | 'preferences';
 
 export interface Nav {
   view: View;
@@ -23,6 +23,7 @@ export interface Nav {
 const TABS: { key: View; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'trademarks', label: 'Trade Marks' },
+  { key: 'designs', label: 'Registered Designs' },
   { key: 'oppositions', label: 'Oppositions' },
   { key: 'contacts', label: 'Contacts' },
   { key: 'alerts', label: 'Alerts' },
@@ -59,7 +60,7 @@ export function App() {
         </div>
         <div className="nav-links">
           {TABS.map((t) => (
-            <button key={t.key} className={`navlink${nav.view === t.key ? ' active' : ''}`} onClick={() => go({ view: t.key })}>
+            <button key={t.key} className={`navlink${nav.view === t.key ? ' active' : ''}`} onClick={() => go({ view: t.key, markId: null, oppositionId: null, companyId: null })}>
               {t.label}
             </button>
           ))}
@@ -79,6 +80,7 @@ export function App() {
         <div className="main">
           {nav.view === 'dashboard' && <Dashboard openMark={openMark} openOpposition={openOpposition} go={(view) => go({ view })} canEdit={canEdit} />}
           {nav.view === 'trademarks' && <Trademarks nav={nav} go={go} canEdit={canEdit} />}
+          {nav.view === 'designs' && <Trademarks key="designs" nav={nav} go={go} canEdit={canEdit} designsOnly />}
           {nav.view === 'oppositions' && <Oppositions nav={nav} go={go} canEdit={canEdit} />}
           {nav.view === 'contacts' && <Contacts nav={nav} go={go} canEdit={canEdit} openMark={openMark} />}
           {nav.view === 'alerts' && <Alerts openMark={openMark} openOpposition={openOpposition} canEdit={canEdit} />}

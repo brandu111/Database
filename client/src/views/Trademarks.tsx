@@ -3,6 +3,7 @@ import {
   addrSchema,
   allJurisdictions,
   fmtDate,
+  isDesign,
   madridMembers,
   rulesFor,
   statusOptions,
@@ -26,9 +27,12 @@ interface Props {
   nav: Nav;
   go: (patch: Partial<Nav>) => void;
   canEdit: boolean;
+  /** When true, this view is the "Registered Designs" tab: it lists only design
+   * cases. When false/absent, the Trade Marks list excludes registered designs. */
+  designsOnly?: boolean;
 }
 
-export function Trademarks({ nav, go, canEdit }: Props) {
+export function Trademarks({ nav, go, canEdit, designsOnly = false }: Props) {
   const [marks, setMarks] = useState<Mark[] | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -99,7 +103,10 @@ export function Trademarks({ nav, go, canEdit }: Props) {
     );
   }
 
-  return <MarkList marks={marks} canEdit={canEdit} canDelete={/^natalie$/i.test(myName)} onReload={reload} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
+  // Registered designs live under their own "Registered Designs" tab; the Trade
+  // Marks list excludes them, and the Designs tab shows only them.
+  const listMarks = marks.filter((m) => (designsOnly ? isDesign(m.type) : !isDesign(m.type)));
+  return <MarkList marks={listMarks} designsOnly={designsOnly} canEdit={canEdit} canDelete={/^natalie$/i.test(myName)} onReload={reload} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
 }
 
 // Case history / audit trail — who changed what, when. Reloads when the case is
@@ -135,7 +142,7 @@ function OpenMissingMark({ id, onLoaded, onMissing }: { id: string; onLoaded: (m
 
 // ---------------------------------------------------------------------------- list
 
-function MarkList({ marks, canEdit, canDelete, onOpen, onCreated, onReload }: { marks: Mark[]; canEdit: boolean; canDelete?: boolean; onOpen: (id: string) => void; onCreated: (m: Mark) => void; onReload: () => void }) {
+function MarkList({ marks, canEdit, canDelete, designsOnly = false, onOpen, onCreated, onReload }: { marks: Mark[]; canEdit: boolean; canDelete?: boolean; designsOnly?: boolean; onOpen: (id: string) => void; onCreated: (m: Mark) => void; onReload: () => void }) {
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -246,8 +253,8 @@ function MarkList({ marks, canEdit, canDelete, onOpen, onCreated, onReload }: { 
         </select>
         <span className="hint">{filtered.length} of {marks.length}</span>
         {canEdit && (
-          <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => api.createMark({}).then(onCreated)}>
-            + New trade mark
+          <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => api.createMark(designsOnly ? { type: 'Registered Design' } : {}).then(onCreated)}>
+            {designsOnly ? '+ New registered design' : '+ New trade mark'}
           </button>
         )}
       </div>
