@@ -818,14 +818,27 @@ function DataImport() {
 
   const fetchAuLogos = async () => {
     setLogoBusy(true);
-    let offset = 0, total = 0, updated = 0;
+    let offset = 0, total = 0, updated = 0, withUrl = 0, noImg = 0, dlFail = 0, noNum = 0;
+    let firstError = '';
     try {
       do {
         const r = await api.fetchAuLogos(offset);
-        offset = r.offset; total = r.total; updated += r.updated;
-        setLogoMsg(`Fetching Australian logos… ${Math.min(offset, total)} of ${total} checked, ${updated} logos added.`);
+        offset = r.offset; total = r.total;
+        updated += r.updated; withUrl += r.withImageUrl; noImg += r.noImageOnRegister; dlFail += r.downloadFailed; noNum += r.noNumber;
+        if (!firstError && r.errors.length) firstError = `${r.errors[0].name}: ${r.errors[0].error}`;
+        setLogoMsg(`Fetching Australian logos… ${Math.min(offset, total)} of ${total} checked, ${updated} added.`);
       } while (offset < total);
-      setLogoMsg(`Done — ${updated} Australian logo${updated === 1 ? '' : 's'} added from the register. Now click "Copy logos to related cases" to fill Madrid and overseas filings.`);
+      // Show a breakdown so a "0 added" result explains itself.
+      let msg = `Done — ${updated} Australian logo${updated === 1 ? '' : 's'} added from the register.`;
+      if (updated) msg += ' Now click "Copy logos to related cases" to fill Madrid and overseas filings.';
+      const diag: string[] = [];
+      if (withUrl) diag.push(`${withUrl} had an image on the register`);
+      if (dlFail) diag.push(`${dlFail} image download(s) failed`);
+      if (noImg) diag.push(`${noImg} had no image on the register`);
+      if (noNum) diag.push(`${noNum} had no usable number`);
+      if (diag.length) msg += `\n(${diag.join('; ')}.)`;
+      if (!updated && firstError) msg += `\nFirst issue: ${firstError}`;
+      setLogoMsg(msg);
     } catch (e) {
       setLogoMsg(e instanceof Error ? e.message : 'Logo fetch failed.');
     } finally {

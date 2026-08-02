@@ -1286,22 +1286,40 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
       .sort((a, b) => (a.id < b.id ? -1 : 1));
     const batch = candidates.slice(offset, offset + limit);
     let updated = 0;
+    let withImageUrl = 0, noImageOnRegister = 0, downloadFailed = 0, noNumber = 0;
     const errors: { name: string; error: string }[] = [];
     for (const m of batch) {
       if (m.image) continue;
-      const num = m.application || m.registration;
-      if (!num) continue;
+      // AU register lookups key on the numeric trade-mark number; take the first
+      // number in the application/registration field (the mirror export sometimes
+      // holds free text like "IR No.1234567 / 5952431").
+      const raw = m.application || m.registration || '';
+      const num = (raw.match(/\d{5,}/) || [raw.trim()])[0];
+      if (!num) { noNumber++; continue; }
       try {
-        const fields = await lookupTradeMark(num, { saveImage: saveLogo });
-        if (fields.image) {
-          const fresh = getMark(db, m.id);
-          if (fresh && !fresh.image) { fresh.image = fields.image; saveMark(db, fresh); updated++; }
+        // Look up WITHOUT saving first, so we can tell whether the register even
+        // has an image, then download and store it explicitly — surfacing any
+        // failure instead of swallowing it (the old code hid image-download
+        // errors, which showed up as a silent "0 added").
+        const fields = await lookupTradeMark(num);
+        if (!fields.image) { noImageOnRegister++; continue; }
+        withImageUrl++;
+        let imgRes: Awaited<ReturnType<typeof fetch>>;
+        try {
+          imgRes = await fetch(fields.image, { headers: { Accept: 'image/*' } });
+        } catch (e) {
+          downloadFailed++; errors.push({ name: m.name || num, error: `image download error: ${(e as Error).message}` }); continue;
         }
+        if (!imgRes.ok) { downloadFailed++; errors.push({ name: m.name || num, error: `image download HTTP ${imgRes.status}` }); continue; }
+        const ct = imgRes.headers.get('content-type') || 'image/jpeg';
+        const url = saveLogo(Buffer.from(await imgRes.arrayBuffer()), ct);
+        const fresh = getMark(db, m.id);
+        if (fresh && !fresh.image) { fresh.image = url; saveMark(db, fresh); updated++; }
       } catch (e) {
         errors.push({ name: m.name || num, error: (e as Error).message });
       }
     }
-    res.json({ processed: batch.length, updated, offset: offset + batch.length, total: candidates.length, errors });
+    res.json({ processed: batch.length, updated, withImageUrl, noImageOnRegister, downloadFailed, noNumber, offset: offset + batch.length, total: candidates.length, errors: errors.slice(0, 20) });
   });
 
   // Copy each case's logo onto related cases that lack one — matched by owner +
