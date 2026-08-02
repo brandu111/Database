@@ -214,6 +214,23 @@ function escapeHtml(s: string): string {
 }
 
 /**
+ * Inline text formatting for templates: **bold** and __underline__. Authors mark
+ * up plain text (via the Bold/Underline buttons in the editor); this renders the
+ * markers as HTML for the email. Applied only to already-escaped literal text, so
+ * it can never corrupt merged values, tags or URLs.
+ */
+export function applyInlineFormat(html: string): string {
+  return html
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<u>$1</u>');
+}
+
+/** Remove the **bold** / __underline__ markers for the plain-text version. */
+export function stripInlineFormat(text: string): string {
+  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1');
+}
+
+/**
  * Placeholders that stand for "the mark itself". When the case has a graphic
  * (a logo / device / composite mark), these render the image instead of the
  * mark name — so device marks show the actual logo in the email, word marks
@@ -250,7 +267,7 @@ export function mergeTemplateHtml(text: string, m: Partial<Mark>, ctx: MergeCont
 
   const src = String(text || '');
   const re = /\[([^\][\n]{1,60})\]|\{\{\s*([^}\n]{1,60}?)\s*\}\}/g;
-  const lit = (s: string) => escapeHtml(s).split('\n').join('<br>');
+  const lit = (s: string) => applyInlineFormat(escapeHtml(s).split('\n').join('<br>'));
   let out = '';
   let last = 0;
   let mm: RegExpExecArray | null;

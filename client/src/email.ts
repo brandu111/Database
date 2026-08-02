@@ -1,4 +1,4 @@
-import { mergeTemplate, mergeTemplateHtml, rulesFor, type EmailTemplate, type FirmSettings, type Mark, type RuleBook } from '@brandu/shared';
+import { mergeTemplate, mergeTemplateHtml, stripInlineFormat, rulesFor, type EmailTemplate, type FirmSettings, type Mark, type RuleBook } from '@brandu/shared';
 
 export interface ComposedEmail {
   to: string;
@@ -79,8 +79,10 @@ export async function buildDeadlineEmail(opts: {
   const signature = hasMine ? htmlToText(mySignature) : firm?.emailSignature || '';
   const ctx = { dueDate: date, firmName: firm?.lawFirmName, signature, signatureHtml };
 
-  const subject = found.subject ? mergeTemplate(found.subject, m, ctx) : `Re: ${m.name} - ${dateName}`;
-  const plain = mergeTemplate(found.body, m, ctx);
+  // Subjects are always plain, and the plain-text body drops the **/__ markers
+  // (they only mean anything in the HTML version).
+  const subject = stripInlineFormat(found.subject ? mergeTemplate(found.subject, m, ctx) : `Re: ${m.name} - ${dateName}`);
+  const plain = stripInlineFormat(mergeTemplate(found.body, m, ctx));
   const markImage = m.image ? await toDataUri(m.image) : undefined;
   const html = `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#16233b;line-height:1.5">${mergeTemplateHtml(found.body, m, { ...ctx, markImage })}</div>`;
   return { to, subject, html, plain };

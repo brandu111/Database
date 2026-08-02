@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { COMPANY_IMPORT_COLUMNS, COMPANY_IMPORT_EXAMPLE_ROW, fmtDate, IMPORT_COLUMN_NOTES, IMPORT_COLUMNS, IMPORT_EXAMPLE_ROW, jurList, MERGE_FIELDS, mergeTemplate, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
+import { COMPANY_IMPORT_COLUMNS, COMPANY_IMPORT_EXAMPLE_ROW, fmtDate, IMPORT_COLUMN_NOTES, IMPORT_COLUMNS, IMPORT_EXAMPLE_ROW, jurList, MERGE_FIELDS, mergeTemplate, mergeTemplateHtml, stripInlineFormat, type EmailTemplate, type FirmSettings, type Mark, type Rule, type RuleBook } from '@brandu/shared';
 import { api, uploadFile, type Me } from '../api';
 import { parseCsv, toCsv } from '../csv';
 import { SignatureEditor } from '../SignatureEditor';
@@ -32,6 +32,7 @@ function EmailTemplates({ isFull }: { isFull: boolean }) {
   const [fJur, setFJur] = useState('All');
   const [saveState, setSaveState] = useState('');
   const [showFields, setShowFields] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const reload = () => api.templates().then((t) => setTemplates(t.sort((a, b) => (a.jurisdiction + a.stage).localeCompare(b.jurisdiction + b.stage))));
   useEffect(() => {
@@ -53,6 +54,20 @@ function EmailTemplates({ isFull }: { isFull: boolean }) {
   const patch = (p: Partial<EmailTemplate>) => {
     if (!sel) return;
     setTemplates((cur) => (cur ? cur.map((t) => (t.id === sel.id ? { ...t, ...p } : t)) : cur));
+  };
+  // Wrap the current selection in the Body with a formatting marker
+  // (** for bold, __ for underline). Restores the selection after the edit.
+  const wrapBody = (marker: string) => {
+    const ta = bodyRef.current;
+    if (!ta || !sel) return;
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const val = sel.body || '';
+    const chosen = val.slice(start, end) || 'text';
+    patch({ body: val.slice(0, start) + marker + chosen + marker + val.slice(end) });
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + marker.length, start + marker.length + chosen.length);
+    });
   };
   const save = async () => {
     if (!sel) return;
@@ -173,7 +188,16 @@ function EmailTemplates({ isFull }: { isFull: boolean }) {
                 </Field>
               </div>
               <Field label="Subject"><input type="text" value={sel.subject} disabled={!isFull} onChange={(e) => patch({ subject: e.target.value })} /></Field>
-              <Field label="Body"><textarea rows={12} value={sel.body} disabled={!isFull} onChange={(e) => patch({ body: e.target.value })} /></Field>
+              <Field label="Body">
+                {isFull && (
+                  <div className="row" style={{ gap: 6, marginBottom: 4 }}>
+                    <button type="button" className="btn secondary small" style={{ fontWeight: 700 }} title="Bold the selected text" onClick={() => wrapBody('**')}>B</button>
+                    <button type="button" className="btn secondary small" style={{ textDecoration: 'underline' }} title="Underline the selected text" onClick={() => wrapBody('__')}>U</button>
+                    <span className="hint">Select text, then click B or U. It shows formatted in the email (preview below).</span>
+                  </div>
+                )}
+                <textarea ref={bodyRef} rows={12} value={sel.body} disabled={!isFull} onChange={(e) => patch({ body: e.target.value })} />
+              </Field>
               {isFull && (
                 <div className="row" style={{ justifyContent: 'space-between' }}>
                   <button className="btn danger-link" onClick={() => { if (confirmDelete('this template')) api.deleteTemplate(sel.id).then(() => { setSelId(null); reload(); }); }}>Delete template</button>
@@ -183,8 +207,8 @@ function EmailTemplates({ isFull }: { isFull: boolean }) {
               <div style={{ marginTop: 14 }}>
                 <div className="section-label">Preview (sample data)</div>
                 <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>{mergeTemplate(sel.subject, sampleMark) || '(no subject)'}</div>
-                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{mergeTemplate(sel.body, sampleMark) || '(no body)'}</div>
+                  <div style={{ fontWeight: 600, marginBottom: 6, color: '#16233b' }}>{stripInlineFormat(mergeTemplate(sel.subject, sampleMark)) || '(no subject)'}</div>
+                  <div style={{ fontSize: 13, color: '#16233b', lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: mergeTemplateHtml(sel.body, sampleMark) || '(no body)' }} />
                 </div>
               </div>
             </>

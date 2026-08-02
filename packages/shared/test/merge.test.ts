@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeTemplate, mergeTemplateHtml } from '../src/merge.js';
+import { mergeTemplate, mergeTemplateHtml, stripInlineFormat } from '../src/merge.js';
 import type { Mark } from '../src/types.js';
 
 /**
@@ -87,6 +87,18 @@ describe('mergeTemplateHtml', () => {
   it('leaves unknown tokens and resolves dates in HTML', () => {
     const out = mergeTemplateHtml('Due [RenewalDeadline]; fee [FEES]', { ...mark, image: null });
     expect(out).toBe('Due 15 Aug 2030; fee [FEES]');
+  });
+
+  it('renders **bold** and __underline__ markers in the HTML, safely', () => {
+    const out = mergeTemplateHtml('Please **note** the __deadline__ for [RenewalDeadline].', { ...mark, image: null });
+    expect(out).toBe('Please <strong>note</strong> the <u>deadline</u> for 15 Aug 2030.');
+    // Markers only format literal text; they never let raw HTML through.
+    const safe = mergeTemplateHtml('**<b>x</b>**', { ...mark, image: null });
+    expect(safe).toBe('<strong>&lt;b&gt;x&lt;/b&gt;</strong>');
+  });
+
+  it('strips the markers for the plain-text version', () => {
+    expect(stripInlineFormat('Please **note** the __deadline__')).toBe('Please note the deadline');
   });
 
   it('inserts an HTML signature unescaped, but escapes a plain-text one', () => {
