@@ -1287,6 +1287,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const batch = candidates.slice(offset, offset + limit);
     let updated = 0;
     let withImageUrl = 0, noImageOnRegister = 0, downloadFailed = 0, noNumber = 0;
+    let notFound = 0, rateLimited = 0, authErr = 0, otherErr = 0;
     const errors: { name: string; error: string }[] = [];
     for (const m of batch) {
       if (m.image) continue;
@@ -1316,10 +1317,17 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
         const fresh = getMark(db, m.id);
         if (fresh && !fresh.image) { fresh.image = url; saveMark(db, fresh); updated++; }
       } catch (e) {
-        errors.push({ name: m.name || num, error: (e as Error).message });
+        // Bucket the failure so a "0 added" run can explain itself: not-found vs
+        // rate-limited vs auth vs other (server config / API change).
+        const status = e instanceof IpAuError ? e.status : 0;
+        const msg = (e as Error).message || '';
+        if (status === 404) notFound++;
+        else if (status === 429 || /\b429\b/.test(msg)) rateLimited++;
+        else if (status === 401 || status === 403) authErr++;
+        else { otherErr++; if (errors.length < 20) errors.push({ name: m.name || num, error: msg }); }
       }
     }
-    res.json({ processed: batch.length, updated, withImageUrl, noImageOnRegister, downloadFailed, noNumber, offset: offset + batch.length, total: candidates.length, errors: errors.slice(0, 20) });
+    res.json({ processed: batch.length, updated, withImageUrl, noImageOnRegister, downloadFailed, noNumber, notFound, rateLimited, authErr, otherErr, offset: offset + batch.length, total: candidates.length, errors });
   });
 
   // Copy each case's logo onto related cases that lack one — matched by owner +
