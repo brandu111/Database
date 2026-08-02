@@ -847,7 +847,7 @@ function DataImport() {
     let firstOther = '';
     try {
       do {
-        const r = await api.fetchAuLogos(offset);
+        const r = await api.fetchAuLogos(offset, 12, logoOverwrite);
         offset = r.offset; total = r.total;
         updated += r.updated; withUrl += r.withImageUrl; noImg += r.noImageOnRegister; dlFail += r.downloadFailed; noNum += r.noNumber;
         notFound += r.notFound; rateLimited += r.rateLimited; authErr += r.authErr; otherErr += r.otherErr; already += r.alreadyHave;
@@ -1310,7 +1310,7 @@ function DataImport() {
             </div>
             <label className="row" style={{ gap: 6, marginBottom: 6, cursor: 'pointer' }}>
               <input type="checkbox" checked={logoOverwrite} onChange={(e) => setLogoOverwrite(e.target.checked)} />
-              <span className="hint">Overwrite existing logos (otherwise only fills cases that have none)</span>
+              <span className="hint">Overwrite existing logos — replaces logos already on cases (applies to both "Fetch Australian logos" and file import). Tick this to re-fetch and replace broken/blank logos once outbound access is enabled.</span>
             </label>
             <label className="btn secondary small" style={{ cursor: logoBusy ? 'default' : 'pointer', display: 'inline-block' }}>
               ⬆ Choose logo files

@@ -1281,6 +1281,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     if (!ipAuConfigured()) return res.status(400).json({ error: 'IP Australia lookup is not configured on this server.' });
     const offset = Math.max(0, Math.trunc(Number((req.body || {}).offset)) || 0);
     const limit = Math.min(30, Math.max(1, Math.trunc(Number((req.body || {}).limit)) || 12));
+    const overwrite = !!(req.body || {}).overwrite;
     const candidates = listMarks(db)
       .filter((m) => ['Australia', 'Australia TTMF'].includes(m.jurisdiction) && isGraphic(m.type) && isLive(m.status))
       .sort((a, b) => (a.id < b.id ? -1 : 1));
@@ -1290,7 +1291,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     let notFound = 0, rateLimited = 0, authErr = 0, otherErr = 0, alreadyHave = 0;
     const errors: { name: string; error: string }[] = [];
     for (const m of batch) {
-      if (m.image) { alreadyHave++; continue; }
+      if (m.image && !overwrite) { alreadyHave++; continue; }
       // AU register lookups key on the numeric trade-mark number; take the first
       // number in the application/registration field (the mirror export sometimes
       // holds free text like "IR No.1234567 / 5952431").
@@ -1315,7 +1316,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
         const ct = imgRes.headers.get('content-type') || 'image/jpeg';
         const url = saveLogo(Buffer.from(await imgRes.arrayBuffer()), ct);
         const fresh = getMark(db, m.id);
-        if (fresh && !fresh.image) { fresh.image = url; saveMark(db, fresh); updated++; }
+        if (fresh && (overwrite || !fresh.image)) { fresh.image = url; saveMark(db, fresh); updated++; }
       } catch (e) {
         // Bucket the failure so a "0 added" run can explain itself: not-found vs
         // rate-limited vs auth vs other (server config / API change).
