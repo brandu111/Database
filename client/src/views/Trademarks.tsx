@@ -61,6 +61,10 @@ export function Trademarks({ nav, go, canEdit, designsOnly = false }: Props) {
   if (error) return <div className="err">{error}</div>;
   if (!marks) return <div className="hint">Loading…</div>;
 
+  // Scope to the current tab (Trade Marks excludes designs; Designs shows only them).
+  const cacheKey = designsOnly ? 'designs' : 'marks';
+  const scoped = marks.filter((m) => (designsOnly ? isDesign(m.type) : !isDesign(m.type)));
+
   if (nav.markId) {
     const sel = marks.find((m) => m.id === nav.markId);
     if (!sel) {
@@ -75,6 +79,11 @@ export function Trademarks({ nav, go, canEdit, designsOnly = false }: Props) {
         />
       );
     }
+    // Previous / next follow the same filtered + sorted order as the list.
+    const ordered = filterSortMarks(scoped, listUiCache[cacheKey]);
+    const idx = ordered.findIndex((m) => m.id === sel.id);
+    const prevId = idx > 0 ? ordered[idx - 1].id : null;
+    const nextId = idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1].id : null;
     return (
       <MarkDetail
         key={sel.id}
@@ -87,6 +96,9 @@ export function Trademarks({ nav, go, canEdit, designsOnly = false }: Props) {
         mySignature={mySignature}
         myName={myName}
         canEdit={canEdit}
+        position={idx >= 0 ? { current: idx + 1, total: ordered.length } : undefined}
+        onPrev={prevId ? () => go({ markId: prevId }) : undefined}
+        onNext={nextId ? () => go({ markId: nextId }) : undefined}
         onBack={() => {
           reload();
           go({ markId: null });
@@ -103,10 +115,9 @@ export function Trademarks({ nav, go, canEdit, designsOnly = false }: Props) {
     );
   }
 
-  // Registered designs live under their own "Registered Designs" tab; the Trade
-  // Marks list excludes them, and the Designs tab shows only them.
-  const listMarks = marks.filter((m) => (designsOnly ? isDesign(m.type) : !isDesign(m.type)));
-  return <MarkList marks={listMarks} designsOnly={designsOnly} canEdit={canEdit} canDelete={/^natalie$/i.test(myName)} onReload={reload} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
+  // Registered designs live under their own tab; Trade Marks excludes them and
+  // the Designs tab shows only them (see `scoped` above).
+  return <MarkList marks={scoped} designsOnly={designsOnly} canEdit={canEdit} canDelete={/^natalie$/i.test(myName)} onReload={reload} onOpen={(id) => go({ markId: id })} onCreated={(m) => { setMarks((cur) => (cur ? [m, ...cur] : [m])); go({ markId: m.id }); }} />;
 }
 
 // Case history / audit trail — who changed what, when. Reloads when the case is
@@ -142,16 +153,58 @@ function OpenMissingMark({ id, onLoaded, onMissing }: { id: string; onLoaded: (m
 
 // ---------------------------------------------------------------------------- list
 
+/** Saved list view state (search / filters / sort), kept in module scope so it
+ * survives leaving the list to open a case and coming back — cleared only on a
+ * full page refresh. Keyed separately for the Trade Marks and Designs tabs. */
+type ListUi = { query: string; fJur: string; fStatus: string; fCompany: string; sortKey: string; sortDir: number; limit: number };
+const DEFAULT_UI: ListUi = { query: '', fJur: 'All jurisdictions', fStatus: 'All statuses', fCompany: 'All companies', sortKey: 'name', sortDir: 1, limit: 150 };
+const listUiCache: Record<string, ListUi> = { marks: { ...DEFAULT_UI }, designs: { ...DEFAULT_UI } };
+
+/** Apply the saved search/filters/sort to a scoped set of marks. Shared by the
+ * list and by the case view's Previous/Next navigation so both agree on order. */
+function filterSortMarks(marks: Mark[], ui: ListUi): Mark[] {
+  const dateOf = (m: Mark, n: string) => (m.dates || []).find((d) => d.name === n)?.date || '';
+  const q = ui.query.trim().toLowerCase();
+  const rows = marks.filter(
+    (m) =>
+      (ui.fJur === 'All jurisdictions' || m.jurisdiction === ui.fJur) &&
+      (ui.fStatus === 'All statuses' || m.status === ui.fStatus) &&
+      (ui.fCompany === 'All companies' || m.owner === ui.fCompany) &&
+      (!q || [m.name, m.owner, m.application, m.registration, m.matter, m.clientDocket].join(' ').toLowerCase().includes(q))
+  );
+  const val = (m: Mark): string => {
+    switch (ui.sortKey) {
+      case 'type': return m.type || '';
+      case 'jurisdiction': return m.jurisdiction || '';
+      case 'status': return m.status || '';
+      case 'owner': return m.owner || '';
+      case 'filed': return dateOf(m, 'Application Filed');
+      case 'renewal': return dateOf(m, 'Renewal Deadline');
+      default: return m.name || '';
+    }
+  };
+  rows.sort((a, b) => val(a).localeCompare(val(b), undefined, { numeric: true }) * ui.sortDir);
+  return rows;
+}
+
 function MarkList({ marks, canEdit, canDelete, designsOnly = false, onOpen, onCreated, onReload }: { marks: Mark[]; canEdit: boolean; canDelete?: boolean; designsOnly?: boolean; onOpen: (id: string) => void; onCreated: (m: Mark) => void; onReload: () => void }) {
-  const [query, setQuery] = useState('');
+  const cacheKey = designsOnly ? 'designs' : 'marks';
+  const saved = listUiCache[cacheKey];
+  const [query, setQuery] = useState(saved.query);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [fJur, setFJur] = useState('All jurisdictions');
-  const [fStatus, setFStatus] = useState('All statuses');
-  const [fCompany, setFCompany] = useState('All companies');
-  const [sortKey, setSortKey] = useState('name');
-  const [sortDir, setSortDir] = useState(1);
-  const [limit, setLimit] = useState(150);
+  const [fJur, setFJur] = useState(saved.fJur);
+  const [fStatus, setFStatus] = useState(saved.fStatus);
+  const [fCompany, setFCompany] = useState(saved.fCompany);
+  const [sortKey, setSortKey] = useState(saved.sortKey);
+  const [sortDir, setSortDir] = useState(saved.sortDir);
+  const [limit, setLimit] = useState(saved.limit);
+
+  // Remember the view state so it's still there after opening a case and
+  // returning (persists until the page is refreshed).
+  useEffect(() => {
+    listUiCache[cacheKey] = { query, fJur, fStatus, fCompany, sortKey, sortDir, limit };
+  }, [cacheKey, query, fJur, fStatus, fCompany, sortKey, sortDir, limit]);
 
   const jurs = useMemo(() => [...new Set(marks.map((m) => m.jurisdiction).filter(Boolean))].sort(), [marks]);
   const statuses = useMemo(() => [...new Set(marks.map((m) => m.status).filter(Boolean))].sort(), [marks]);
@@ -159,33 +212,10 @@ function MarkList({ marks, canEdit, canDelete, designsOnly = false, onOpen, onCr
 
   const dateOf = (m: Mark, n: string) => (m.dates || []).find((d) => d.name === n)?.date || '';
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const rows = marks.filter(
-      (m) =>
-        (fJur === 'All jurisdictions' || m.jurisdiction === fJur) &&
-        (fStatus === 'All statuses' || m.status === fStatus) &&
-        (fCompany === 'All companies' || m.owner === fCompany) &&
-        (!q ||
-          [m.name, m.owner, m.application, m.registration, m.matter, m.clientDocket]
-            .join(' ')
-            .toLowerCase()
-            .includes(q))
-    );
-    const val = (m: Mark): string => {
-      switch (sortKey) {
-        case 'type': return m.type || '';
-        case 'jurisdiction': return m.jurisdiction || '';
-        case 'status': return m.status || '';
-        case 'owner': return m.owner || '';
-        case 'filed': return dateOf(m, 'Application Filed');
-        case 'renewal': return dateOf(m, 'Renewal Deadline');
-        default: return m.name || '';
-      }
-    };
-    rows.sort((a, b) => val(a).localeCompare(val(b), undefined, { numeric: true }) * sortDir);
-    return rows;
-  }, [marks, query, fJur, fStatus, fCompany, sortKey, sortDir]);
+  const filtered = useMemo(
+    () => filterSortMarks(marks, { query, fJur, fStatus, fCompany, sortKey, sortDir, limit }),
+    [marks, query, fJur, fStatus, fCompany, sortKey, sortDir, limit]
+  );
 
   const sortBy = (k: string) => {
     if (k === sortKey) setSortDir(-sortDir);
@@ -252,8 +282,9 @@ function MarkList({ marks, canEdit, canDelete, designsOnly = false, onOpen, onCr
           {owners.map((o) => <option key={o}>{o}</option>)}
         </select>
         <span className="hint">{filtered.length} of {marks.length}</span>
+        <button className="btn secondary" style={{ marginLeft: 'auto' }} onClick={onReload} title="Reload the list from the server">↻ Refresh</button>
         {canEdit && (
-          <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => api.createMark(designsOnly ? { type: 'Registered Design' } : {}).then(onCreated)}>
+          <button className="btn" onClick={() => api.createMark(designsOnly ? { type: 'Registered Design' } : {}).then(onCreated)}>
             {designsOnly ? '+ New registered design' : '+ New trade mark'}
           </button>
         )}
@@ -338,6 +369,11 @@ interface DetailProps {
   mySignature: string;
   myName: string;
   canEdit: boolean;
+  /** Position within the current filtered list, for the "3 of 128" indicator. */
+  position?: { current: number; total: number };
+  /** Navigate to the previous / next case in the filtered list (undefined at the ends). */
+  onPrev?: () => void;
+  onNext?: () => void;
   onBack: () => void;
   onOpen: (id: string) => void;
   onOpenOpposition: (id: string) => void;
@@ -346,7 +382,7 @@ interface DetailProps {
   onCreated: () => void;
 }
 
-function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySignature, myName, canEdit, onBack, onOpen, onOpenOpposition, onChanged, onDeleted, onCreated }: DetailProps) {
+function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySignature, myName, canEdit, position, onPrev, onNext, onBack, onOpen, onOpenOpposition, onChanged, onDeleted, onCreated }: DetailProps) {
   const [m, setM] = useState<Mark>(initial);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [addDateName, setAddDateName] = useState('');
@@ -629,9 +665,17 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
         ? `Designation — ${r.jurisdiction}`
         : `Basic case — ${r.jurisdiction}`;
 
+  const backLabel = isDesign(m.type) ? '← All registered designs' : '← All trade marks';
   return (
     <>
-      <button className="back" onClick={onBack}>← All trade marks</button>
+      <div className="row" style={{ alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <button className="back" style={{ margin: 0 }} onClick={onBack}>{backLabel}</button>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          {position && <span className="hint">{position.current} of {position.total}</span>}
+          <button className="btn secondary small" disabled={!onPrev} onClick={() => onPrev && onPrev()} title="Previous in the current list">← Previous</button>
+          <button className="btn secondary small" disabled={!onNext} onClick={() => onNext && onNext()} title="Next in the current list">Next →</button>
+        </span>
+      </div>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
         <h2 style={{ margin: 0 }}>{m.name || '(untitled trade mark)'}</h2>
         <div className="row">
@@ -1093,7 +1137,7 @@ function TypeFields({ m, update, ro }: { m: Mark; update: (p: Partial<Mark>, flu
         <Field label={m.type === 'Logo' ? 'Graphic / image' : 'Logo / image'}>
           {m.image ? (
             <div className="row">
-              <img src={m.image} alt="mark" style={{ maxHeight: 70, maxWidth: 180, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 7 }} />
+              <img src={m.image} alt="mark" style={{ maxHeight: '2cm', maxWidth: '2cm', objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 7 }} />
               {!ro && <button className="btn danger-link" onClick={() => update({ image: null }, true)}>Remove</button>}
             </div>
           ) : ro ? (

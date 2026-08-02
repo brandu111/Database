@@ -52,6 +52,7 @@ import {
 } from './db.js';
 import { IpAuError, ipAuConfigured, lookupTradeMark } from './ipaustralia.js';
 import { csvRowToMark, fullRowToMark, parseImportDate } from './import-marks.js';
+import { toRevaCsv } from './reva-export.js';
 import { indexCases, isStandardDateName, matchCase, normName, toAction } from './import-actions.js';
 import { groupCompanies } from './import-companies.js';
 import { mailerConfigured, sendMail } from './mailer.js';
@@ -626,6 +627,18 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
       fs.rm(tmp, { force: true }, () => undefined);
       if (err && !res.headersSent) res.status(500).end();
     });
+  });
+
+  // Reva-format export: every case written back into the legacy 205-column CSV
+  // layout, so it can be handed to a developer to re-upload into Reva. This is
+  // the portable, vendor-neutral backup (the .sqlite backup above restores THIS
+  // app; this CSV round-trips to the old system).
+  app.get('/api/backup/reva-csv', full, (_req, res) => {
+    const csv = toRevaCsv(listMarks(db));
+    const filename = `brandu-reva-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
   });
 
   // Pin every current renewal deadline exactly as it stands now, so the date

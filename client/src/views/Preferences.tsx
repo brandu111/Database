@@ -1205,6 +1205,10 @@ function DataImport() {
             Downloads a complete, up-to-the-second copy of the whole database as a single <code>.sqlite</code> file. Safe to run any time — it snapshots without interrupting the app. Keep a copy off the server for peace of mind; to restore, place the file back as <code>data/brandu.sqlite</code>. (A daily automatic backup can also run on the server — ask about the cron job.)
           </div>
           <a className="btn secondary small" href="/api/backup/download" style={{ display: 'inline-block', textDecoration: 'none' }}>⬇ Download backup now</a>
+          <div className="hint" style={{ margin: '14px 0 8px' }}>
+            <strong>Reva-format export.</strong> Downloads every case as a CSV in the exact legacy (Reva) column layout. This is the portable copy — the <code>.sqlite</code> file above restores <em>this</em> system, whereas this CSV can be handed to a developer to re-upload into Reva if you ever need to move back.
+          </div>
+          <a className="btn secondary small" href="/api/backup/reva-csv" style={{ display: 'inline-block', textDecoration: 'none' }}>⬇ Download Reva-format CSV</a>
         </Card>
 
         <Card label="Lock renewal dates (source of truth)">

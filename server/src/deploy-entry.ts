@@ -1,6 +1,8 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { createApp, runDailyDigest } from './app.js';
-import { backupDatabase, openDb } from './db.js';
+import { backupDatabase, listMarks, openDb } from './db.js';
+import { toRevaCsv } from './reva-export.js';
 import { seed } from './seed.js';
 
 /**
@@ -49,7 +51,12 @@ if (process.env.RUN_TASK === 'daily-digest') {
     const dir = process.env.BACKUP_DIR || path.join(cwd, 'backups');
     const keep = parseInt(process.env.BACKUP_KEEP_DAYS || '30', 10);
     const r = backupDatabase(db, dir, keep);
-    console.log(`Backup written: ${r.file}${r.pruned ? ` (pruned ${r.pruned} old snapshot${r.pruned === 1 ? '' : 's'})` : ''}.`);
+    // Alongside the .sqlite snapshot, write a Reva-format CSV so the daily backup
+    // is also a portable, re-uploadable copy of the whole portfolio.
+    const day = new Date().toISOString().slice(0, 10);
+    const revaFile = path.join(dir, `brandu-reva-export-${day}.csv`);
+    fs.writeFileSync(revaFile, toRevaCsv(listMarks(db)), 'utf8');
+    console.log(`Backup written: ${r.file} + ${revaFile}${r.pruned ? ` (pruned ${r.pruned} old snapshot${r.pruned === 1 ? '' : 's'})` : ''}.`);
     process.exit(0);
   } catch (e) {
     console.error('Backup failed:', (e as Error).message);
