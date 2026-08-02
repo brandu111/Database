@@ -19,6 +19,8 @@ const BASE_COLS: BaseCol[] = [
   { key: 'application', label: 'Application no.', get: (m) => m.application || '', defaultOn: true },
   { key: 'registration', label: 'Registration no.', get: (m) => m.registration || '', defaultOn: true },
   { key: 'status', label: 'Status', get: (m) => m.status || '', defaultOn: true },
+  { key: 'filed', label: 'Filing date', get: (m) => { const d = (m.dates || []).find((x) => x.name === 'Application Filed')?.date; return d ? fmtDate(d) : ''; }, defaultOn: true },
+  { key: 'renewal', label: 'Renewal deadline', get: (m) => { const d = (m.dates || []).find((x) => x.name === 'Renewal Deadline')?.date; return d ? fmtDate(d) : ''; }, defaultOn: true },
   { key: 'classes', label: 'Classes', get: (m) => m.classes || '' },
   { key: 'goods', label: 'Goods/services', get: (m) => m.goods || '' },
   { key: 'clientDocket', label: 'Client file ref.', get: (m) => m.clientDocket || '' },
@@ -38,7 +40,10 @@ export function Reports() {
   const [settings, setSettings] = useState<FirmSettings | null>(null);
   const [rules, setRules] = useState<RuleBook>({});
   const saved = useMemo(loadLayout, []);
-  const [colsOn, setColsOn] = useState<Record<string, boolean>>(saved.colsOn || Object.fromEntries(BASE_COLS.map((c) => [c.key, !!c.defaultOn])));
+  // Start from the built-in defaults, then apply any saved choices on top — so
+  // newly-added default-on columns (e.g. Filing date / Renewal deadline) still
+  // appear for people who already have a saved layout.
+  const [colsOn, setColsOn] = useState<Record<string, boolean>>({ ...Object.fromEntries(BASE_COLS.map((c) => [c.key, !!c.defaultOn])), ...(saved.colsOn || {}) });
   const [dateCols, setDateCols] = useState<string[]>(saved.dateCols || []);
   const [order, setOrder] = useState<string[]>(saved.order || []);
   const [dragKey, setDragKey] = useState<string | null>(null);
