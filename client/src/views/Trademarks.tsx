@@ -1123,36 +1123,39 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
 }
 
 function TypeFields({ m, update, ro }: { m: Mark; update: (p: Partial<Mark>, flush?: boolean) => void; ro: boolean }) {
+  // Any graphic mark type gets the logo/image upload. The legacy import uses
+  // several type names for these — "Logo", "Combined", "and logo", "Stylised",
+  // "Device", "Figurative" — so match on the words rather than an exact type.
+  if (/logo|combined|stylis|device|figurative|composite/i.test(m.type || '')) {
+    return (
+      <Field label="Logo / image">
+        {m.image ? (
+          <div className="row">
+            <img src={m.image} alt="mark" style={{ maxHeight: '2cm', maxWidth: '2cm', objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 7 }} />
+            {!ro && <button className="btn danger-link" onClick={() => update({ image: null }, true)}>Remove</button>}
+          </div>
+        ) : ro ? (
+          <div className="hint">No image.</div>
+        ) : (
+          <label className="btn secondary small" style={{ cursor: 'pointer', display: 'inline-block' }}>
+            ⬆ Upload image
+            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              const up = await uploadFile(f);
+              update({ image: up.url }, true);
+            }} />
+          </label>
+        )}
+      </Field>
+    );
+  }
   switch (m.type) {
     case 'Word':
       return (
         <Field label="Word text">
           <input type="text" value={m.wordText ?? m.name} disabled={ro}
             onChange={(e) => update({ wordText: e.target.value, name: e.target.value })} />
-        </Field>
-      );
-    case 'Logo':
-    case 'Combined':
-      return (
-        <Field label={m.type === 'Logo' ? 'Graphic / image' : 'Logo / image'}>
-          {m.image ? (
-            <div className="row">
-              <img src={m.image} alt="mark" style={{ maxHeight: '2cm', maxWidth: '2cm', objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 7 }} />
-              {!ro && <button className="btn danger-link" onClick={() => update({ image: null }, true)}>Remove</button>}
-            </div>
-          ) : ro ? (
-            <div className="hint">No image.</div>
-          ) : (
-            <label className="btn secondary small" style={{ cursor: 'pointer', display: 'inline-block' }}>
-              ⬆ Upload image
-              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                const up = await uploadFile(f);
-                update({ image: up.url }, true);
-              }} />
-            </label>
-          )}
         </Field>
       );
     case 'Sound':
