@@ -58,6 +58,7 @@ export const api = {
   addRenewalReminders: () => req<{ remindersAdded: number; casesChanged: number }>('POST', '/api/marks/add-renewal-reminders', {}),
   tidyRegistered: () => req<{ datesCleared: number; casesChanged: number }>('POST', '/api/marks/tidy-registered', {}),
   addAdminContact: () => req<{ added: number; casesTotal: number }>('POST', '/api/marks/add-admin-contact', {}),
+  backfillOwnerDetails: () => req<{ casesChanged: number; addressFilled: number; contactsFilled: number; noMatch: number; casesTotal: number }>('POST', '/api/marks/backfill-owner-details', {}),
   importHeadstart: (rows: Record<string, string>[]) => req<{ imported: number; unmatched: number; unmatchedList: { trademark: string; jurisdiction: string }[]; casesChanged: number; total: number }>('POST', '/api/marks/import-headstart', { rows }),
   syncAuPending: (offset: number, limit = 10) => req<{ processed: number; changed: number; changesLog: { id: string; name: string; number: string; changes: string[] }[]; errors: { name: string; error: string }[]; offset: number; total: number }>('POST', '/api/marks/sync-au-pending', { offset, limit }),
   importActions: (rows: Record<string, string>[]) => req<{ imported: number; skipped: number; unmatched: number; unmatchedList: { trademark: string; jurisdiction: string; dateName: string }[]; casesChanged: number; total: number }>('POST', '/api/marks/import-actions', { rows }),

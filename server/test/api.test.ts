@@ -643,6 +643,30 @@ describe('bulk import & clear', () => {
     expect(r.matched).toBe(2);
     expect(r.mismatchCount).toBe(0);
   });
+
+  it('backfills owner address and contacts from the matching contact record', async () => {
+    // A contact (company) record with an address and a contact person.
+    await admin.post('/api/companies').send({
+      name: 'Backfill Holdings Pty Ltd', type: 'Company',
+      address: '10 Example St', city: 'Sydney', state: 'NSW', zip: '2000', country: 'Australia', phone: '02 9000 0000',
+      contacts: [{ name: 'Jane Client', position: 'Director', email: 'jane@backfill.example', phone: '0400 000 000' }],
+    }).expect(201);
+    // A case whose owner name matches, but with no address/contacts (as after a full-mirror import).
+    const m = (await admin.post('/api/marks').send({ name: 'BACKFILLME', jurisdiction: 'Australia', owner: 'Backfill Holdings Pty Ltd' }).expect(201)).body;
+
+    const r = (await admin.post('/api/marks/backfill-owner-details').expect(200)).body;
+    expect(r.casesChanged).toBeGreaterThanOrEqual(1);
+
+    const after = (await admin.get(`/api/marks/${m.id}`)).body;
+    expect(after.city).toBe('Sydney');
+    expect(after.state).toBe('NSW');
+    expect(after.zip).toBe('2000');
+    // Owner contact was added (alongside the firm Admin contact).
+    expect(after.contacts.some((c: { email: string }) => c.email === 'jane@backfill.example')).toBe(true);
+    expect(after.contacts.some((c: { email: string }) => c.email === 'admin@brandulegal.com.au')).toBe(true);
+    // Viewers cannot run it.
+    await viewer.post('/api/marks/backfill-owner-details').expect(403);
+  });
 });
 
 describe('oppositions', () => {

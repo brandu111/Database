@@ -865,6 +865,69 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     res.json({ added: changed.length, casesTotal: all.length });
   });
 
+  // Backfill each case's owner ADDRESS and CONTACTS from the matching contact
+  // (company) record. The full-mirror import carries only the owner's NAME, so
+  // the address and contacts live in the separately-imported Contacts records —
+  // this links them onto every case by owner name. Only fills blanks (never
+  // overwrites a detail already on the case); contacts from the owner record are
+  // appended if the case has none of its own (the firm Admin contact aside).
+  app.post('/api/marks/backfill-owner-details', full, (_req, res) => {
+    const companies = listCompanies(db);
+    const exact = new Map<string, typeof companies[number]>();
+    const loose = new Map<string, typeof companies[number]>();
+    const nExact = (s?: string) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const nLoose = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (const co of companies) {
+      const e = nExact(co.name); if (e && !exact.has(e)) exact.set(e, co);
+      const l = nLoose(co.name); if (l && !loose.has(l)) loose.set(l, co);
+    }
+    const all = listMarks(db);
+    const changed: Mark[] = [];
+    let addressFilled = 0;
+    let contactsFilled = 0;
+    let noMatch = 0;
+    for (const m of all) {
+      if (!m.owner) continue;
+      const co = exact.get(nExact(m.owner)) || loose.get(nLoose(m.owner));
+      if (!co) { noMatch++; continue; }
+      let touched = false;
+      // Fill address blanks only.
+      type StrKey = 'address1' | 'address2' | 'city' | 'state' | 'zip' | 'country' | 'phone';
+      const setIf = (key: StrKey, val?: string) => {
+        if (val && !m[key]) { m[key] = val; touched = true; }
+      };
+      const before = touched;
+      setIf('address1', co.address);
+      setIf('address2', co.address2);
+      setIf('city', co.city);
+      setIf('state', co.state);
+      setIf('zip', co.zip);
+      setIf('country', co.country);
+      setIf('phone', co.phone);
+      if (!m.ownerType && (co.type === 'Individual' || co.type === 'Company')) { m.ownerType = co.type; touched = true; }
+      if (touched && !before) addressFilled++;
+      // Append owner contacts if the case has none of its own (Admin aside).
+      const ownContacts = (m.contacts || []).filter((c) => (c.email || '').toLowerCase() !== ADMIN_CONTACT.email);
+      const coContacts = (co.contacts || []).filter((c) => c.name || c.first || c.last || c.email);
+      if (ownContacts.length === 0 && coContacts.length) {
+        const mapped = coContacts.map((c) => ({
+          name: c.name || [c.first, c.last].filter(Boolean).join(' '),
+          company: co.name,
+          position: c.position || c.title || '',
+          phone: c.phone || '',
+          email: c.email || '',
+        }));
+        m.contacts = [...(m.contacts || []), ...mapped];
+        contactsFilled++;
+        touched = true;
+      }
+      if (touched) { ensureAdminContact(m); changed.push(m); }
+    }
+    const tx = db.transaction(() => { for (const m of changed) saveMark(db, m); });
+    tx();
+    res.json({ casesChanged: changed.length, addressFilled, contactsFilled, noMatch, casesTotal: all.length });
+  });
+
   // Import legacy "Trademark Action" diary entries from the firm's alert export.
   // Each row is matched to a case by application/registration number (then by
   // name + jurisdiction). Standard jurisdiction/reminder date names are skipped

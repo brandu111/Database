@@ -1134,6 +1134,23 @@ function DataImport() {
           }}>{busy ? 'Working…' : 'Add Admin to all cases'}</button>
         </Card>
 
+        <Card label="Fill owner address & contacts from the Contacts records">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            The case import brings across only the owner’s <strong>name</strong>. This links each case to its matching <strong>Contacts (company) record</strong> by owner name and fills in the owner’s <strong>address</strong> and <strong>case contacts</strong>. It only fills blanks — nothing already on a case is overwritten. Import your contacts first, then run this.
+          </div>
+          <button className="btn secondary small" disabled={busy} onClick={async () => {
+            setBusy(true);
+            try {
+              const r = await api.backfillOwnerDetails();
+              window.alert(`Updated ${r.casesChanged} of ${r.casesTotal} case${r.casesTotal === 1 ? '' : 's'}: ${r.addressFilled} had an address added, ${r.contactsFilled} had contacts added.${r.noMatch ? `\n\n${r.noMatch} case${r.noMatch === 1 ? '' : 's'} had an owner with no matching contact record — check the owner name matches a contact.` : ''}`);
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : 'Failed.');
+            } finally {
+              setBusy(false);
+            }
+          }}>{busy ? 'Working…' : 'Fill owner address & contacts'}</button>
+        </Card>
+
         <Card label="Import trade mark actions (from legacy alerts)">
           <div className="hint" style={{ marginBottom: 8 }}>
             Upload the CSV of legacy action items. Each row is matched to a case by application / registration number (then by name + jurisdiction) and added as an alerting <strong>Trade mark action</strong>, keeping its original date. Standard jurisdiction/reminder dates are skipped (the engine already generates those), and any action already on a case isn’t duplicated. Existing dates are never changed.
