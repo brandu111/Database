@@ -705,6 +705,7 @@ function DataImport() {
   const [rows, setRows] = useState<Record<string, string>[] | null>(null);
   const [fileName, setFileName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [prog, setProg] = useState('');
   const [result, setResult] = useState<{ imported: number; total: number; errors: { line: number; error: string }[] } | null>(null);
   const [delText, setDelText] = useState('');
   const [delMsg, setDelMsg] = useState('');
@@ -748,13 +749,25 @@ function DataImport() {
     if (!f) return;
     setVerifyBusy(true);
     setVerifyResult(null);
+    setProg('');
     try {
-      const rows = parseCsv(await f.text());
-      setVerifyResult(await api.verifyImport(rows));
+      const all = parseCsv(await f.text());
+      // Same as the full import: batch so the big mirror file clears the proxy.
+      const CHUNK = 100;
+      let checked = 0, matched = 0, unmatched = 0, mismatchCount = 0;
+      const mismatches: { name: string; jur: string; field: string; source: string; current: string }[] = [];
+      for (let i = 0; i < all.length; i += CHUNK) {
+        const r = await api.verifyImport(all.slice(i, i + CHUNK));
+        checked += r.checked; matched += r.matched; unmatched += r.unmatched; mismatchCount += r.mismatchCount;
+        r.mismatches.forEach((m) => mismatches.push(m));
+        setProg(`Verifying… ${Math.min(i + CHUNK, all.length)} of ${all.length} cases`);
+      }
+      setVerifyResult({ checked, matched, unmatched, mismatchCount, mismatches });
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Verify failed.');
     } finally {
       setVerifyBusy(false);
+      setProg('');
     }
   };
 
@@ -859,14 +872,29 @@ function DataImport() {
   const doImportFull = async () => {
     if (!rows?.length) return;
     setBusy(true);
+    setProg('');
     try {
-      const r = await api.importFull(rows);
-      setResult({ imported: r.imported, total: r.total, errors: r.errors });
-      window.alert(`Imported ${r.imported} of ${r.total} cases with ${r.dates} dates — all locked to mirror the legacy database (nothing recomputed).${r.errors.length ? `\n\n${r.errors.length} row(s) had errors.` : ''}`);
+      // The full mirror can be thousands of cases with 200+ columns each — far
+      // too large for one request (the cPanel proxy rejects it with a 413). Send
+      // it in small batches; the endpoint is additive, so each batch just adds
+      // its cases. Batch size stays well under typical proxy body limits.
+      const CHUNK = 100;
+      let imported = 0, dates = 0, total = 0;
+      const errors: { line: number; error: string }[] = [];
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const batch = rows.slice(i, i + CHUNK);
+        const r = await api.importFull(batch);
+        imported += r.imported; dates += r.dates; total += r.total;
+        r.errors.forEach((e) => errors.push({ line: e.line + i, error: e.error }));
+        setProg(`Importing… ${Math.min(i + CHUNK, rows.length)} of ${rows.length} cases`);
+      }
+      setResult({ imported, total, errors });
+      window.alert(`Imported ${imported} of ${total} cases with ${dates} dates — all locked to mirror the legacy database (nothing recomputed).${errors.length ? `\n\n${errors.length} row(s) had errors.` : ''}`);
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Import failed.');
     } finally {
       setBusy(false);
+      setProg('');
     }
   };
 
@@ -983,8 +1011,8 @@ function DataImport() {
                   </table>
                   {rows.length > preview.length && <div className="hint" style={{ marginBottom: 8 }}>…and {rows.length - preview.length} more.</div>}
                   <div className="row">
-                    <button className="btn" disabled={busy} onClick={doImport}>{busy ? 'Importing…' : `Import ${rows.length} case${rows.length === 1 ? '' : 's'}`}</button>
-                    <button className="btn secondary" disabled={busy} title="Bring every date across exactly as in the legacy export, locked. Use this for the legacy mirror file." onClick={doImportFull}>{busy ? 'Importing…' : 'Import as full mirror (dates locked)'}</button>
+                    <button className="btn" disabled={busy} onClick={doImport}>{busy ? (prog || 'Importing…') : `Import ${rows.length} case${rows.length === 1 ? '' : 's'}`}</button>
+                    <button className="btn secondary" disabled={busy} title="Bring every date across exactly as in the legacy export, locked. Use this for the legacy mirror file." onClick={doImportFull}>{busy ? (prog || 'Importing…') : 'Import as full mirror (dates locked)'}</button>
                   </div>
                   <div className="hint" style={{ marginTop: 6 }}>Use <strong>full mirror</strong> for the all-dates legacy file — it stores every date exactly as the legacy holds it and never recomputes. Use the normal import for the standard template (renewals/reminders auto-calculated).</div>
                 </>
@@ -1234,7 +1262,7 @@ function DataImport() {
             Read-only check. Upload your authoritative cases CSV and this compares each case's <strong>renewal, registration and filing dates</strong> in the live database against the file, listing anything that differs. Nothing is changed. A clean result (0 differences) confirms the database matches your source of truth.
           </div>
           <label className="btn secondary small" style={{ cursor: verifyBusy ? 'default' : 'pointer', display: 'inline-block' }}>
-            {verifyBusy ? 'Checking…' : '⬆ Choose CSV to verify against'}
+            {verifyBusy ? (prog || 'Checking…') : '⬆ Choose CSV to verify against'}
             <input type="file" accept=".csv,text/csv" disabled={verifyBusy} style={{ display: 'none' }}
               onChange={(e) => { verifyAgainstFile(e.target.files); e.currentTarget.value = ''; }} />
           </label>
