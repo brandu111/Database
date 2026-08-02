@@ -111,6 +111,7 @@ export const api = {
   updateUser: (id: string, u: { name?: string; level?: string; password?: string; signature?: string; email?: string; title?: string }) => req<{ id: string }>('PUT', `/api/users/${id}`, u),
   deleteUser: (id: string) => req<{ ok: true }>('DELETE', `/api/users/${id}`),
 
+  markOwners: () => req<{ name: string; count: number }[]>('GET', '/api/mark-owners'),
   clientAccess: () => req<{ id: string; company: string; userId: string; active: number; createdAt: string }[]>('GET', '/api/client-access'),
   grantAccess: (company: string) => req<{ id: string; company: string; userId: string; password: string }>('POST', '/api/client-access', { company }),
   regenerateAccess: (id: string, password?: string) => req<{ password: string }>('POST', `/api/client-access/${id}/regenerate`, password ? { password } : {}),

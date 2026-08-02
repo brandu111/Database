@@ -489,6 +489,7 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
   const [users, setUsers] = useState<{ id: string; name: string; level: string; email?: string; title?: string }[]>([]);
   const [access, setAccess] = useState<{ id: string; company: string; userId: string; active: number; createdAt: string }[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
+  const [markOwners, setMarkOwners] = useState<{ name: string; count: number }[]>([]);
   const [grantCompany, setGrantCompany] = useState('');
   const [freshCreds, setFreshCreds] = useState<Record<string, string>>({});
   const [newUser, setNewUser] = useState({ name: '', level: 'Edit Only', password: '' });
@@ -511,6 +512,7 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
     if (isFull) {
       api.users().then(setUsers, () => undefined);
       api.clientAccess().then(setAccess, () => undefined);
+      api.markOwners().then(setMarkOwners, () => undefined);
     }
   }, [isFull]);
 
@@ -678,8 +680,11 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
               Invite a client company: a unique login ID and password give read-only access to that company's own matters. Passwords are stored hashed, so an existing one can't be shown again — use <strong>Set</strong> to choose a new one or <strong>⟳</strong> to generate one, then <strong>Copy</strong> it and send it over a secure channel.
             </div>
             <div className="row" style={{ marginBottom: 12 }}>
-              <input type="text" list="grant-cos" placeholder="Company…" value={grantCompany} onChange={(e) => setGrantCompany(e.target.value)} style={{ maxWidth: 280 }} />
-              <datalist id="grant-cos">{companies.map((c) => <option key={c} value={c} />)}</datalist>
+              <input type="text" list="grant-cos" placeholder="Owner company (as it appears on the cases)…" value={grantCompany} onChange={(e) => setGrantCompany(e.target.value)} style={{ maxWidth: 340 }} />
+              <datalist id="grant-cos">
+                {markOwners.map((o) => <option key={o.name} value={o.name}>{o.name} — {o.count} case{o.count === 1 ? '' : 's'}</option>)}
+                {companies.filter((c) => !markOwners.some((o) => o.name === c)).map((c) => <option key={c} value={c} />)}
+              </datalist>
               <button className="btn small" disabled={!grantCompany} onClick={async () => {
                 try {
                   const g = await api.grantAccess(grantCompany);

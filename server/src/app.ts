@@ -1922,6 +1922,17 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.get('/api/client-access', full, (_req, res) => {
     res.json(db.prepare(`SELECT id, company, user_id AS userId, active, created_at AS createdAt FROM client_access ORDER BY created_at DESC`).all());
   });
+  // Distinct case-owner names (with case counts) — these are what a client portal
+  // matches on, so granting access to one of these guarantees the client sees
+  // their marks.
+  app.get('/api/mark-owners', full, (_req, res) => {
+    const counts = new Map<string, number>();
+    for (const m of listMarks(db)) {
+      const o = (m.owner || '').trim();
+      if (o) counts.set(o, (counts.get(o) || 0) + 1);
+    }
+    res.json([...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count })));
+  });
 
   /** Invite a company: unique login id + generated password (returned once, stored hashed). */
   app.post('/api/client-access', full, (req, res) => {
@@ -1963,14 +1974,18 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
 
   // ---- client extranet (read-only, scoped to the signed-in company) ---------
 
+  // Match the client's company to case owners case- and spacing-insensitively
+  // (but not so loosely that two different companies collide — client data must
+  // stay scoped to that one company).
+  const normCo = (s?: string) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
   app.get('/api/portal/marks', requireClient(db), (req, res) => {
-    const company = (req.session as { company: string }).company;
-    res.json(listMarks(db).filter((m) => m.owner === company));
+    const company = normCo((req.session as { company: string }).company);
+    res.json(listMarks(db).filter((m) => normCo(m.owner) === company));
   });
 
   app.get('/api/portal/oppositions', requireClient(db), (req, res) => {
-    const company = (req.session as { company: string }).company;
-    res.json(listOppositions(db).filter((o) => o.client === company));
+    const company = normCo((req.session as { company: string }).company);
+    res.json(listOppositions(db).filter((o) => normCo(o.client) === company));
   });
 
   // ---- file uploads (documents, mark images) --------------------------------
