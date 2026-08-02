@@ -594,6 +594,29 @@ describe('bulk import & clear', () => {
     await admin.post('/api/marks/verify-import').send({ rows: [] }).expect(400);
     await viewer.post('/api/marks/verify-import').send({ rows }).expect(403);
   });
+
+  it('verifies against the full-mirror (legacy Reva) column layout by application no.', async () => {
+    // A case with an application number and legacy-named date rows, as produced
+    // by the full-mirror import.
+    const m = (await admin.post('/api/marks').send({ name: 'MIRRORCHECK', jurisdiction: 'Australia', owner: 'Mirror Co', application: '1234567' }).expect(201)).body;
+    m.dates = [
+      { name: 'Application Filed', date: '2020-08-15', done: true, pinned: true },
+      { name: 'Registration Date', date: '2021-02-10', done: true, pinned: true },
+      { name: 'Renewal Deadline', date: '2030-08-15', done: false, pinned: true },
+    ];
+    await admin.put(`/api/marks/${m.id}`).send(m).expect(200);
+
+    // Rows use the legacy Reva column names and ISO dates (what fullRowToMark reads).
+    const rows = [
+      { MarkName: 'MIRRORCHECK', Jurisdiction: 'Australia', OwnerName: 'Mirror Co', ApplicationNo: '1234567',
+        'Application Filed': '2020-08-15', 'Registration Date': '2021-02-10', 'Renewal Deadline': '2030-08-15' },
+    ];
+    const r = (await admin.post('/api/marks/verify-import').send({ rows }).expect(200)).body;
+    // Matched by application number, and every locked date agrees → clean.
+    expect(r.matched).toBe(1);
+    expect(r.unmatched).toBe(0);
+    expect(r.mismatchCount).toBe(0);
+  });
 });
 
 describe('oppositions', () => {

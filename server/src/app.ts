@@ -1381,28 +1381,48 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     const nName = (s?: string) => (s || '').toLowerCase().replace(/\b(logo|device|stylised|stylized|word|series|and logo)\b/g, '').replace(/[^a-z0-9]/g, '');
     const nOwner = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const nJur = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const nNum = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const dateOf = (m: Mark, n: string) => (m.dates || []).find((d) => d.name === n)?.date || '';
-    const keyOf = (jur: string, name: string, owner: string, filed: string) => `${nJur(jur)}|${nName(name)}|${nOwner(owner)}|${filed}`;
-    const index = new Map<string, Mark>();
+    // First value present among several possible column spellings (full-mirror
+    // uses the legacy date-column names; a plain import CSV uses short aliases).
+    const pick = (r: Record<string, string>, ...keys: string[]) => {
+      for (const k of keys) if (r[k] != null && String(r[k]).trim() !== '') return String(r[k]).trim();
+      return '';
+    };
+    // Match a file row to a case by application no., then registration no., then
+    // jurisdiction + mark name + owner — robust to whether filing dates line up.
+    const byApp = new Map<string, Mark>();
+    const byReg = new Map<string, Mark>();
+    const byComposite = new Map<string, Mark>();
     for (const m of listMarks(db)) {
-      const k = keyOf(m.jurisdiction, m.name, m.owner, dateOf(m, 'Application Filed'));
-      if (!index.has(k)) index.set(k, m);
+      const a = nNum(m.application); if (a && !byApp.has(a)) byApp.set(a, m);
+      const rg = nNum(m.registration); if (rg && !byReg.has(rg)) byReg.set(rg, m);
+      const ck = `${nJur(m.jurisdiction)}|${nName(m.name)}|${nOwner(m.owner)}`;
+      if (!byComposite.has(ck)) byComposite.set(ck, m);
     }
-    const fields: { csv: string; row: string }[] = [
-      { csv: 'RenewalDate', row: 'Renewal Deadline' },
-      { csv: 'RegistrationDate', row: 'Registration Date' },
-      { csv: 'FiledDate', row: 'Application Filed' },
+    const find = (r: Record<string, string>): Mark | undefined => {
+      const a = nNum(pick(r, 'ApplicationNo', 'ApplicationNumber', 'Application'));
+      if (a && byApp.has(a)) return byApp.get(a);
+      const rg = nNum(pick(r, 'RegistrationNo', 'RegistrationNumber', 'Registration'));
+      if (rg && byReg.has(rg)) return byReg.get(rg);
+      return byComposite.get(`${nJur(pick(r, 'Jurisdiction'))}|${nName(pick(r, 'MarkName', 'Name'))}|${nOwner(pick(r, 'OwnerName', 'Owner'))}`);
+    };
+    // Compare the key deadlines. Each entry lists the legacy column name first,
+    // then the short alias, then the matching date row on the case.
+    const fields: { cols: string[]; row: string }[] = [
+      { cols: ['Application Filed', 'FiledDate'], row: 'Application Filed' },
+      { cols: ['Registration Date', 'RegistrationDate'], row: 'Registration Date' },
+      { cols: ['Renewal Deadline', 'RenewalDate'], row: 'Renewal Deadline' },
     ];
     let matched = 0;
     let unmatched = 0;
     const mismatches: { id: string; name: string; jur: string; field: string; source: string; current: string }[] = [];
     for (const r of rows) {
-      const filed = parseImportDate(r.FiledDate || '');
-      const m = index.get(keyOf(r.Jurisdiction || '', r.MarkName || '', r.OwnerName || '', filed));
+      const m = find(r);
       if (!m) { unmatched++; continue; }
       matched++;
       for (const f of fields) {
-        const source = parseImportDate(r[f.csv] || '');
+        const source = parseImportDate(pick(r, ...f.cols));
         const current = dateOf(m, f.row);
         if (source && source !== current) {
           mismatches.push({ id: m.id, name: m.name || '(untitled)', jur: m.jurisdiction, field: f.row, source, current: current || '(none)' });
