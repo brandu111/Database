@@ -36,6 +36,29 @@ function endpoints() {
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
+/**
+ * fetch with a per-attempt timeout and retries. IP Australia's production
+ * hostname rotates across several IPs, some of which currently time out
+ * (confirmed by the host, reproduced externally). A stalled connection is
+ * aborted after `timeoutMs` and retried — DNS usually rotates to a healthy IP,
+ * so a couple of retries get through instead of hanging or failing outright.
+ */
+async function fetchRetry(url: string, opts: RequestInit, tries = 4, timeoutMs = 12_000): Promise<Awaited<ReturnType<typeof fetch>>> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...opts, signal: ac.signal });
+    } catch (e) {
+      lastErr = e; // timeout/abort or network error — try again (DNS may rotate)
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('fetch failed');
+}
+
 async function getAccessToken(): Promise<string> {
   const now = Date.now();
   if (cachedToken && cachedToken.expiresAt > now + 60_000) return cachedToken.value;
@@ -46,7 +69,7 @@ async function getAccessToken(): Promise<string> {
   const basic = Buffer.from(`${process.env.IPAU_CLIENT_ID}:${process.env.IPAU_CLIENT_SECRET}`).toString('base64');
   let res: Awaited<ReturnType<typeof fetch>>;
   try {
-    res = await fetch(token, {
+    res = await fetchRetry(token, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -56,7 +79,7 @@ async function getAccessToken(): Promise<string> {
       body: new URLSearchParams({ grant_type: 'client_credentials' }),
     });
   } catch (e) {
-    throw new IpAuError(503, `Cannot reach the IP Australia auth server (${(e as Error).message}). The hosting may be blocking outbound HTTPS.`);
+    throw new IpAuError(503, `Cannot reach the IP Australia auth server after retries (${(e as Error).message}). Their endpoint may be intermittently timing out.`);
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -263,13 +286,13 @@ export async function lookupTradeMark(numberRaw: string, opts: { saveImage?: Sav
   const { base } = endpoints();
   let res: Awaited<ReturnType<typeof fetch>>;
   try {
-    res = await fetch(`${base}/trade-mark/${encodeURIComponent(num)}`, {
+    res = await fetchRetry(`${base}/trade-mark/${encodeURIComponent(num)}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     });
   } catch (e) {
-    // Network-level failure (e.g. the host blocks outbound HTTPS) — undici throws
-    // a bare "fetch failed". Give a message that says what actually happened.
-    throw new IpAuError(503, `Cannot reach the IP Australia search server (${(e as Error).message}). The hosting may be blocking outbound HTTPS.`);
+    // Network-level failure after retries — IP Australia's endpoint rotates
+    // across IPs and some are timing out. Report it clearly.
+    throw new IpAuError(503, `Cannot reach the IP Australia search server after retries (${(e as Error).message}). Their endpoint may be intermittently timing out.`);
   }
   if (res.status === 404) throw new IpAuError(404, `No trade mark found on the IP Australia register for "${num}".`);
   if (res.status === 401 || res.status === 403) {
