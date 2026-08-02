@@ -107,7 +107,7 @@ export const api = {
 
   clientAccess: () => req<{ id: string; company: string; userId: string; active: number; createdAt: string }[]>('GET', '/api/client-access'),
   grantAccess: (company: string) => req<{ id: string; company: string; userId: string; password: string }>('POST', '/api/client-access', { company }),
-  regenerateAccess: (id: string) => req<{ password: string }>('POST', `/api/client-access/${id}/regenerate`),
+  regenerateAccess: (id: string, password?: string) => req<{ password: string }>('POST', `/api/client-access/${id}/regenerate`, password ? { password } : {}),
   setAccessActive: (id: string, active: boolean) => req<{ ok: true }>('PUT', `/api/client-access/${id}`, { active }),
   deleteAccess: (id: string) => req<{ ok: true }>('DELETE', `/api/client-access/${id}`),
 

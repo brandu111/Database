@@ -1943,7 +1943,10 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   app.post('/api/client-access/:id/regenerate', full, (req, res) => {
     const row = db.prepare(`SELECT id FROM client_access WHERE id=?`).get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
-    const password = generatePassword();
+    // Accept a chosen password, or generate one when none is supplied.
+    const custom = String(req.body?.password || '').trim();
+    if (custom && custom.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    const password = custom || generatePassword();
     db.prepare(`UPDATE client_access SET password_hash=? WHERE id=?`).run(hashPassword(password), req.params.id);
     res.json({ password });
   });

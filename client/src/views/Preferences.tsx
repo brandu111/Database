@@ -675,16 +675,20 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
         {isFull && (
           <Card label="Client access (extranet)">
             <div className="hint" style={{ marginBottom: 8 }}>
-              Invite a client company: a unique login ID and generated password give read-only access to that company's own matters. Passwords are stored hashed and shown once — send them over a secure channel.
+              Invite a client company: a unique login ID and password give read-only access to that company's own matters. Passwords are stored hashed, so an existing one can't be shown again — use <strong>Set</strong> to choose a new one or <strong>⟳</strong> to generate one, then <strong>Copy</strong> it and send it over a secure channel.
             </div>
             <div className="row" style={{ marginBottom: 12 }}>
               <input type="text" list="grant-cos" placeholder="Company…" value={grantCompany} onChange={(e) => setGrantCompany(e.target.value)} style={{ maxWidth: 280 }} />
               <datalist id="grant-cos">{companies.map((c) => <option key={c} value={c} />)}</datalist>
               <button className="btn small" disabled={!grantCompany} onClick={async () => {
-                const g = await api.grantAccess(grantCompany);
-                setFreshCreds((f) => ({ ...f, [g.id]: g.password }));
-                setGrantCompany('');
-                api.clientAccess().then(setAccess);
+                try {
+                  const g = await api.grantAccess(grantCompany);
+                  setFreshCreds((f) => ({ ...f, [g.id]: g.password }));
+                  setGrantCompany('');
+                  api.clientAccess().then(setAccess);
+                } catch (e) {
+                  window.alert(e instanceof Error ? e.message : 'Could not grant access.');
+                }
               }}>
                 Grant access
               </button>
@@ -699,17 +703,34 @@ function SettingsUsers({ isFull }: { isFull: boolean }) {
                       <td className="mono">{a.userId}</td>
                       <td className="mono">
                         {freshCreds[a.id] ? freshCreds[a.id] : '••••••••'}
-                        <button className="btn danger-link" title="Regenerate password" onClick={async () => {
-                          const r = await api.regenerateAccess(a.id);
-                          setFreshCreds((f) => ({ ...f, [a.id]: r.password }));
+                        {freshCreds[a.id] && (
+                          <button className="btn secondary small" title="Copy password" style={{ marginLeft: 6 }} onClick={() => navigator.clipboard?.writeText(freshCreds[a.id])}>Copy</button>
+                        )}
+                        <button className="btn secondary small" title="Set a specific password" style={{ marginLeft: 6 }} onClick={async () => {
+                          const pw = window.prompt(`Set a password for ${a.company} (min 6 characters):`);
+                          if (!pw) return;
+                          try {
+                            const r = await api.regenerateAccess(a.id, pw.trim());
+                            setFreshCreds((f) => ({ ...f, [a.id]: r.password }));
+                          } catch (e) {
+                            window.alert(e instanceof Error ? e.message : 'Could not set the password.');
+                          }
+                        }}>Set</button>
+                        <button className="btn danger-link" title="Generate a new random password" style={{ marginLeft: 6 }} onClick={async () => {
+                          try {
+                            const r = await api.regenerateAccess(a.id);
+                            setFreshCreds((f) => ({ ...f, [a.id]: r.password }));
+                          } catch (e) {
+                            window.alert(e instanceof Error ? e.message : 'Could not regenerate the password.');
+                          }
                         }}>⟳</button>
                       </td>
                       <td>
-                        <button className={`chip${a.active ? ' on' : ''}`} onClick={() => api.setAccessActive(a.id, !a.active).then(() => api.clientAccess().then(setAccess))}>
+                        <button className={`chip${a.active ? ' on' : ''}`} onClick={() => api.setAccessActive(a.id, !a.active).then(() => api.clientAccess().then(setAccess)).catch((e) => window.alert(e instanceof Error ? e.message : 'Could not change status.'))}>
                           {a.active ? 'Active' : 'Revoked'}
                         </button>
                       </td>
-                      <td><button className="btn danger-link" onClick={() => { if (confirmDelete(`access for ${a.company}`)) api.deleteAccess(a.id).then(() => api.clientAccess().then(setAccess)); }}>✕</button></td>
+                      <td><button className="btn danger-link" onClick={() => { if (confirmDelete(`access for ${a.company}`)) api.deleteAccess(a.id).then(() => api.clientAccess().then(setAccess)).catch((e) => window.alert(e instanceof Error ? e.message : 'Could not delete access.')); }}>✕</button></td>
                     </tr>
                   ))}
                 </tbody>

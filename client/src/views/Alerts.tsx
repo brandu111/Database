@@ -20,6 +20,7 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
 }) {
   const [days, setDays] = useState(30);
   const [mode, setMode] = useState<'list' | 'calendar'>('list');
+  const [fUser, setFUser] = useState('All users');
   const [rows, setRows] = useState<AlertRow[] | null>(null);
   const [busy, setBusy] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -129,11 +130,24 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
 
   if (!rows) return <div className="hint">Loading…</div>;
 
+  // Users an alert can be attributed to (the responsible staff member), for the
+  // "by user" filter. Rows with no attributed user fall under "Unassigned".
+  const users = [...new Set(rows.map((r) => r.owner).filter(Boolean) as string[])].sort();
+  const hasUnassigned = rows.some((r) => !r.owner);
+  const shown = rows.filter((r) =>
+    fUser === 'All users' ? true : fUser === 'Unassigned' ? !r.owner : (r.owner || '') === fUser
+  );
+
   return (
     <>
       <div className="filters">
         <div className="section-label" style={{ marginBottom: 0 }}>Upcoming deadlines, reminders &amp; flagged actions</div>
         <div className="row" style={{ marginLeft: 'auto', gap: 6 }}>
+          <select value={fUser} onChange={(e) => setFUser(e.target.value)} title="Show only alerts for a given staff member">
+            <option>All users</option>
+            {users.map((u) => <option key={u}>{u}</option>)}
+            {hasUnassigned && <option>Unassigned</option>}
+          </select>
           <button className={`chip${mode === 'list' ? ' on' : ''}`} onClick={() => setMode('list')}>List</button>
           <button className={`chip${mode === 'calendar' ? ' on' : ''}`} onClick={() => setMode('calendar')}>Calendar</button>
           <select value={days} onChange={(e) => setDays(parseInt(e.target.value, 10))}>
@@ -141,18 +155,18 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
           </select>
         </div>
       </div>
-      {mode === 'calendar' && <AlertsCalendar rows={rows} openMark={openMark} openOpposition={openOpposition} />}
+      {mode === 'calendar' && <AlertsCalendar rows={shown} openMark={openMark} openOpposition={openOpposition} />}
       {mode === 'list' && (
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="list">
           <thead>
-            <tr><th style={{ width: 24 }} /><th>Date</th><th>Kind</th><th>Matter</th><th>Jurisdiction</th><th>What</th><th style={{ width: 190 }} /></tr>
+            <tr><th style={{ width: 24 }} /><th>Date</th><th>Kind</th><th>Matter</th><th>Jurisdiction</th><th>What</th><th>User</th><th style={{ width: 190 }} /></tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={7} className="hint" style={{ padding: 18 }}>Nothing due in the selected window.</td></tr>
+            {shown.length === 0 && (
+              <tr><td colSpan={8} className="hint" style={{ padding: 18 }}>Nothing due in the selected window{fUser === 'All users' ? '' : ` for ${fUser}`}.</td></tr>
             )}
-            {rows.map((a, i) => {
+            {shown.map((a, i) => {
               const ks = KIND_STYLE[a.kind];
               const key = rowKey(a);
               const isOpen = expanded === key;
@@ -176,6 +190,7 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
                     </td>
                     <td>{a.jur || '—'}</td>
                     <td>{a.text}</td>
+                    <td>{a.owner || <span className="hint">—</span>}</td>
                     <td>
                       <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
                         {canEdit && canEmail(a) && (
@@ -194,7 +209,7 @@ export function Alerts({ openMark, openOpposition, canEdit }: {
                   {isOpen && (
                     <tr>
                       <td />
-                      <td colSpan={6} style={{ background: 'var(--panel)' }}>
+                      <td colSpan={7} style={{ background: 'var(--panel)' }}>
                         <div style={{ padding: '6px 2px 10px' }}>
                           {a.refType === 'opposition' ? (
                             <div className="hint">Opposition matter — open the case to work the timeline.</div>
