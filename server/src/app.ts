@@ -1389,23 +1389,28 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
       for (const k of keys) if (r[k] != null && String(r[k]).trim() !== '') return String(r[k]).trim();
       return '';
     };
-    // Match a file row to a case by application no., then registration no., then
-    // jurisdiction + mark name + owner — robust to whether filing dates line up.
+    // Match a file row to a case by jurisdiction + application no., then
+    // jurisdiction + registration no., then jurisdiction + mark name + owner.
+    // Numbers are scoped by jurisdiction because a Madrid family shares one IR
+    // number across every designated country — matching on the bare number would
+    // collapse the whole family onto one case and cross-compare their dates.
     const byApp = new Map<string, Mark>();
     const byReg = new Map<string, Mark>();
     const byComposite = new Map<string, Mark>();
     for (const m of listMarks(db)) {
-      const a = nNum(m.application); if (a && !byApp.has(a)) byApp.set(a, m);
-      const rg = nNum(m.registration); if (rg && !byReg.has(rg)) byReg.set(rg, m);
-      const ck = `${nJur(m.jurisdiction)}|${nName(m.name)}|${nOwner(m.owner)}`;
+      const j = nJur(m.jurisdiction);
+      const a = nNum(m.application); if (a && !byApp.has(`${j}|${a}`)) byApp.set(`${j}|${a}`, m);
+      const rg = nNum(m.registration); if (rg && !byReg.has(`${j}|${rg}`)) byReg.set(`${j}|${rg}`, m);
+      const ck = `${j}|${nName(m.name)}|${nOwner(m.owner)}`;
       if (!byComposite.has(ck)) byComposite.set(ck, m);
     }
     const find = (r: Record<string, string>): Mark | undefined => {
+      const j = nJur(pick(r, 'Jurisdiction'));
       const a = nNum(pick(r, 'ApplicationNo', 'ApplicationNumber', 'Application'));
-      if (a && byApp.has(a)) return byApp.get(a);
+      if (a && byApp.has(`${j}|${a}`)) return byApp.get(`${j}|${a}`);
       const rg = nNum(pick(r, 'RegistrationNo', 'RegistrationNumber', 'Registration'));
-      if (rg && byReg.has(rg)) return byReg.get(rg);
-      return byComposite.get(`${nJur(pick(r, 'Jurisdiction'))}|${nName(pick(r, 'MarkName', 'Name'))}|${nOwner(pick(r, 'OwnerName', 'Owner'))}`);
+      if (rg && byReg.has(`${j}|${rg}`)) return byReg.get(`${j}|${rg}`);
+      return byComposite.get(`${j}|${nName(pick(r, 'MarkName', 'Name'))}|${nOwner(pick(r, 'OwnerName', 'Owner'))}`);
     };
     // Compare the key deadlines. Each entry lists the legacy column name first,
     // then the short alias, then the matching date row on the case.
