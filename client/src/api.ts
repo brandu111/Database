@@ -14,6 +14,12 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
     } catch {
       /* keep status */
     }
+    // Session expired mid-use: bounce to the login screen instead of leaving the
+    // user on a stale page hitting "Not signed in" on every action. (Login/auth
+    // endpoints handle their own 401s, so don't reload for those.)
+    if (res.status === 401 && msg === 'Not signed in' && !url.includes('/api/auth/')) {
+      window.location.reload();
+    }
     throw new ApiError(res.status, msg);
   }
   return res.json() as Promise<T>;
