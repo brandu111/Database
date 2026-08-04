@@ -51,19 +51,7 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
         placeholder="dd/mm/yyyy"
         value={text}
         disabled={disabled}
-        onChange={(e) => {
-          const v = e.target.value;
-          setText(v);
-          // Commit as soon as a complete dd/mm/yyyy (4-digit year) is typed, so
-          // the value sticks even if the next click is a button (which would
-          // otherwise read the field before the on-blur commit fires). Partial
-          // input (and 2-digit years) still waits for blur so typing isn't
-          // disrupted mid-way.
-          if (/^\d{1,2}[/\-. ]\d{1,2}[/\-. ]\d{4}$/.test(v.trim())) {
-            const iso = dmyToIso(v);
-            if (iso && iso !== value) onChange(iso);
-          }
-        }}
+        onChange={(e) => setText(e.target.value)}
         onBlur={() => commit(text)}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
         style={{ width: '100%', paddingRight: 26 }}

@@ -152,9 +152,11 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   // Notify the staff member attributed to any newly added, alert-flagged date
   // that action is required in the system. Only fires for genuinely new rows.
   if (mailerConfigured()) {
-    const prevKeys = new Set((previous?.dates || []).map((d) => `${d.name}|${d.date}`));
+    // Notify only when a genuinely NEW alert date (by name) is added — not when
+    // an existing date's value is edited, so changing a date never re-emails.
+    const prevNames = new Set((previous?.dates || []).map((d) => d.name));
     for (const d of m.dates) {
-      if (d.notify && d.createdBy && !d.done && !prevKeys.has(`${d.name}|${d.date}`)) {
+      if (d.notify && d.createdBy && !d.done && d.date && !prevNames.has(d.name)) {
         const to = staffEmailByName(db, d.createdBy);
         if (to) {
           const mail = actionRequiredEmail(m, d);
