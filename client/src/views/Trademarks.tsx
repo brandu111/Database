@@ -387,6 +387,9 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [addDateName, setAddDateName] = useState('');
   const [addDateDate, setAddDateDate] = useState('');
+  // Synchronous mirror of the typed add-date value, so the "Add date" button
+  // reads the real date even if it's clicked before React state has settled.
+  const addDateRef = useRef('');
   const [mpCountry, setMpCountry] = useState('');
   const [mpModal, setMpModal] = useState<null | 'file' | 'subsequent'>(null);
   const [mpPicked, setMpPicked] = useState<Set<string>>(new Set());
@@ -854,14 +857,15 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
               <div className="row" style={{ marginTop: 10 }}>
                 <input type="text" list="date-names" placeholder="Add date…" style={{ flex: 2 }} value={addDateName} onChange={(e) => setAddDateName(e.target.value)} />
                 <datalist id="date-names">{jurNames.map((n) => <option key={n} value={n} />)}</datalist>
-                <DateInput value={addDateDate} onChange={setAddDateDate} style={{ width: 150 }} />
+                <DateInput value={addDateDate} onChange={(iso) => { setAddDateDate(iso); addDateRef.current = iso; }} style={{ width: 150 }} />
                 <button className="btn small" disabled={!addDateName} onClick={() => {
                   update({
-                    dates: [...m.dates, { name: addDateName, date: addDateDate || todayISO(), done: false, createdBy: myName, notify: true }],
+                    dates: [...m.dates, { name: addDateName, date: addDateRef.current || addDateDate || todayISO(), done: false, createdBy: myName, notify: true }],
                     suppressedRules: (m.suppressedRules || []).filter((n) => n !== addDateName),
                   }, true);
                   setAddDateName('');
                   setAddDateDate('');
+                  addDateRef.current = '';
                 }}>
                   Add date
                 </button>
