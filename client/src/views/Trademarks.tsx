@@ -404,12 +404,21 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   const timer = useRef<number | null>(null);
   const latest = useRef(m);
   latest.current = m;
+  // Monotonic edit counter: lets an in-flight save detect that a newer edit has
+  // landed, so a slow/older save response can't overwrite it (which looked like
+  // a date "flipping back to today").
+  const editSeq = useRef(0);
 
   const doSave = useCallback(async () => {
     if (!canEdit) return;
+    const seq = editSeq.current;
     setSaveState('saving');
     try {
       const resp = await api.saveMark(latest.current);
+      // If a newer edit landed while this save was in flight, don't let this
+      // older response overwrite it — the newer edit will save itself. This is
+      // what caused a just-typed date to "flip back to today".
+      if (editSeq.current !== seq) return;
       // Only the dates panel is engine-computed server-side — merge it back
       // without clobbering fields the user may have kept typing into.
       setM((cur) => ({ ...cur, dates: resp.dates, madridId: resp.madridId }));
@@ -423,6 +432,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
   const update = useCallback(
     (patch: Partial<Mark>, flush = false) => {
       if (!canEdit) return;
+      editSeq.current++;
       setM((cur) => ({ ...cur, ...patch }));
       setSaveState('dirty');
       if (timer.current) window.clearTimeout(timer.current);

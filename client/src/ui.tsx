@@ -52,6 +52,7 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
         value={text}
         disabled={disabled}
         onChange={(e) => setText(e.target.value)}
+        onFocus={(e) => e.target.select()}
         onBlur={() => commit(text)}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
         style={{ width: '100%', paddingRight: 26 }}
