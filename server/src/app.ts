@@ -581,6 +581,15 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     }
   });
 
+  // Public build check — confirms the SERVER is running the newest app.cjs,
+  // independent of any browser/CDN caching of the front-end JS. Open
+  // /api/version in a browser: no-store means it is never cached, so whatever
+  // build string it shows is definitively what the server is running.
+  app.get('/api/version', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.json({ build: '2026-08-05-5' });
+  });
+
   // ---- marks ---------------------------------------------------------------
 
   app.get('/api/marks', view, (_req, res) => res.json(listMarks(db)));
