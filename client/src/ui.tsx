@@ -36,11 +36,17 @@ export function dmyToIso(text: string): string | null {
  */
 export function DateInput({ value, onChange, disabled, style }: { value: string; onChange: (iso: string) => void; disabled?: boolean; style?: React.CSSProperties }) {
   const [text, setText] = useState(isoToDMY(value));
+  // Mirror the field text in a ref so `commit` always reads the very latest
+  // keystroke, even if it fires before React has re-rendered (clicking away
+  // right after the last digit used to commit a truncated, invalid date that
+  // then reverted to the old value).
+  const textRef = useRef(text);
+  const setBoth = (v: string) => { textRef.current = v; setText(v); };
   const picker = useRef<HTMLInputElement>(null);
-  useEffect(() => { setText(isoToDMY(value)); }, [value]);
-  const commit = (t: string) => {
-    const iso = dmyToIso(t);
-    if (iso === null) setText(isoToDMY(value)); // unparseable → revert
+  useEffect(() => { setBoth(isoToDMY(value)); }, [value]);
+  const commit = () => {
+    const iso = dmyToIso(textRef.current);
+    if (iso === null) setBoth(isoToDMY(value)); // unparseable → revert
     else if (iso !== value) onChange(iso);
   };
   return (
@@ -51,9 +57,9 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
         placeholder="dd/mm/yyyy"
         value={text}
         disabled={disabled}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => setBoth(e.target.value)}
         onFocus={(e) => e.target.select()}
-        onBlur={() => commit(text)}
+        onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
         style={{ width: '100%', paddingRight: 26 }}
       />
