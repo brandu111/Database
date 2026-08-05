@@ -8,38 +8,68 @@ export function isoToDMY(iso: string): string {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
 }
 
+// Month names/abbreviations → month number, so legal-office dates like
+// "3 Jan 2023", "Jan 3, 2023" or "3 January 2023" parse as readily as 3/1/2023.
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
+  january: 1, february: 2, march: 3, april: 4, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
 /**
- * Parse a typed date into ISO yyyy-mm-dd. Accepts dd/mm/yyyy, dd-mm-yyyy,
- * dd.mm.yyyy, ddmmyyyy, 2-digit years, and a raw ISO string. Returns '' for an
- * empty field (clears the date) and null when it can't be parsed (leave as-is).
+ * Parse a typed date into ISO yyyy-mm-dd. Deliberately liberal so day-to-day
+ * typing just works. Accepts, with any separator (/, ., -, space or none):
+ *   - dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, dd mm yyyy
+ *   - ddmmyyyy and ddmmyy (no separators)
+ *   - 2-digit years (70+ → 19xx, else 20xx)
+ *   - month names: "3 Jan 2023", "Jan 3 2023", "3 January 2023", "3-Jan-23"
+ *   - a raw ISO string (yyyy-mm-dd)
+ * Returns '' for an empty field (clears the date) and null when it genuinely
+ * can't be read (the caller keeps the user's text and shows a hint rather than
+ * blanking the field).
  */
 export function dmyToIso(text: string): string | null {
   const t = (text || '').trim();
   if (!t) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t; // already ISO
-  // Pull out the number groups, whatever separators were used (/, ., -, space,
-  // or none). This is deliberately liberal so day-to-day typing just works.
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(t)) {
+    const [yy, mm, dd] = t.split('-').map(Number);
+    return validDate(dd, mm, yy);
+  }
   let d: number, mo: number, y: number, yLen: number;
-  const groups = t.match(/\d+/g);
-  if (groups && groups.length === 3) {
-    d = parseInt(groups[0], 10);
-    mo = parseInt(groups[1], 10);
-    y = parseInt(groups[2], 10);
-    yLen = groups[2].length;
-  } else if (/^\d{8}$/.test(t)) {
-    // ddmmyyyy
-    d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 4;
-  } else if (/^\d{6}$/.test(t)) {
-    // ddmmyy
-    d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 2;
+  const nameMatch = t.match(/[A-Za-z]+/);
+  if (nameMatch) {
+    // A month written as a word, e.g. "3 Jan 2023" or "Jan 3, 2023".
+    const mo0 = MONTHS[nameMatch[0].toLowerCase()];
+    if (!mo0) return null;
+    const nums = t.match(/\d+/g);
+    if (!nums || nums.length !== 2) return null; // need exactly a day and a year
+    // Whichever number is 4 digits (or clearly > 31) is the year; the other is the day.
+    const [a, b] = nums;
+    if (a.length === 4 || +a > 31) { y = +a; yLen = a.length; d = +b; }
+    else { d = +a; y = +b; yLen = b.length; }
+    mo = mo0;
   } else {
-    return null;
+    const groups = t.match(/\d+/g);
+    if (groups && groups.length === 3) {
+      d = +groups[0]; mo = +groups[1]; y = +groups[2]; yLen = groups[2].length;
+    } else if (/^\d{8}$/.test(t)) {
+      d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 4;
+    } else if (/^\d{6}$/.test(t)) {
+      d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 2;
+    } else {
+      return null;
+    }
   }
   if (yLen === 2) y += y >= 70 ? 1900 : 2000;
-  if (d < 1 || d > 31 || mo < 1 || mo > 12) return null;
+  return validDate(d, mo, y);
+}
+
+/** Build an ISO date, returning null for out-of-range or non-existent dates (e.g. 31 Feb). */
+function validDate(d: number, mo: number, y: number): string | null {
+  if (!Number.isFinite(d) || !Number.isFinite(mo) || !Number.isFinite(y)) return null;
+  if (d < 1 || d > 31 || mo < 1 || mo > 12 || y < 1000 || y > 9999) return null;
   const iso = `${y}-${pad(mo)}-${pad(d)}`;
   const check = new Date(`${iso}T00:00:00`);
-  if (check.getUTCMonth() + 1 !== mo || check.getUTCDate() !== d) return null; // e.g. 31/02
+  if (check.getUTCMonth() + 1 !== mo || check.getUTCDate() !== d) return null;
   return iso;
 }
 
@@ -55,29 +85,46 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
   // then reverted to the old value).
   const textRef = useRef(text);
   const setBoth = (v: string) => { textRef.current = v; setText(v); };
+  // When the typed text can't be read as a date we KEEP it on screen and flag it,
+  // rather than silently wiping the field (which looked like the date "going
+  // blank" for no reason). Cleared as soon as the user edits again.
+  const [badText, setBadText] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
-  useEffect(() => { setBoth(isoToDMY(value)); }, [value]);
+  useEffect(() => { setBoth(isoToDMY(value)); setBadText(false); }, [value]);
   // Commit from the raw value passed in (read straight off the input element),
   // so it can never lag the last keystroke.
   const commit = (raw: string) => {
     const iso = dmyToIso(raw);
-    if (iso === null) setBoth(isoToDMY(value)); // unparseable → revert
-    else if (iso !== value) onChange(iso);
+    if (iso === null) {
+      // Unreadable: keep what they typed and show a hint instead of blanking.
+      if ((raw || '').trim()) { setBadText(true); return; }
+      setBoth(isoToDMY(value)); // empty text → restore the stored value
+    } else {
+      setBadText(false);
+      setBoth(isoToDMY(iso)); // always show the canonical dd/mm/yyyy, even if unchanged
+      if (iso !== value) onChange(iso);
+    }
   };
   return (
     <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', ...style }}>
       <input
         type="text"
-        inputMode="numeric"
+        inputMode="text"
         placeholder="dd/mm/yyyy"
         value={text}
         disabled={disabled}
-        onChange={(e) => setBoth(e.target.value)}
+        title={badText ? "Couldn't read that date — try 3/1/2023 or 3 Jan 2023" : undefined}
+        onChange={(e) => { setBadText(false); setBoth(e.target.value); }}
         onFocus={(e) => e.target.select()}
         onBlur={(e) => commit(e.currentTarget.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') commit((e.target as HTMLInputElement).value); }}
-        style={{ width: '100%', paddingRight: 26 }}
+        style={{ width: '100%', paddingRight: 26, ...(badText ? { borderColor: '#c2372e', background: '#fdeceb' } : null) }}
       />
+      {badText && (
+        <span style={{ position: 'absolute', top: '100%', left: 0, fontSize: 11, color: '#c2372e', whiteSpace: 'nowrap', zIndex: 1 }}>
+          Couldn't read that — try 3/1/2023 or 3 Jan 2023
+        </span>
+      )}
       {!disabled && (
         <>
           <button

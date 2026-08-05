@@ -587,7 +587,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   // build string it shows is definitively what the server is running.
   app.get('/api/version', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.json({ build: '2026-08-05-5' });
+    res.json({ build: '2026-08-05-6' });
   });
 
   // ---- marks ---------------------------------------------------------------
