@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -62,15 +62,6 @@ export function dmyToIso(text: string): string | null {
   return validDate(d, mo, y);
 }
 
-/** Render a raw string with any non-printable / non-ASCII character shown as its
- * code point («N»), so an invisible stray character is visible in the hint. */
-function visibleRaw(s: string): string {
-  return [...(s || '')].map((ch) => {
-    const c = ch.charCodeAt(0);
-    return c < 32 || c > 126 ? `«${c}»` : ch;
-  }).join('');
-}
-
 /** Build an ISO date, returning null for out-of-range or non-existent dates (e.g. 31 Feb). */
 function validDate(d: number, mo: number, y: number): string | null {
   if (!Number.isFinite(d) || !Number.isFinite(mo) || !Number.isFinite(y)) return null;
@@ -82,86 +73,25 @@ function validDate(d: number, mo: number, y: number): string | null {
 }
 
 /**
- * A date field you can type into (dd/mm/yyyy) without fighting the browser date
- * picker, with a small calendar button as a fallback. Stores ISO yyyy-mm-dd.
+ * Date field backed by the browser's NATIVE date input — the same control as
+ * the calendar picker, which works reliably even when a browser extension
+ * (form-filler, password manager, Grammarly, …) interferes with ordinary text
+ * inputs. The browser itself handles typing and formatting; the value we store
+ * and emit is always ISO yyyy-mm-dd, and it displays in the user's locale
+ * (dd/mm/yyyy in Australia). This deliberately replaces the earlier custom
+ * text+parser field, which some users could not type into for exactly that
+ * extension-interference reason.
  */
 export function DateInput({ value, onChange, disabled, style }: { value: string; onChange: (iso: string) => void; disabled?: boolean; style?: React.CSSProperties }) {
-  const [text, setText] = useState(isoToDMY(value));
-  // Mirror the field text in a ref so `commit` always reads the very latest
-  // keystroke, even if it fires before React has re-rendered (clicking away
-  // right after the last digit used to commit a truncated, invalid date that
-  // then reverted to the old value).
-  const textRef = useRef(text);
-  const setBoth = (v: string) => { textRef.current = v; setText(v); };
-  // When the typed text can't be read as a date we KEEP it on screen and flag it,
-  // rather than silently wiping the field (which looked like the date "going
-  // blank" for no reason). Cleared as soon as the user edits again.
-  const [badText, setBadText] = useState(false);
-  const [badRaw, setBadRaw] = useState('');
-  const picker = useRef<HTMLInputElement>(null);
-  useEffect(() => { setBoth(isoToDMY(value)); setBadText(false); }, [value]);
-  // Commit from the raw value passed in (read straight off the input element),
-  // so it can never lag the last keystroke.
-  const commit = (raw: string) => {
-    const iso = dmyToIso(raw);
-    if (iso === null) {
-      // Unreadable: keep what they typed and show a hint instead of blanking.
-      // Also surface the exact characters (visibly and in the console) so an
-      // invisible/stray character sneaking in can be identified.
-      if ((raw || '').trim()) {
-        setBadText(true);
-        setBadRaw(raw);
-        try { console.warn('[DateInput] could not parse:', JSON.stringify(raw), 'char codes:', [...raw].map((c) => c.charCodeAt(0)).join(',')); } catch { /* noop */ }
-        return;
-      }
-      setBoth(isoToDMY(value)); // empty text → restore the stored value
-    } else {
-      setBadText(false);
-      setBoth(isoToDMY(iso)); // always show the canonical dd/mm/yyyy, even if unchanged
-      if (iso !== value) onChange(iso);
-    }
-  };
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', ...style }}>
-      <input
-        type="text"
-        inputMode="text"
-        placeholder="dd/mm/yyyy"
-        value={text}
-        disabled={disabled}
-        title={badText ? "Couldn't read that date — try 3/1/2023 or 3 Jan 2023" : undefined}
-        onChange={(e) => { setBadText(false); setBoth(e.target.value); }}
-        onFocus={(e) => e.target.select()}
-        onBlur={(e) => commit(e.currentTarget.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') commit((e.target as HTMLInputElement).value); }}
-        style={{ width: '100%', paddingRight: 26, ...(badText ? { borderColor: '#c2372e', background: '#fdeceb' } : null) }}
-      />
-      {badText && (
-        <span style={{ position: 'absolute', top: '100%', left: 0, fontSize: 11, color: '#c2372e', whiteSpace: 'nowrap', zIndex: 1 }}>
-          Couldn't read “{visibleRaw(badRaw)}” — try 3/1/2023 or 3 Jan 2023
-        </span>
-      )}
-      {!disabled && (
-        <>
-          <button
-            type="button"
-            title="Pick from calendar"
-            onClick={() => { try { picker.current?.showPicker?.(); } catch { /* browser without showPicker */ } }}
-            style={{ position: 'absolute', right: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
-          >
-            📅
-          </button>
-          <input
-            ref={picker}
-            type="date"
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            style={{ position: 'absolute', width: 1, height: 1, opacity: 0, right: 4, pointerEvents: 'none' }}
-            tabIndex={-1}
-          />
-        </>
-      )}
-    </span>
+    <input
+      type="date"
+      value={value || ''}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      className="date-native"
+      style={{ width: '100%', ...style }}
+    />
   );
 }
 
