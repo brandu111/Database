@@ -555,6 +555,25 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
       });
   }, [m.dates, m.jurisdiction, m.irId, m.status]);
 
+  // Put every date row into chronological order (blanks last). On demand only —
+  // rows are never auto-sorted on save, so nothing jumps while you're editing.
+  const sortDatesByDate = () => {
+    const sorted = [...m.dates].sort((a, b) => ((a.date || '9999-99-99') < (b.date || '9999-99-99') ? -1 : 1));
+    update({ dates: sorted }, true);
+  };
+  // Nudge a single row up or down one place in the visible list (swaps it with
+  // its neighbouring visible row in the underlying array).
+  const moveDate = (mIndex: number, dir: -1 | 1) => {
+    const order = visibleDates.map((v) => v.i);
+    const pos = order.indexOf(mIndex);
+    const swapPos = pos + dir;
+    if (pos < 0 || swapPos < 0 || swapPos >= order.length) return;
+    const next = m.dates.slice();
+    const b = order[swapPos];
+    [next[mIndex], next[b]] = [next[b], next[mIndex]];
+    update({ dates: next }, true);
+  };
+
   const emailForDate = (name: string, emailFor: string | undefined, date: string) => {
     if (!templateForDate(m, name, emailFor, templates, rules)) return null;
     return async () => {
@@ -826,10 +845,10 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
         </div>
 
         <div>
-          <Card label="Dates">
+          <Card label="Dates" right={canEdit ? <button className="btn secondary small" title="Put all dates into date order" onClick={sortDatesByDate}>↕ Sort by date</button> : undefined}>
             <table className="list nozebra">
               <thead>
-                <tr><th style={{ width: 30 }}>✓</th><th>Date name</th><th style={{ width: 140 }}>Date</th><th>Note</th><th style={{ width: 60 }}></th></tr>
+                <tr><th style={{ width: 30 }}>✓</th><th>Date name</th><th style={{ width: 140 }}>Date</th><th>Note</th><th style={{ width: 92 }}></th></tr>
               </thead>
               <tbody>
                 {visibleDates.map(({ d, i }) => {
@@ -855,6 +874,12 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                           onChange={(e) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)) })} />
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
+                        {canEdit && (
+                          <>
+                            <button className="btn danger-link" title="Move up" style={{ padding: '0 2px' }} onClick={() => moveDate(i, -1)}>▲</button>
+                            <button className="btn danger-link" title="Move down" style={{ padding: '0 2px' }} onClick={() => moveDate(i, 1)}>▼</button>
+                          </>
+                        )}
                         {sendEmail && <button className="btn danger-link email-btn" title="Send client email" onClick={sendEmail}><span className="email-ico">✉</span></button>}
                         {canEdit && <button className="btn danger-link" title="Remove this date" onClick={() => update({ dates: m.dates.filter((_, j) => j !== i), suppressedRules: Array.from(new Set([...(m.suppressedRules || []), d.name])) }, true)}>✕</button>}
                       </td>
