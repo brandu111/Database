@@ -44,8 +44,10 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
   const setBoth = (v: string) => { textRef.current = v; setText(v); };
   const picker = useRef<HTMLInputElement>(null);
   useEffect(() => { setBoth(isoToDMY(value)); }, [value]);
-  const commit = () => {
-    const iso = dmyToIso(textRef.current);
+  // Commit from the raw value passed in (read straight off the input element),
+  // so it can never lag the last keystroke.
+  const commit = (raw: string) => {
+    const iso = dmyToIso(raw);
     if (iso === null) setBoth(isoToDMY(value)); // unparseable → revert
     else if (iso !== value) onChange(iso);
   };
@@ -59,8 +61,8 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
         disabled={disabled}
         onChange={(e) => setBoth(e.target.value)}
         onFocus={(e) => e.target.select()}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        onBlur={(e) => commit(e.currentTarget.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit((e.target as HTMLInputElement).value); }}
         style={{ width: '100%', paddingRight: 26 }}
       />
       {!disabled && (
