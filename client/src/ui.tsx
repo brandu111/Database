@@ -16,13 +16,26 @@ export function isoToDMY(iso: string): string {
 export function dmyToIso(text: string): string | null {
   const t = (text || '').trim();
   if (!t) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  const m = /^(\d{1,2})[/\-. ](\d{1,2})[/\-. ](\d{2}|\d{4})$/.exec(t) || /^(\d{2})(\d{2})(\d{4}|\d{2})$/.exec(t);
-  if (!m) return null;
-  const d = parseInt(m[1], 10);
-  const mo = parseInt(m[2], 10);
-  let y = parseInt(m[3], 10);
-  if (m[3].length === 2) y += y >= 70 ? 1900 : 2000;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t; // already ISO
+  // Pull out the number groups, whatever separators were used (/, ., -, space,
+  // or none). This is deliberately liberal so day-to-day typing just works.
+  let d: number, mo: number, y: number, yLen: number;
+  const groups = t.match(/\d+/g);
+  if (groups && groups.length === 3) {
+    d = parseInt(groups[0], 10);
+    mo = parseInt(groups[1], 10);
+    y = parseInt(groups[2], 10);
+    yLen = groups[2].length;
+  } else if (/^\d{8}$/.test(t)) {
+    // ddmmyyyy
+    d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 4;
+  } else if (/^\d{6}$/.test(t)) {
+    // ddmmyy
+    d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 2;
+  } else {
+    return null;
+  }
+  if (yLen === 2) y += y >= 70 ? 1900 : 2000;
   if (d < 1 || d > 31 || mo < 1 || mo > 12) return null;
   const iso = `${y}-${pad(mo)}-${pad(d)}`;
   const check = new Date(`${iso}T00:00:00`);
@@ -48,8 +61,6 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
   // so it can never lag the last keystroke.
   const commit = (raw: string) => {
     const iso = dmyToIso(raw);
-    // TEMP DIAGNOSTIC: show exactly what the field captured on commit.
-    try { window.alert(`DATE DEBUG\nyou typed: [${raw}]\nparsed to: [${iso}]\ncurrent value: [${value}]\nwill save: ${iso !== null && iso !== value ? 'YES → ' + iso : 'NO (revert)'}`); } catch { /* ignore */ }
     if (iso === null) setBoth(isoToDMY(value)); // unparseable → revert
     else if (iso !== value) onChange(iso);
   };

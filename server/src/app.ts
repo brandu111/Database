@@ -2021,12 +2021,16 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
     app.use(
       express.static(opts.clientDist, {
         setHeaders: (res, filePath) => {
-          if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+          // Never cache the HTML shell — it must always fetch the current build's
+          // (hashed) asset filenames, or a deploy is invisible behind a stale page.
+          if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         },
       })
     );
     app.get(/^\/(?!api\/|files\/).*/, (_req, res) => {
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.sendFile(path.join(opts.clientDist!, 'index.html'));
     });
   }
