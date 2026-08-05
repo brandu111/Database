@@ -775,6 +775,11 @@ function DataImport() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [syncLog, setSyncLog] = useState<{ name: string; number: string; changes: string[] }[]>([]);
+  const [renBusy, setRenBusy] = useState(false);
+  const [renMsg, setRenMsg] = useState('');
+  const [renDiffs, setRenDiffs] = useState<{ id: string; name: string; number: string; stored: string; official: string }[]>([]);
+  const [renSel, setRenSel] = useState<Set<string>>(new Set());
+  const [renApplied, setRenApplied] = useState('');
   const [actionsBusy, setActionsBusy] = useState(false);
   const [actionsResult, setActionsResult] = useState<{ imported: number; skipped: number; unmatched: number; unmatchedList: { trademark: string; jurisdiction: string; dateName: string }[]; casesChanged: number } | null>(null);
 
@@ -1180,6 +1185,75 @@ function DataImport() {
               <tbody>
                 {syncLog.slice(0, 200).map((c, i) => (
                   <tr key={i}><td>{c.name}</td><td className="mono">{c.number}</td><td>{c.changes.join('; ')}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+
+        <Card label="Update AU renewal dates from IP Australia (official)">
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Reads the <strong>official renewal date</strong> straight from the IP Australia register for every <strong>registered Australian</strong> case and shows where it differs from what's stored. <strong>Nothing changes until you review the list and click apply</strong> — and the only value ever written is the register's own (no dates are computed here). Runs in batches; leave the page open until the scan finishes.
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn secondary small" disabled={renBusy} onClick={async () => {
+              setRenBusy(true); setRenMsg(''); setRenDiffs([]); setRenSel(new Set()); setRenApplied('');
+              try {
+                let offset = 0, total = 0;
+                const diffs: { id: string; name: string; number: string; stored: string; official: string }[] = [];
+                const errs: { name: string; error: string }[] = [];
+                do {
+                  const r = await api.syncAuRenewals(offset);
+                  offset = r.offset; total = r.total;
+                  diffs.push(...r.diffs); errs.push(...r.errors);
+                  setRenMsg(`Scanning the register… ${Math.min(offset, total)} of ${total} registered AU cases checked · ${diffs.length} differ${errs.length ? ` · ${errs.length} couldn't be looked up` : ''}.`);
+                  setRenDiffs([...diffs]); setRenSel(new Set(diffs.map((d) => d.id)));
+                } while (offset < total);
+                setRenMsg(`Scan complete — ${total} registered AU cases checked, ${diffs.length} differ from the register${errs.length ? `, ${errs.length} could not be looked up` : ''}. Review below, untick any you want to skip, then apply.`);
+              } catch (e) {
+                setRenMsg(e instanceof Error ? e.message : 'Scan failed.');
+              } finally {
+                setRenBusy(false);
+              }
+            }}>{renBusy ? 'Scanning…' : 'Scan register for renewal differences'}</button>
+            {renDiffs.length > 0 && !renBusy && (
+              <button className="btn small" disabled={!renSel.size} onClick={async () => {
+                const updates = renDiffs.filter((d) => renSel.has(d.id)).map((d) => ({ id: d.id, date: d.official }));
+                if (!updates.length) return;
+                if (!window.confirm(`Update ${updates.length} renewal date${updates.length === 1 ? '' : 's'} to the official IP Australia value? A backup is recommended first.`)) return;
+                setRenBusy(true);
+                try {
+                  const r = await api.applyAuRenewals(updates);
+                  setRenApplied(`Applied ${r.applied} renewal update${r.applied === 1 ? '' : 's'} from the register.`);
+                  setRenDiffs((cur) => cur.filter((d) => !renSel.has(d.id)));
+                  setRenSel(new Set());
+                } catch (e) {
+                  setRenApplied(e instanceof Error ? e.message : 'Apply failed.');
+                } finally {
+                  setRenBusy(false);
+                }
+              }}>Apply {renSel.size} update{renSel.size === 1 ? '' : 's'}</button>
+            )}
+          </div>
+          {renMsg && <div className="hint" style={{ marginTop: 8 }}>{renMsg}</div>}
+          {renApplied && <div className="hint" style={{ marginTop: 4, color: 'var(--good, #1d7a3f)' }}>{renApplied}</div>}
+          {renDiffs.length > 0 && (
+            <table className="list nozebra" style={{ marginTop: 8 }}>
+              <thead><tr>
+                <th style={{ width: 30 }}>
+                  <input type="checkbox" checked={renSel.size === renDiffs.length && renDiffs.length > 0} onChange={(e) => setRenSel(e.target.checked ? new Set(renDiffs.map((d) => d.id)) : new Set())} />
+                </th>
+                <th>Case</th><th>Number</th><th>Stored</th><th>IP Australia says</th>
+              </tr></thead>
+              <tbody>
+                {renDiffs.slice(0, 400).map((d) => (
+                  <tr key={d.id}>
+                    <td><input type="checkbox" checked={renSel.has(d.id)} onChange={(e) => setRenSel((cur) => { const n = new Set(cur); if (e.target.checked) n.add(d.id); else n.delete(d.id); return n; })} /></td>
+                    <td>{d.name}</td>
+                    <td className="mono">{d.number}</td>
+                    <td style={{ color: 'var(--danger, #c2372e)' }}>{d.stored ? fmtDate(d.stored) : '—'}</td>
+                    <td style={{ color: 'var(--good, #1d7a3f)', fontWeight: 600 }}>{fmtDate(d.official)}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>

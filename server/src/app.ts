@@ -587,7 +587,7 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
   // build string it shows is definitively what the server is running.
   app.get('/api/version', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.json({ build: '2026-08-05-6' });
+    res.json({ build: '2026-08-05-7' });
   });
 
   // ---- marks ---------------------------------------------------------------
@@ -841,6 +841,72 @@ export function createApp(db: DB, opts: { uploadsDir?: string; clientDist?: stri
       }
     }
     res.json({ processed: batch.length, changed: changesLog.length, changesLog, errors, offset: offset + batch.length, total: candidates.length });
+  });
+
+  // Official AU renewal sync — PREVIEW ONLY. For every registered AU case it
+  // fetches the live record and reads IP Australia's own renewalDueDate: the
+  // authoritative next renewal, already reflecting any renewals paid. Returns
+  // (per batch, offset/limit so it never times out) the cases where the
+  // register's renewal date differs from what's stored. Nothing is computed —
+  // the "official" value is exactly what the register returns — and nothing is
+  // written. The client loops the batches and shows the full list for approval.
+  app.post('/api/marks/sync-au-renewals', full, async (req, res) => {
+    if (!ipAuConfigured()) return res.status(400).json({ error: 'IP Australia lookup is not configured on this server.' });
+    const offset = Math.max(0, Math.trunc(Number((req.body || {}).offset)) || 0);
+    const limit = Math.min(15, Math.max(1, Math.trunc(Number((req.body || {}).limit)) || 8));
+    const candidates = listMarks(db)
+      .filter((m) => ['Australia', 'Australia TTMF'].includes(m.jurisdiction) && /register/i.test(m.status))
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    const batch = candidates.slice(offset, offset + limit);
+    const diffs: { id: string; name: string; number: string; stored: string; official: string }[] = [];
+    const errors: { name: string; error: string }[] = [];
+    for (const m0 of batch) {
+      const number = (m0.registration || m0.application || '').trim();
+      if (!number) continue;
+      try {
+        const fetched = await lookupTradeMark(number);
+        const official = (fetched.dates || []).find((d) => d.name === 'Renewal Deadline' && d.date)?.date || '';
+        if (!official) continue; // register carries no renewal date for this case
+        const stored = (m0.dates || []).find((d) => d.name === 'Renewal Deadline' && d.date)?.date || '';
+        if (official !== stored) diffs.push({ id: m0.id, name: m0.name || number, number, stored, official });
+      } catch (e) {
+        errors.push({ name: m0.name || number, error: (e as Error).message });
+      }
+    }
+    res.json({ processed: batch.length, diffs, errors, offset: offset + batch.length, total: candidates.length });
+  });
+
+  // Apply approved AU renewal updates. Sets each case's Renewal Deadline to the
+  // official value from the preview, pins it (so the engine keeps it verbatim),
+  // reopens it as the active renewal, refreshes its reminders off the firm's
+  // rulebook, and saves. The only value written is the register's own.
+  app.post('/api/marks/apply-au-renewals', full, (req, res) => {
+    const updates: { id?: string; date?: string }[] = Array.isArray(req.body?.updates) ? req.body.updates : [];
+    if (!updates.length) return res.status(400).json({ error: 'No updates to apply.' });
+    const rules = loadRules(db);
+    const cuMonths = getFirmSettings(db).caseUpdateMonths;
+    const toSave: Mark[] = [];
+    const changed: { id: string; name: string; before: string; after: string }[] = [];
+    for (const u of updates) {
+      const id = String(u?.id || '');
+      const date = String(u?.date || '');
+      if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      const m = getMark(db, id);
+      if (!m) continue;
+      m.dates = m.dates || [];
+      const row = m.dates.find((d) => d.name === 'Renewal Deadline');
+      const before = row?.date || '';
+      if (before === date) continue;
+      if (row) { row.date = date; row.pinned = true; row.done = false; }
+      else m.dates.push({ name: 'Renewal Deadline', date, done: false, pinned: true });
+      ensureRuleRows(m, rules, undefined, cuMonths);
+      ensureAdminContact(m);
+      toSave.push(m);
+      changed.push({ id, name: m.name || id, before: before || '(none)', after: date });
+    }
+    const tx = db.transaction(() => { for (const m of toSave) saveMark(db, m); });
+    tx();
+    res.json({ applied: changed.length, changed });
   });
 
   // Tidy registered cases: on any case that has a Registration Date, tick off

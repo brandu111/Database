@@ -227,6 +227,12 @@ export function mapApiTrademark(tm: ApiTrademark): Partial<Mark> {
   addDate('OA Issued', isoDate(tm.firstReportDate));
   addDate('Publication Date', isoDate(tm.acceptanceAdvertisedDate) || isoDate(tm.registrationAdvertisedDate));
   addDate('Registration Date', isoDate(tm.enteredOnRegisterDate) || isoDate(tm.registeredFromDate));
+  // Official renewal due date straight from the register: the authoritative next
+  // renewal, already reflecting any renewals paid. Kept as the active (not done)
+  // Renewal Deadline and pinned so the engine never recomputes it away. Used by
+  // the AU renewal sync and to seed new AU cases.
+  const renewalIso = isoDate(tm.renewalDueDate);
+  if (renewalIso) dates.push({ name: 'Renewal Deadline', date: renewalIso, done: false, pinned: true });
 
   const image = imageUrlOf(tm) || null;
   const number = clean(tm.number);
