@@ -28,39 +28,47 @@ const MONTHS: Record<string, number> = {
  * blanking the field).
  */
 export function dmyToIso(text: string): string | null {
-  const t = (text || '').trim();
+  // Strip zero-width, bidi and other invisible/control characters first — some
+  // keyboards, extensions and paste sources sneak these in and they must never
+  // stop a perfectly good date from parsing.
+  const t = (text || '').replace(/[\u0000-\u001F\u00A0\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, '').trim();
   if (!t) return '';
   if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(t)) {
     const [yy, mm, dd] = t.split('-').map(Number);
     return validDate(dd, mm, yy);
   }
   let d: number, mo: number, y: number, yLen: number;
+  const nums = t.match(/\d+/g) || [];
   const nameMatch = t.match(/[A-Za-z]+/);
-  if (nameMatch) {
+  const monthName = nameMatch ? MONTHS[nameMatch[0].toLowerCase()] : undefined;
+  if (monthName && nums.length === 2) {
     // A month written as a word, e.g. "3 Jan 2023" or "Jan 3, 2023".
-    const mo0 = MONTHS[nameMatch[0].toLowerCase()];
-    if (!mo0) return null;
-    const nums = t.match(/\d+/g);
-    if (!nums || nums.length !== 2) return null; // need exactly a day and a year
-    // Whichever number is 4 digits (or clearly > 31) is the year; the other is the day.
     const [a, b] = nums;
     if (a.length === 4 || +a > 31) { y = +a; yLen = a.length; d = +b; }
     else { d = +a; y = +b; yLen = b.length; }
-    mo = mo0;
+    mo = monthName;
+  } else if (nums.length === 3) {
+    // Numeric d/m/y. A stray letter that isn't a month name is ignored — we go
+    // by the three number groups, whatever punctuation or junk sits between them.
+    d = +nums[0]; mo = +nums[1]; y = +nums[2]; yLen = nums[2].length;
+  } else if (/^\d{8}$/.test(t)) {
+    d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 4;
+  } else if (/^\d{6}$/.test(t)) {
+    d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 2;
   } else {
-    const groups = t.match(/\d+/g);
-    if (groups && groups.length === 3) {
-      d = +groups[0]; mo = +groups[1]; y = +groups[2]; yLen = groups[2].length;
-    } else if (/^\d{8}$/.test(t)) {
-      d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 4;
-    } else if (/^\d{6}$/.test(t)) {
-      d = +t.slice(0, 2); mo = +t.slice(2, 4); y = +t.slice(4); yLen = 2;
-    } else {
-      return null;
-    }
+    return null;
   }
   if (yLen === 2) y += y >= 70 ? 1900 : 2000;
   return validDate(d, mo, y);
+}
+
+/** Render a raw string with any non-printable / non-ASCII character shown as its
+ * code point («N»), so an invisible stray character is visible in the hint. */
+function visibleRaw(s: string): string {
+  return [...(s || '')].map((ch) => {
+    const c = ch.charCodeAt(0);
+    return c < 32 || c > 126 ? `«${c}»` : ch;
+  }).join('');
 }
 
 /** Build an ISO date, returning null for out-of-range or non-existent dates (e.g. 31 Feb). */
@@ -89,6 +97,7 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
   // rather than silently wiping the field (which looked like the date "going
   // blank" for no reason). Cleared as soon as the user edits again.
   const [badText, setBadText] = useState(false);
+  const [badRaw, setBadRaw] = useState('');
   const picker = useRef<HTMLInputElement>(null);
   useEffect(() => { setBoth(isoToDMY(value)); setBadText(false); }, [value]);
   // Commit from the raw value passed in (read straight off the input element),
@@ -97,7 +106,14 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
     const iso = dmyToIso(raw);
     if (iso === null) {
       // Unreadable: keep what they typed and show a hint instead of blanking.
-      if ((raw || '').trim()) { setBadText(true); return; }
+      // Also surface the exact characters (visibly and in the console) so an
+      // invisible/stray character sneaking in can be identified.
+      if ((raw || '').trim()) {
+        setBadText(true);
+        setBadRaw(raw);
+        try { console.warn('[DateInput] could not parse:', JSON.stringify(raw), 'char codes:', [...raw].map((c) => c.charCodeAt(0)).join(',')); } catch { /* noop */ }
+        return;
+      }
       setBoth(isoToDMY(value)); // empty text → restore the stored value
     } else {
       setBadText(false);
@@ -122,7 +138,7 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
       />
       {badText && (
         <span style={{ position: 'absolute', top: '100%', left: 0, fontSize: 11, color: '#c2372e', whiteSpace: 'nowrap', zIndex: 1 }}>
-          Couldn't read that — try 3/1/2023 or 3 Jan 2023
+          Couldn't read “{visibleRaw(badRaw)}” — try 3/1/2023 or 3 Jan 2023
         </span>
       )}
       {!disabled && (
