@@ -11,6 +11,10 @@ import { Reports } from './views/Reports';
 import { Preferences } from './views/Preferences';
 import { Portal } from './views/Portal';
 
+// Bumped on each deploy so it's easy to confirm the browser is running the
+// newest build (shown small under the sign-out button).
+const BUILD = 'build 2026-08-05-1';
+
 export type View = 'dashboard' | 'trademarks' | 'designs' | 'oppositions' | 'contacts' | 'alerts' | 'reports' | 'preferences';
 
 export interface Nav {
@@ -71,6 +75,7 @@ export function App() {
           <button className="btn secondary small" onClick={() => api.logout().then(() => setMe(null))}>
             Sign out
           </button>
+          <span style={{ fontSize: 10, opacity: 0.6, marginTop: 6 }}>{BUILD}</span>
         </div>
       </nav>
       <div className="content">

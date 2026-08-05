@@ -869,8 +869,10 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 <datalist id="date-names">{jurNames.map((n) => <option key={n} value={n} />)}</datalist>
                 <DateInput value={addDateDate} onChange={(iso) => { setAddDateDate(iso); addDateRef.current = iso; }} style={{ width: 150 }} />
                 <button className="btn small" disabled={!addDateName} onClick={() => {
+                  // No silent default to today — if no date was entered the row is
+                  // blank, so it never looks like the date "became today".
                   update({
-                    dates: [...m.dates, { name: addDateName, date: addDateRef.current || addDateDate || todayISO(), done: false, createdBy: myName, notify: true }],
+                    dates: [...m.dates, { name: addDateName, date: addDateRef.current || addDateDate || '', done: false, createdBy: myName, notify: true }],
                     suppressedRules: (m.suppressedRules || []).filter((n) => n !== addDateName),
                   }, true);
                   setAddDateName('');
