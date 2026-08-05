@@ -48,6 +48,8 @@ export function DateInput({ value, onChange, disabled, style }: { value: string;
   // so it can never lag the last keystroke.
   const commit = (raw: string) => {
     const iso = dmyToIso(raw);
+    // TEMP DIAGNOSTIC: show exactly what the field captured on commit.
+    try { window.alert(`DATE DEBUG\nyou typed: [${raw}]\nparsed to: [${iso}]\ncurrent value: [${value}]\nwill save: ${iso !== null && iso !== value ? 'YES → ' + iso : 'NO (revert)'}`); } catch { /* ignore */ }
     if (iso === null) setBoth(isoToDMY(value)); // unparseable → revert
     else if (iso !== value) onChange(iso);
   };
