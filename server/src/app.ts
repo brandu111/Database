@@ -129,7 +129,13 @@ function processMarkWrite(db: DB, incoming: Mark, previous: Mark | null): Mark {
   if (previous && previous.status !== m.status) applyStage(m, rules, m.status);
   ensureRuleRows(m, rules, all, getFirmSettings(db).caseUpdateMonths);
   ensureAdminContact(m);
-  m.dates.sort((a, b) => ((a.date || '9999') < (b.date || '9999') ? -1 : 1));
+  // Do NOT re-sort the date rows on every save. Cases are stored in chronological
+  // order at import time; re-sorting here on each write made a row jump to a new
+  // position the instant its date changed, so a just-typed date appeared to
+  // "revert" — the value was saved correctly but a different row slid into the
+  // screen position the user was looking at. Preserving the incoming order keeps
+  // the edited row exactly where it is. (Alerts/dashboard/digest sort dates
+  // themselves, so display order here is purely cosmetic for the case panel.)
   // Keep the International Registration number in sync across the Madrid family:
   // it is entered once on the IR case and copied down to every designation
   // (initial and subsequent). Designations are saved below via `touched`.
