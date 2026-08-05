@@ -13,7 +13,7 @@ import { Portal } from './views/Portal';
 
 // Bumped on each deploy so it's easy to confirm the browser is running the
 // newest build (shown small under the sign-out button).
-const BUILD = 'build 2026-08-05-3';
+const BUILD = 'build 2026-08-05-4';
 
 export type View = 'dashboard' | 'trademarks' | 'designs' | 'oppositions' | 'contacts' | 'alerts' | 'reports' | 'preferences';
 

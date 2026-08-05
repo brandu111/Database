@@ -848,7 +848,7 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                       </td>
                       <td>
                         <DateInput value={d.date || ''} disabled={ro || !!d.linkedToIR}
-                          onChange={(iso) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, date: iso } : x)) }, true)} />
+                          onChange={(iso) => update({ dates: m.dates.map((x, j) => (j === i ? { ...x, date: iso, pinned: iso ? true : x.pinned } : x)) }, true)} />
                       </td>
                       <td>
                         <input type="text" value={d.note || ''} placeholder="" disabled={ro}
@@ -871,8 +871,12 @@ function MarkDetail({ initial, allMarks, companies, templates, rules, firm, mySi
                 <button className="btn small" disabled={!addDateName} onClick={() => {
                   // No silent default to today — if no date was entered the row is
                   // blank, so it never looks like the date "became today".
+                  const addedDate = addDateRef.current || addDateDate || '';
                   update({
-                    dates: [...m.dates, { name: addDateName, date: addDateRef.current || addDateDate || '', done: false, createdBy: myName, notify: true }],
+                    // Pin a hand-entered date so the engine treats it as authoritative
+                    // and never recomputes it away; a blank add stays unpinned so it
+                    // can auto-fill from its rule base if one applies.
+                    dates: [...m.dates, { name: addDateName, date: addedDate, done: false, createdBy: myName, notify: true, pinned: !!addedDate }],
                     suppressedRules: (m.suppressedRules || []).filter((n) => n !== addDateName),
                   }, true);
                   setAddDateName('');
